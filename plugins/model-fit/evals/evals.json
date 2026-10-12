@@ -1,0 +1,2808 @@
+{
+  "skill_name": "model-fit-classifier",
+  "evals": [
+    {
+      "id": 1,
+      "name": "chat-greeting",
+      "prompt": "hey, you there?",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Greeting; no work product asked.",
+      "expected_output": "chat / enough / haiku — because greeting; no work product asked.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "chat-status-question",
+      "prompt": "did that migration from earlier finish or is it still running?",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Status question about prior work; nothing to produce.",
+      "expected_output": "chat / enough / haiku — because status question about prior work; nothing to produce.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "chat-opinion-orm",
+      "prompt": "do you think SQLAlchemy 2.0 style is nicer than the old Query API? just curious what you'd go with",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Opinion question; no work product.",
+      "expected_output": "chat / enough / haiku — because opinion question; no work product.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "chat-near-miss-mutex-vs-semaphore",
+      "prompt": "whats the difference between a mutex and a semaphore? couple of sentences is fine",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Mentions concurrency but is a general-knowledge question answerable in a few sentences.",
+      "expected_output": "chat / enough / haiku — because mentions concurrency but is a general-knowledge question answerable in a few sentences.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "chat-thanks-ukrainian",
+      "prompt": "дякую, це працює! гарного дня",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Thanks/farewell in Ukrainian; no work asked.",
+      "expected_output": "chat / enough / haiku — because thanks/farewell in Ukrainian; no work asked.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "chat-german-idempotent-explainer",
+      "prompt": "Was bedeutet eigentlich 'idempotent' bei einem PUT-Request? Kurz erklärt bitte.",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Short general-knowledge explanation in German; no work product.",
+      "expected_output": "chat / enough / haiku — because short general-knowledge explanation in German; no work product.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "chat-near-miss-thinking-out-loud-flaky",
+      "prompt": "thinking out loud about the flaky checkout test: in general, is it better to quarantine a flaky test or delete it? don't touch anything, I just want your take",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Looks like a flaky-test task but explicitly asks for an opinion only.",
+      "expected_output": "chat / enough / haiku — because looks like a flaky-test task but explicitly asks for an opinion only.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "chat-near-miss-jwt-localstorage",
+      "prompt": "is it ok to keep a jwt in localStorage or is that a no-go?",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Security keyword but a general-knowledge question answerable in a few sentences; no review requested.",
+      "expected_output": "chat / enough / haiku — because security keyword but a general-knowledge question answerable in a few sentences; no review requested.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "chat-status-refactor",
+      "prompt": "how's the refactor looking so far, are we on track?",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Status question; no work product.",
+      "expected_output": "chat / enough / haiku — because status question; no work product.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "chat-rust-borrow-checker",
+      "prompt": "why does Rust make me clone here? i keep fighting the borrow checker, is that normal or am i holding it wrong",
+      "expected": {
+        "kind": "chat",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Conceptual question answerable in a few sentences; no file or task referenced.",
+      "expected_output": "chat / enough / haiku — because conceptual question answerable in a few sentences; no file or task referenced.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is chat"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "haiku-grep-legacy-auth-usages",
+      "prompt": "find every place we call `legacyAuth.verify(` in src/ and list them as file:line. dont change anything",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Auth word is a trap; the task is a plain search/list.",
+      "expected_output": "task / enough / haiku — because auth word is a trap; the task is a plain search/list.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "haiku-bulk-rename-400-files",
+      "prompt": "rename all the files in assets/img (about 400 of them) from IMG_0001.jpg style to photo-0001.jpg, same numbers, just a mv loop. extension stays",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Large but mechanical rename with no decisions.",
+      "expected_output": "task / enough / haiku — because large but mechanical rename with no decisions.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "haiku-bump-version-two-files",
+      "prompt": "bump the version to 2.4.1 in package.json and pyproject.toml. nothing else",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Version bump, exact edit.",
+      "expected_output": "task / enough / haiku — because version bump, exact edit.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "haiku-run-billing-tests-report",
+      "prompt": "run `pytest tests/billing -q` and tell me how many passed and failed",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Payments word is a trap; run a named command and report.",
+      "expected_output": "task / enough / haiku — because payments word is a trap; run a named command and report.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "haiku-convert-csv-to-json",
+      "prompt": "convert data/users.csv to JSON (array of objects, header row as keys) and save it as data/users.json",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Pure format conversion.",
+      "expected_output": "task / enough / haiku — because pure format conversion.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "haiku-translate-button-labels-de",
+      "prompt": "translate these button labels to German: Save, Cancel, Delete account, Remember me, Forgot password?",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Short translation, fully specified.",
+      "expected_output": "task / enough / haiku — because short translation, fully specified.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "haiku-list-migrations-touching-payments",
+      "prompt": "list all the .sql files in db/migrations that mention the payments table",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Database keyword is a trap; this is a search and list.",
+      "expected_output": "task / enough / haiku — because database keyword is a trap; this is a search and list.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "haiku-count-todos-go",
+      "prompt": "how many TODO comments are in the Go code under internal/? just give me the number",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Count; phrased as a question but needs a lookup.",
+      "expected_output": "task / enough / haiku — because count; phrased as a question but needs a lookup.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "haiku-yaml-exact-edit-replicas",
+      "prompt": "in deploy/prod/values.yaml change `replicas: 3` to `replicas: 5` under the api section. nothing else",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Exact spelled-out edit.",
+      "expected_output": "task / enough / haiku — because exact spelled-out edit.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "haiku-reformat-fixture-json",
+      "prompt": "reformat everything in fixtures/*.json with 2 space indent and sorted keys",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Reformat only; behaviour unchanged.",
+      "expected_output": "task / enough / haiku — because reformat only; behaviour unchanged.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "haiku-boilerplate-from-template",
+      "prompt": "create src/components/UserCard.tsx from templates/component.tsx.tmpl, replace NAME with UserCard and thats all",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Boilerplate from a given template.",
+      "expected_output": "task / enough / haiku — because boilerplate from a given template.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "haiku-summarise-pasted-release-notes",
+      "prompt": "summarise this in 3 bullets:\n\nv3.2 adds an offline mode for the mobile app, so drafts are cached locally and synced when the connection comes back. The export dialog now supports CSV and XLSX in addition to PDF. We fixed a crash when opening very large workspaces (over 10k items) and sped up search by roughly 40 percent. The legacy v1 API is deprecated and will be removed in v4.0.",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Summarise a text that is given in the message.",
+      "expected_output": "task / enough / haiku — because summarise a text that is given in the message.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "haiku-ukrainian-rename-variable",
+      "prompt": "перейменуй змінну `usr` на `user` у файлі app/handlers.py, більше нічого не міняй",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Mechanical rename in one file.",
+      "expected_output": "task / enough / haiku — because mechanical rename in one file.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "haiku-question-which-postgres-version",
+      "prompt": "can you tell me which postgres version we pin in docker-compose.yml?",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Phrased like a question but it is a one-file lookup.",
+      "expected_output": "task / enough / haiku — because phrased like a question but it is a one-file lookup.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "haiku-exact-sql-into-migration-file",
+      "prompt": "put exactly this into db/migrations/0042_orders_created_idx.sql, no changes:\n\nCREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_created_at ON orders (created_at);",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Database keyword is a trap; the content is spelled out verbatim.",
+      "expected_output": "task / enough / haiku — because database keyword is a trap; the content is spelled out verbatim.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "haiku-copy-env-example-set-secret",
+      "prompt": "copy .env.example to .env.local and set JWT_SECRET to dev-secret-change-me, leave the other values as they are",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Auth/secret keyword is a trap; a spelled-out copy and one value edit for local dev.",
+      "expected_output": "task / enough / haiku — because auth/secret keyword is a trap; a spelled-out copy and one value edit for local dev.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "haiku-cargo-fmt-clippy-report",
+      "prompt": "run cargo fmt --check and cargo clippy and give me the list of warnings. dont fix them",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Run named commands and report.",
+      "expected_output": "task / enough / haiku — because run named commands and report.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "haiku-german-list-large-files",
+      "prompt": "Liste alle Dateien in src/ auf, die mehr als 500 Zeilen haben, mit Zeilenanzahl",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Mechanical listing/counting, in German.",
+      "expected_output": "task / enough / haiku — because mechanical listing/counting, in German.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "haiku-bulk-import-path-replace",
+      "prompt": "change the import path '@/lib/api' to '@/services/api' in all the tsx files under src/ (should be ~230 files). exact string replace",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Large but mechanical exact replacement.",
+      "expected_output": "task / enough / haiku — because large but mechanical exact replacement.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "haiku-git-log-last-change-ledger",
+      "prompt": "who last changed internal/ledger/ and when? just the commit hash, author and date",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Lookup; no decisions.",
+      "expected_output": "task / enough / haiku — because lookup; no decisions.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "name": "sonnet-add-nullable-column-alembic",
+      "prompt": "add a nullable `archived_at` timestamp column to the projects table (we use alembic), and expose it in the ProjectOut pydantic schema + the list endpoint filter ?archived=true|false",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "DB touched but the work is an ordinary column and a filter; no integrity problem.",
+      "expected_output": "task / enough / sonnet — because dB touched but the work is an ordinary column and a filter; no integrity problem.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "name": "sonnet-login-page-existing-nextauth",
+      "prompt": "add a login page to the admin dashboard using our existing NextAuth setup (credentials provider is already configured in auth.ts). email+password form, show the error from the query string, redirect to /admin on success",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Auth word but the auth design exists; it is a UI task.",
+      "expected_output": "task / enough / sonnet — because auth word but the auth design exists; it is a UI task.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "name": "sonnet-go-endpoint-invoice-pdf",
+      "prompt": "add a GET /v1/invoices/{id}/pdf endpoint to the go service. reuse the renderer in internal/pdf, 404 if the invoice doesnt exist, and add a handler test",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Plain endpoint in a known stack.",
+      "expected_output": "task / enough / sonnet — because plain endpoint in a known stack.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "name": "sonnet-big-feature-notification-center",
+      "prompt": "We need an in-app notification center for the web app (React + TypeScript, Express backend, Postgres).\n\nFrontend: bell icon in the header with an unread badge, a dropdown list of the latest 20 notifications with relative timestamps, \"mark as read\" per item and \"mark all as read\", and a full page /notifications with infinite scroll.\n\nBackend: notifications table, REST endpoints to list/mark read, and push new ones to connected clients through our existing socket.io gateway (src/realtime/gateway.ts) so the badge updates live. Add a small preferences page where users can mute categories (comments, mentions, billing).\n\nPlease add tests for the reducers and the endpoints, and update docs/architecture.md with a short section on how it works.",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Big but ordinary feature; no hard concurrency or security core.",
+      "expected_output": "task / enough / sonnet — because big but ordinary feature; no hard concurrency or security core.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "name": "sonnet-critical-labelled-null-avatar",
+      "prompt": "CRITICAL!! settings page crashes for users without an avatar (TypeError reading 'url' of null in ProfileForm.tsx). fix asap",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Called critical but it is a bug whose cause is stated and findable by reading.",
+      "expected_output": "task / enough / sonnet — because called critical but it is a bug whose cause is stated and findable by reading.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "name": "sonnet-hard-labelled-pagination",
+      "prompt": "this one is really hard, I've been stuck for hours: add pagination (page + page_size, default 25) to GET /orders in our fastapi app, with total count in the response",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Called hard, but it is a standard endpoint change.",
+      "expected_output": "task / enough / sonnet — because called hard, but it is a standard endpoint change.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "name": "sonnet-code-review-not-security",
+      "prompt": "review my diff on branch feat/csv-export. naming, readability, test coverage, anything that looks off. its a normal review not a security one",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Non-security code review.",
+      "expected_output": "task / enough / sonnet — because non-security code review.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "name": "sonnet-write-readme-cli",
+      "prompt": "write a README for the cli in tools/dbseed: what it does, install, all flags, 3 usage examples. read the code to get the flags right",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Docs writing.",
+      "expected_output": "task / enough / sonnet — because docs writing.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "name": "sonnet-sql-mau-per-country",
+      "prompt": "write a postgres query for monthly active users per country over the last 12 months from events(user_id, country, occurred_at), plus month-over-month growth using a window function",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Analytical SQL query.",
+      "expected_output": "task / enough / sonnet — because analytical SQL query.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "name": "sonnet-bugfix-date-picker-timezone",
+      "prompt": "the date picker shows the wrong day for users west of UTC because we do new Date('YYYY-MM-DD') in components/DatePicker.tsx (parses as UTC midnight). fix it and add a test",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Bug with stated cause.",
+      "expected_output": "task / enough / sonnet — because bug with stated cause.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "sonnet-refactor-report-builder",
+      "prompt": "services/report_builder.py is a 900 line god class. split it into a few focused modules, keep behaviour identical, the existing tests have to still pass",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Refactor with existing tests as a safety net.",
+      "expected_output": "task / enough / sonnet — because refactor with existing tests as a safety net.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "sonnet-rust-tests-parse-duration",
+      "prompt": "add unit tests for parse_duration in src/time.rs: empty input, overflow, mixed units like 1h30m, invalid units, whitespace",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Tests for a known function.",
+      "expected_output": "task / enough / sonnet — because tests for a known function.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "sonnet-swiftui-settings-screen",
+      "prompt": "SwiftUI: build a settings screen with toggles for notifications and dark mode, and a stepper for font size (12-24). persist with @AppStorage and apply font size app wide through the environment",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "UI feature.",
+      "expected_output": "task / enough / sonnet — because uI feature.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "sonnet-python-script-s3-top-ips",
+      "prompt": "write a python script (boto3) that walks s3://acme-logs/2026/, downloads the .gz access logs, and prints the top 10 client IPs by request count. nginx combined log format",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Scripting task.",
+      "expected_output": "task / enough / sonnet — because scripting task.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "name": "sonnet-index-and-keyset-pagination",
+      "prompt": "add an index on orders(customer_id, created_at) and switch list_orders in repo/orders.go from OFFSET pagination to keyset pagination on (created_at, id)",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "DB touched but the work is an index and a query change.",
+      "expected_output": "task / enough / sonnet — because dB touched but the work is an index and a query change.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "name": "sonnet-receipt-download-button",
+      "prompt": "add a 'download receipt' button on the order details page that calls our existing GET /orders/:id/receipt (returns a pdf) and saves the file. show a spinner and an error toast",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Payments page but the task is a UI button on an existing API.",
+      "expected_output": "task / enough / sonnet — because payments page but the task is a UI button on an existing API.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "name": "sonnet-ukrainian-telegram-stats-command",
+      "prompt": "додай в нашого Telegram-бота команду /stats, яка показує кількість нових користувачів за останні 7 днів із Postgres. стек: python-telegram-bot, asyncpg, конфіг вже є в bot/config.py",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Small feature, known stack, in Ukrainian.",
+      "expected_output": "task / enough / sonnet — because small feature, known stack, in Ukrainian.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "name": "sonnet-german-css-overlap-bug",
+      "prompt": "Der Login-Button in der Mobile-Ansicht überlappt mit dem Logo bei Breite unter 360px. Bitte fixen, das CSS liegt in styles/header.scss",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "UI bug fix, German.",
+      "expected_output": "task / enough / sonnet — because uI bug fix, German.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "name": "sonnet-analyse-weekly-signups",
+      "prompt": "our weekly signups: wk1 120, wk2 135, wk3 128, wk4 190, wk5 140, wk6 152. whats the trend, is wk4 an outlier? write one paragraph i can drop into the board update",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": [
+          "haiku",
+          "sonnet"
+        ]
+      },
+      "tier_uncertain": false,
+      "why": "Analysis of given data and writing. Six numbers and one paragraph: haiku is enough, sonnet is acceptable.",
+      "expected_output": "task / enough / sonnet — because analysis of given data and writing.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku or sonnet"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "name": "sonnet-terraform-s3-versioning-lifecycle",
+      "prompt": "in infra/terraform/storage.tf add an S3 bucket for exports with versioning on, and a lifecycle rule expiring noncurrent versions after 30 days. follow the style of the existing modules there",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Infra change following existing patterns.",
+      "expected_output": "task / enough / sonnet — because infra change following existing patterns.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "name": "sonnet-plan-sse-migration-one-service",
+      "prompt": "plan how we'd move the notification service from client polling to SSE. just that one service, give me the steps, what changes in client and server, and risks. no code yet",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Planning within one component.",
+      "expected_output": "task / enough / sonnet — because planning within one component.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "name": "sonnet-helm-probes",
+      "prompt": "add liveness and readiness probes to the helm chart for the worker deployment: GET /healthz on port 8080, readiness shouldnt start until 10s after boot",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Config change in infra.",
+      "expected_output": "task / enough / sonnet — because config change in infra.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "name": "sonnet-existing-role-middleware",
+      "prompt": "protect the /admin/reports routes in routes/admin.ts with the existing requireRole('admin') middleware and add a test that a non admin gets 403",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Auth word but applying an existing middleware; no authz design.",
+      "expected_output": "task / enough / sonnet — because auth word but applying an existing middleware; no authz design.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "name": "sonnet-sortable-table-typos",
+      "prompt": "pls make the table in UsersPage sortabel by clicking the column headers, we alredy use tanstack table. asc/desc arrow indicator too",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Plain UI feature with typos.",
+      "expected_output": "task / enough / sonnet — because plain UI feature with typos.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "name": "sonnet-react-native-order-history",
+      "prompt": "RN screen for order history: pull to refresh, infinite scroll, empty state, data comes from the useOrders() hook in src/hooks. match the style of the other list screens",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Mobile UI feature.",
+      "expected_output": "task / enough / sonnet — because mobile UI feature.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "name": "sonnet-csv-export-commas-bug",
+      "prompt": "users report the csv export drops rows when a name has a comma in it. look at exporter/csv.go and fix it, add a regression test",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Bug whose cause is findable by reading the code.",
+      "expected_output": "task / enough / sonnet — because bug whose cause is findable by reading the code.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "name": "sonnet-question-phrased-http-retries",
+      "prompt": "could you add retries with backoff to the http client in pkg/httpx? 3 attempts, only on GET requests, and only for 5xx or network errors. jitter pls",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Phrased as a question but it is a task; retries here are on safe GETs in a client wrapper.",
+      "expected_output": "task / enough / sonnet — because phrased as a question but it is a task; retries here are on safe GETs in a client wrapper.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "name": "sonnet-gha-go-test-lint-workflow",
+      "prompt": "write a github actions workflow that runs go test ./... and golangci-lint on every PR, with module caching and go version from go.mod",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "CI config in a known stack.",
+      "expected_output": "task / enough / sonnet — because cI config in a known stack.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "opus-conc-casual-job-queue-double-pickup",
+      "prompt": "quick one: two workers sometimes grab the same job from our jobs table (postgres). we do a SELECT of the oldest pending row and then UPDATE it to running. can you make sure only one worker ever gets a job?",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Concurrency / locking on a shared queue, phrased as quick.",
+      "expected_output": "task / enough / opus — because concurrency / locking on a shared queue, phrased as quick.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "name": "opus-conc-go-deadlock-lock-order",
+      "prompt": "our go service deadlocks under load. I suspect the lock ordering between accountMu and cacheMu in internal/store/store.go but im not sure there arent more. find all the deadlocks and fix them",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Deadlocks and lock ordering.",
+      "expected_output": "task / enough / opus — because deadlocks and lock ordering.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "name": "opus-conc-oversell-isolation",
+      "prompt": "we run at READ COMMITTED and reserve_stock() in inventory/service.py oversells at high concurrency. decide between SERIALIZABLE with retries and explicit row locks, implement it, and show it holds with a concurrent test",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Isolation level / transactions decision.",
+      "expected_output": "task / enough / opus — because isolation level / transactions decision.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "name": "opus-conc-rust-ring-buffer-orderings",
+      "prompt": "review the lock-free SPSC ring buffer in src/ring.rs. I think the memory orderings on the consumer side are wrong (Relaxed where it needs Acquire?). prove it or fix it",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Memory ordering and lock-free correctness.",
+      "expected_output": "task / enough / opus — because memory ordering and lock-free correctness.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "name": "opus-conc-german-redis-lock-lease",
+      "prompt": "Wir haben ein Problem mit unserem verteilten Lock auf Redis: manchmal läuft das Lease ab, während der Job noch arbeitet, und ein zweiter Worker startet denselben Report parallel. Bitte das Locking so umbauen, dass das nicht mehr passiert (Fencing o.ä.).",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Distributed locking, lease expiry, German.",
+      "expected_output": "task / enough / opus — because distributed locking, lease expiry, German.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "name": "opus-money-simple-refund",
+      "prompt": "simple task: implement refund() in billing/refunds.py. partial refunds allowed, can't exceed the captured amount in total, and a payment can get several refunds. amounts in cents, postgres",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Money correctness called simple.",
+      "expected_output": "task / enough / opus — because money correctness called simple.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "name": "opus-idempotency-stripe-webhooks",
+      "prompt": "stripe webhooks arrive more than once and sometimes out of order. make the handler in src/webhooks/stripe.ts safe for that: subscription state and invoices must end up right no matter what",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Idempotency and ordering for payment events.",
+      "expected_output": "task / enough / opus — because idempotency and ordering for payment events.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "name": "opus-live-migration-split-full-name",
+      "prompt": "We need to split users.full_name into first_name and last_name on a 400M-row postgres table. The app keeps reading and writing that table the whole time, we can't have a maintenance window, and there are 3 services plus a nightly ETL that read full_name.\n\nWrite the migration plan and the code: expand/contract steps, backfill strategy that doesn't lock the table or lag the replicas, how the writers keep both representations in sync during the transition, and the rollback story at each step.",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Live data migration with concurrent writers.",
+      "expected_output": "task / enough / opus — because live data migration with concurrent writers.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "name": "opus-crash-consistency-batch-exporter",
+      "prompt": "write the checkpointing for our batch exporter so that if the pod is killed anywhere in the middle, the restart neither duplicates nor skips rows. output goes to S3 as parquet parts + a watermark in postgres",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Crash consistency and exactly-once effects.",
+      "expected_output": "task / enough / opus — because crash consistency and exactly-once effects.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "name": "opus-ukrainian-double-entry-loyalty-points",
+      "prompt": "потрібно реалізувати подвійний запис (double-entry) для внутрішніх балів лояльності в Go сервісі на Postgres, щоб баланси завжди сходилися навіть при збоях і повторних запитах від клієнтів. сума всіх рахунків має бути інваріантом",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Ledger correctness with failures and retries.",
+      "expected_output": "task / enough / opus — because ledger correctness with failures and retries.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "name": "opus-sec-threat-model-upload-service",
+      "prompt": "write a threat model for our new file upload service: presigned S3 URLs, a virus-scan lambda that moves files from quarantine to clean, and public share links with optional passwords. include concrete attack paths and mitigations",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Threat modelling.",
+      "expected_output": "task / enough / opus — because threat modelling.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "name": "opus-sec-authz-multitenant-design",
+      "prompt": "design and implement the authz layer for our multi-tenant API (orgs, teams, per-resource permissions, service accounts). a user must never be able to reach another tenant's data, even through IDs in nested routes or bulk endpoints. implement the core policy check in Go",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Authn/authz design with tenant isolation.",
+      "expected_output": "task / enough / opus — because authn/authz design with tenant isolation.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "name": "opus-sec-crypto-pii-cbc-iv-user-id",
+      "prompt": "we encrypt user PII with AES-CBC, the key comes from an env var and the IV is the user id (yeah I know). replace it with something proper, and handle key rotation without re-encrypting everything at once",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Cryptography use.",
+      "expected_output": "task / enough / opus — because cryptography use.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "name": "opus-sec-review-password-reset",
+      "prompt": "do a security review of the password reset flow in auth/reset.py: token generation, expiry, single use, account enumeration, timing, rate limiting, host header stuff, anything an attacker could use",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Vulnerability review.",
+      "expected_output": "task / enough / opus — because vulnerability review.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "name": "opus-sec-casual-quick-jwt-alg",
+      "prompt": "quick q: can you check if our jwt verification in middleware/jwt.go is actually safe? i think we just trust whatever alg is in the header lol",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Security review phrased casually as quick.",
+      "expected_output": "task / enough / opus — because security review phrased casually as quick.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "name": "opus-xservice-order-stock-event-contracts",
+      "prompt": "orders, inventory and shipping are three services each with their own db. design the events/contracts and failure handling so an order can never ship without stock being reserved, including duplicates and out of order delivery on Kafka. write it up as an ADR and then put the event schemas in the shared repo",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Cross-service architecture and contracts.",
+      "expected_output": "task / enough / opus — because cross-service architecture and contracts.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "name": "opus-xservice-public-api-v2-compat",
+      "prompt": "The public /v2/quotes response shape has to change (price becomes an object with amount and currency). Three partner integrations consume it and we can't force them to update, and our mobile apps stay on old versions for months.\n\nPropose how we change it without breaking anyone, then make the changes across the gateway and quotes-service. I also need a deprecation plan with how we'd find out who still depends on the old shape.",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Public contract evolution across consumers.",
+      "expected_output": "task / enough / opus — because public contract evolution across consumers.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "name": "opus-xservice-checkout-saga",
+      "prompt": "convert the checkout flow (cart -> payment -> fulfilment, three services, currently chained sync REST calls) to a saga with compensation. design it and implement the orchestrator. what happens when payment succeeds but fulfilment is down for an hour?",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Cross-service workflow with failure semantics.",
+      "expected_output": "task / enough / opus — because cross-service workflow with failure semantics.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "name": "opus-xservice-ukrainian-extract-billing",
+      "prompt": "ми хочемо виокремити billing з Django-монолiта в окремий сервіс. який контракт між ними, як мігрувати дані, і що робити з транзакціями, які зараз охоплюють обидва модулі? запропонуй підхід і реалізуй перший крок",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Service extraction, data split and cross-boundary transactions.",
+      "expected_output": "task / enough / opus — because service extraction, data split and cross-boundary transactions.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "name": "opus-xservice-protobuf-compat-ci",
+      "prompt": "our protobuf schemas are shared by 12 services with rolling deploys. design a compatibility policy and a CI check so a schema change can't break a consumer that's still on the previous version. implement the check",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Cross-service contracts and deploy-time compatibility.",
+      "expected_output": "task / enough / opus — because cross-service contracts and deploy-time compatibility.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "name": "opus-rootcause-flaky-e2e-ci-only",
+      "prompt": "test_checkout_e2e fails about 1 in 15 runs, only in CI, never locally. no pattern i can see in the logs. find out why",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Flaky failure with unknown cause.",
+      "expected_output": "task / enough / opus — because flaky failure with unknown cause.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "name": "opus-rootcause-p99-regression-search",
+      "prompt": "p99 on /search went from 120ms to 900ms after last tuesday's deploy. nothing in the diff looks related. its node + elasticsearch + a redis cache. find the cause",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Unexplained perf regression across layers.",
+      "expected_output": "task / enough / opus — because unexplained perf regression across layers.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "name": "opus-rootcause-celery-gevent-memory-leak",
+      "prompt": "our python worker's RSS grows about 50MB an hour until it gets OOM killed. only in prod (celery + gevent + sqlalchemy), cant repro locally. can you track it down?",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Memory leak with unknown root cause.",
+      "expected_output": "task / enough / opus — because memory leak with unknown root cause.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "name": "opus-rootcause-ios-background-freeze",
+      "prompt": "the iOS app freezes for ~30s now and then when coming back from background. looks like it involves our networking layer, core data and the push handler. no crash logs. dig in and find out what is going on",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Hang spanning layers.",
+      "expected_output": "task / enough / opus — because hang spanning layers.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "name": "opus-rootcause-nightly-job-stalls-casual",
+      "prompt": "sometimes (like once every few days) the nightly sync just stops and never finishes. no errors, pod still shows Running. idk where to even start",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Intermittent hang, unknown cause.",
+      "expected_output": "task / enough / opus — because intermittent hang, unknown cause.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "name": "fable-new-replication-protocol-proof",
+      "prompt": "design and implement a new replication protocol for our embedded KV store that gives linearizable reads without leader leases or clock assumptions, then prove it safe: write a TLA+ spec and model check it",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Inventing and verifying a new protocol.",
+      "expected_output": "task / enough / fable — because inventing and verifying a new protocol.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "name": "fable-rust-lsm-storage-engine",
+      "prompt": "build an embedded storage engine in Rust from scratch for our time-series data: LSM-style with WAL, compaction, crash recovery and MVCC snapshot reads. no existing library, we want to own it",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Whole new storage engine; several opus concerns together.",
+      "expected_output": "task / enough / fable — because whole new storage engine; several opus concerns together.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "name": "fable-wasm-backend-for-dsl",
+      "prompt": "write a compiler backend that lowers our in-house DSL's IR to WebAssembly, with register allocation and an optimization pipeline. there is no reference implementation and the IR semantics are only half documented",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Compiler backend from scratch.",
+      "expected_output": "task / enough / fable — because compiler backend from scratch.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "name": "fable-research-long-context-degradation",
+      "prompt": "our fine-tuned model degrades on long contexts, but only after about step 40k of training and nobody knows why. design and run the experiments to find the cause and propose a fix",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Open research question needing original experiments.",
+      "expected_output": "task / enough / fable — because open research question needing original experiments.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "name": "fable-e2ee-offline-sync-convergence-proof",
+      "prompt": "invent a sync protocol for our offline-first notes app: edits from multiple devices merge without a central authority, content is end-to-end encrypted so the server can't read it, and I want a proof that all replicas converge",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "New protocol with crypto and a convergence proof.",
+      "expected_output": "task / enough / fable — because new protocol with crypto and a convergence proof.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "name": "fable-german-distributed-sql-db",
+      "prompt": "Wir wollen eine eigene verteilte SQL-Datenbank von Grund auf bauen: Raft-basierte Replikation, verteilte Transaktionen mit Serializability, ein Query-Planner. Fang mit der Architektur an und dann mit dem Code für den Storage-Layer.",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Whole distributed database from scratch.",
+      "expected_output": "task / enough / fable — because whole distributed database from scratch.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "name": "fable-formal-verify-lockfree-queue",
+      "prompt": "formally verify our lock-free MPMC queue in src/queue.rs: prove linearizability of push and pop in Lean or Coq (whichever you can make work), including the ABA handling",
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Formal verification of a concurrent algorithm.",
+      "expected_output": "task / enough / fable — because formal verification of a concurrent algorithm.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "name": "vague-read-prompt-md-implement",
+      "prompt": "read PROMPT.md, implement",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "Substance lives in an unseen file; tier is a guess, sonnet by default.",
+      "expected_output": "task / not enough / sonnet — because substance lives in an unseen file; tier is a guess, sonnet by default. (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "name": "vague-continue",
+      "prompt": "continue",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "Pointer to prior unseen state; tier is a guess, sonnet by default.",
+      "expected_output": "task / not enough / sonnet — because pointer to prior unseen state; tier is a guess, sonnet by default. (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "name": "vague-do-it",
+      "prompt": "ok do it",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "No shown substance; tier is a guess, sonnet by default.",
+      "expected_output": "task / not enough / sonnet — because no shown substance; tier is a guess, sonnet by default. (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "name": "vague-ticket-link",
+      "prompt": "can you take care of https://github.com/acme/payments-api/issues/482",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "Substance lives in a link; tier is a guess (could be anything).",
+      "expected_output": "task / not enough / sonnet — because substance lives in a link; tier is a guess (could be anything). (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "name": "vague-implement-the-plan",
+      "prompt": "implement the plan we wrote in docs/PLAN.md",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "Substance lives in the plan file; tier is a guess.",
+      "expected_output": "task / not enough / sonnet — because substance lives in the plan file; tier is a guess. (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "name": "vague-german-todo-md",
+      "prompt": "mach das, was in TODO.md steht",
+      "expected": {
+        "kind": "task",
+        "enough": false,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": true,
+      "why": "German pointer to an unseen file; tier is a guess.",
+      "expected_output": "task / not enough / sonnet — because german pointer to an unseen file; tier is a guess. (tier is uncertain: only kind and enough are graded)",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is false"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "name": "ctx-live-prompt-md-ledger-concurrency",
+      "prompt": "read PROMPT.md, implement",
+      "context": [
+        {
+          "from": "Read PROMPT.md",
+          "text": "`ledger.py` is the account store for an API that runs as several worker processes behind a load balancer. All workers open the same SQLite file. Production shows three problems:\n\n1. Customers overdraw. Concurrent withdrawals both pass the balance check.\n2. Transfers lose or create money when something fails between the debit and the credit. Also, transfers in opposite directions (A→B and B→A at the same time) sometimes hang.\n3. Client retries after a timeout move money twice.\n\nRequirements:\n- `withdraw` and `transfer` must never overdraw, under any interleaving across processes.\n- A transfer is atomic: either both sides change or neither does, even if the process dies midway.\n- `transfer` with an existing `transfer_id` returns the original result and changes nothing.\n- Concurrent opposite-direction transfers must not deadlock.\n- The sum of all balances never changes through transfers.\n- Keep the public signatures of `open_account`, `balance`, `total`, `withdraw`, `transfer`.\n\nDo this:\n- Diagnose each of the three problems from the code, with the root cause for each.\n- Write a test suite that reproduces each problem before the fix, using real separate processes against one database file. Include a crash-injection test (kill a process between debit and credit) and a retry test.\n- Implement the fix, and show the suite passing.\n- Explain the design choices: isolation level or locking strategy, how idempotency is stored, and what you ruled out and why.\n- Name any remaining risk you could not test here.\n"
+        }
+      ],
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "opus"
+      },
+      "tier_uncertain": false,
+      "why": "Context reveals concurrency, atomicity and idempotency of money transfers: opus.",
+      "expected_output": "task / enough / opus — because context reveals concurrency, atomicity and idempotency of money transfers: opus.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is opus"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "name": "ctx-ticket-env-var-rename",
+      "prompt": "take care of OPS-2291, it's in tickets/OPS-2291.md",
+      "context": [
+        {
+          "from": "Read tickets/OPS-2291.md",
+          "text": "# OPS-2291: Rename env var API_TIMEOUT to API_TIMEOUT_MS\n\nFiles and lines:\n- .env.example, line 14\n- docs/setup.md, lines 31 and 58\n- deploy/values.yaml, line 9\n\nPure find/replace of the name, the value stays the same. No code reads this variable yet, so nothing else changes."
+        }
+      ],
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "haiku"
+      },
+      "tier_uncertain": false,
+      "why": "Context reveals a pure find/replace rename at named lines: mechanical.",
+      "expected_output": "task / enough / haiku — because context reveals a pure find/replace rename at named lines: mechanical.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is haiku"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "name": "ctx-plan-md-new-database",
+      "prompt": "continue with the plan",
+      "context": [
+        {
+          "from": "Read docs/plan.md",
+          "text": "# Plan: ember-db\n\nGoal: our own distributed SQL database replacing Postgres for the events workload.\n\nPhase 1 - storage engine from scratch in Rust: LSM tree, WAL, compaction, MVCC snapshots, crash recovery.\nPhase 2 - multi-raft replication with range splits and rebalancing.\nPhase 3 - serializable distributed transactions without an external coordinator, then a cost-based query planner and a Postgres wire-protocol frontend.\n\nThere is no existing code and no reference implementation to compare against. We start Phase 1 today."
+        }
+      ],
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "fable"
+      },
+      "tier_uncertain": false,
+      "why": "Context reveals building a distributed database from scratch: fable.",
+      "expected_output": "task / enough / fable — because context reveals building a distributed database from scratch: fable.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is fable"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "name": "ctx-task-md-healthz-endpoint",
+      "prompt": "see TASK.md and do it",
+      "context": [
+        {
+          "from": "Read TASK.md",
+          "text": "# TASK\n\nAdd GET /healthz to the Express API (src/server.ts).\n- Return 200 with {\"status\":\"ok\",\"uptime\":<seconds>}.\n- Ping the Postgres pool with SELECT 1; if it fails or takes over 1s, return 503.\n- Add a HEALTHCHECK to the Dockerfile that calls it.\n- Add 2 jest tests (healthy, db down)."
+        }
+      ],
+      "expected": {
+        "kind": "task",
+        "enough": true,
+        "tier": "sonnet"
+      },
+      "tier_uncertain": false,
+      "why": "Context reveals an ordinary endpoint plus a Docker healthcheck and tests: sonnet.",
+      "expected_output": "task / enough / sonnet — because context reveals an ordinary endpoint plus a Docker healthcheck and tests: sonnet.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "kind",
+          "text": "kind is task"
+        },
+        {
+          "id": "enough",
+          "text": "enough is true"
+        },
+        {
+          "id": "tier",
+          "text": "tier is sonnet"
+        }
+      ]
+    }
+  ]
+}

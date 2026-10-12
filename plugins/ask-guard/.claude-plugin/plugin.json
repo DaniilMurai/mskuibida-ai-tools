@@ -1,0 +1,15 @@
+{
+  "name": "ask-guard",
+  "displayName": "Ask Guard",
+  "version": "0.1.0",
+  "description": "Keeps the question dialog readable: a question the model writes longer than one line is sent back, with word to put the context in a markdown message first and ask in one line.",
+  "author": { "name": "Maksym Skuibida" },
+  "userConfig": {
+    "maxQuestionChars": {
+      "type": "number",
+      "title": "Longest question",
+      "description": "The most characters one question in the dialog may have. The dialog draws it as plain text, so anything longer belongs in a message before it.",
+      "default": 250
+    }
+  }
+}

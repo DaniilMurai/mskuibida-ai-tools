@@ -1,0 +1,544 @@
+#!/bin/bash
+# Regression suite for worktree-cleanup. Run: bash tests/regression.sh
+# Each case asserts on the fixture's final on-disk state, or on the remover's own
+# output, because a report claiming a worktree was preserved proves nothing.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+S="$HERE/../scripts"
+# .pyc caches were the one thing the suite wrote outside its own root, and a
+# $S/__pycache__ shared with a concurrent run meant each deleted the other's.
+# Writing none is simpler than cleaning up after them.
+export PYTHONDONTWRITEBYTECODE=1
+
+# Normalised once and used for both the mktemp template and the guard below, so
+# the two can never disagree: macOS exports TMPDIR with a trailing slash, and the
+# guard only matched today because BSD mktemp echoes the template back verbatim,
+# '//' and all. An mktemp that canonicalised the path would fail the guard. Every
+# trailing slash goes, not just one: TMPDIR=/tmp// would reproduce the same
+# mismatch one level deeper.
+TMPROOT="${TMPDIR:-/tmp}"
+while [ "${TMPROOT%/}" != "$TMPROOT" ]; do TMPROOT="${TMPROOT%/}"; done
+# Installed before mktemp rather than after it, because mktemp creates the
+# directory before the shell ever sees its name: a signal in that window leaked a
+# root for good -- the very failure the trap exists to prevent. The name check
+# makes cleanup a no-op while $W is still empty, and stops a mktemp that returned
+# some other path from turning cleanup into an rm -rf of a directory we never
+# created. chmod first because the fixture contains read-only git dirs. No `exit`
+# of its own, so the suite's own status still stands.
+W=
+cleanup() {
+  case "${W##*/}" in wtc-tests.??????*) ;; *) return 0 ;; esac
+  chmod -R u+rwX "$W" 2>/dev/null; rm -rf "$W"; W=
+}
+trap cleanup EXIT
+# Signals re-raise after cleaning: a plain handler would resume the script, and
+# exiting from it would report success for a run that was killed. Clearing $W in
+# cleanup makes the EXIT trap that follows the re-raise a no-op, so that second
+# rm -rf cannot land on a root mktemp has meanwhile handed to another run.
+trap 'cleanup; trap - INT; kill -INT $$' INT
+trap 'cleanup; trap - TERM; kill -TERM $$' TERM
+# Start from nothing, in a root unique to this run. mktemp -d guarantees both: an
+# empty directory (a scan that crashed in a previous run cannot leave a stale plan
+# for the assertions to read -- a green suite proving nothing about this revision)
+# and one no concurrent run shares (two suites on a fixed $W clobbered each other's
+# fixture and failed spuriously).
+W="$(mktemp -d "$TMPROOT/wtc-tests.XXXXXX")"
+# Everything below rm -rf's $W, so refuse to run unless $W is an existing absolute
+# directory under $TMPROOT with our prefix. The absolute test is not redundant: a
+# relative TMPDIR passes a bare prefix match and would point the cleanup at a
+# relative path. mktemp has already created the directory by the time we look, so
+# a refusal has to give it back: exiting runs the EXIT trap, which reclaims it if
+# the name is unmistakably the template we asked for and leaves it alone if not.
+w_abs=; w_pfx=
+case "$W" in /*) w_abs=1 ;; esac
+case "$W" in "$TMPROOT"/wtc-tests.??????*) w_pfx=1 ;; esac
+if [ -z "$W" ]; then
+  echo "refusing to run: mktemp -d failed under '$TMPROOT'" >&2; exit 1
+elif [ -z "$w_abs" ] || [ -z "$w_pfx" ] || [ ! -d "$W" ]; then
+  echo "refusing to run: mktemp returned an unexpected path '$W' (wanted an existing absolute directory under '$TMPROOT')" >&2
+  exit 1
+fi
+T=$W/regress
+PASS=0; FAIL=0
+
+ok()   { PASS=$((PASS+1)); echo "  PASS  $1"; }
+bad()  { FAIL=$((FAIL+1)); echo "  FAIL  $1"; }
+chk()  { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (got '$2', want '$3')"; fi; }
+has()  { if printf '%s' "$2" | grep -qF -- "$3"; then ok "$1"; else bad "$1 (no '$3' in: $(printf '%s' "$2" | tr '\n' '|'))"; fi; }
+
+age() { # age a worktree so the recency gate does not fire
+  local sb=$1 w=$2 r=webapp
+  [ -d "$sb/api/.git/worktrees/$w" ] && r=api
+  find "$sb/$r/.git/worktrees/$w" "$sb/$w" -exec touch -t 202001010000 {} \; 2>/dev/null
+}
+
+WTS="wt-feature-done wt-bugfix-shipped wt-review-072f6e wt-experiment wt-hotfix wt-spike wt-secrets wt-untracked"
+fresh() { chmod -R u+rwX "$T" 2>/dev/null; rm -rf "$T"
+          bash "$HERE/build_fixture.sh" "$T" >/dev/null 2>&1
+          for w in $WTS; do age "$T" "$w"; done; }
+
+# Every scan below lets stderr through on purpose: swallowing it hid crashes.
+scan() { python3 $S/scan_worktrees.py --roots "$T" --maxdepth 2 --quiet "$@"; }
+
+echo "== 1. classification =="
+fresh
+scan --assume-no-live-sessions --json "$W/r.json"
+v() { python3 -c "
+import json;d=json.load(open('$W/r.json'))
+print(next((w['verdict'] for w in d['worktrees'] if w['path'].endswith('/$1')),'MISSING'))"; }
+chk "clean+published  -> safe"       "$(v wt-feature-done)"    "safe"
+chk "detached+published -> safe"     "$(v wt-review-072f6e)"   "safe"
+chk "unpushed commits -> protected"  "$(v wt-experiment)"      "protected"
+chk "uncommitted edits -> protected" "$(v wt-hotfix)"          "protected"
+chk "missing dir -> stale"           "$(v wt-vanished)"        "stale"
+chk "recently used -> protected"     "$(v wt-active-session)"  "protected"
+chk "untracked only -> protected"    "$(v wt-untracked)"       "protected"
+
+echo "== 1b. ignored files: data holds back, build output does not =="
+# git status --porcelain never lists ignored files, so this whole class used to be
+# invisible: a worktree holding the only copy of a .env classified as safe, was
+# deleted, and the .env was never named in any report.
+chk "ignored .env -> review"        "$(v wt-secrets)" "review"
+ic() { python3 -c "
+import json;d=json.load(open('$W/r.json'))
+w=next(w for w in d['worktrees'] if w['path'].endswith('/$1'));print(w['$2'])"; }
+chk "counts the .env"               "$(ic wt-secrets ignored_count)"     "1"
+chk "names it in the report"        "$(ic wt-secrets ignored_sample)"    "['.env']"
+chk "node_modules/dist not counted" "$(ic wt-feature-done ignored_count)" "0"
+# Deliberately not --quiet: the table is the thing being asserted on here.
+python3 $S/scan_worktrees.py --roots "$T" --maxdepth 2 --assume-no-live-sessions \
+  --json "$W/r1b.json" > "$W/table.txt"
+has "table names the ignored file" "$(cat "$W/table.txt")" "ignored data (1): .env"
+
+echo "== 2. no liveness data => nothing is safe =="
+scan --json "$W/r2.json"
+chk "safe count without liveness" "$(python3 -c "
+import json;print(sum(1 for w in json.load(open('$W/r2.json'))['worktrees'] if w['verdict']=='safe'))")" "0"
+
+echo "== 3. remover refuses to execute blind =="
+# Assert on the message, not just the exit code: argparse also exits 2 on a usage
+# error, so a typo in this invocation would otherwise pass the test.
+out=$(python3 $S/remove_worktrees.py "$W/r.json" --execute 2>&1); rc=$?
+chk "exit code" "$rc" "2"
+has "names the reason" "$out" "refusing to execute without liveness data"
+
+echo "== 4. happy path removes safe, keeps the rest =="
+fresh
+scan --assume-no-live-sessions --json "$W/r3.json"
+python3 $S/remove_worktrees.py "$W/r3.json" --include safe stale --assume-no-live-sessions --execute >/dev/null 2>&1
+for w in wt-feature-done wt-bugfix-shipped wt-review-072f6e; do
+  [ -d "$T/$w" ] && bad "$w removed" || ok "$w removed"; done
+for w in wt-experiment wt-spike wt-hotfix wt-active-session wt-secrets wt-untracked; do
+  [ -d "$T/$w" ] && ok "$w preserved" || bad "$w preserved"; done
+chk "the .env survived" "$(cat "$T/wt-secrets/.env" 2>/dev/null)" "DB_PASSWORD=hunter2"
+chk "unpushed commit reachable (webapp)" "$(/usr/bin/git -C "$T/webapp" log --all --format=%s | grep -c 'WIP: the only copy')" "1"
+chk "unpushed commit reachable (api)"    "$(/usr/bin/git -C "$T/api"    log --all --format=%s | grep -c 'WIP: the only copy')" "1"
+chk "stale registration pruned" "$(/usr/bin/git -C "$T/webapp" worktree list | grep -c wt-vanished)" "0"
+
+echo "== 5. races are caught at removal time, by the gate that should catch them =="
+# Survival alone would pass even if one always-firing gate held everything back, so
+# each mode also asserts on the reason the remover printed.
+for mode in dirty live headmove touch; do
+  fresh
+  scan --assume-no-live-sessions --json "$W/r4-$mode.json"
+  case $mode in
+    dirty)    echo "x" >> "$T/wt-feature-done/src/index.js"; want="uncommitted change" ;;
+    live)     echo "$T/wt-feature-done" > "$W/live-$mode.txt";  want="in use — session cwd" ;;
+    headmove) (cd "$T/wt-feature-done" && echo y > n.txt && /usr/bin/git add . && /usr/bin/git commit -qm late)
+              want="HEAD moved since the scan" ;;
+    touch)    touch "$T/wt-feature-done/src/index.js"; want="something is using it" ;;
+  esac
+  if [ $mode = live ]; then
+    out=$(python3 $S/remove_worktrees.py "$W/r4-$mode.json" --include safe --live-paths-file "$W/live-$mode.txt" --execute 2>&1)
+  else
+    out=$(python3 $S/remove_worktrees.py "$W/r4-$mode.json" --include safe --assume-no-live-sessions --execute 2>&1)
+  fi
+  [ -d "$T/wt-feature-done" ] && ok "race '$mode' held back" || bad "race '$mode' held back"
+  has "race '$mode' held back BY THE RIGHT GATE" "$out" "$want"
+done
+
+echo "== 6. branch handling =="
+fresh
+scan --assume-no-live-sessions --json "$W/r5.json"
+python3 $S/remove_worktrees.py "$W/r5.json" --include safe --assume-no-live-sessions --only "$T/wt-feature-done" --execute >/dev/null 2>&1
+chk "branch kept by default" "$(/usr/bin/git -C "$T/webapp" branch --list feat/checkout-flow | grep -c .)" "1"
+fresh
+scan --assume-no-live-sessions --json "$W/r6.json"
+python3 $S/remove_worktrees.py "$W/r6.json" --include safe --assume-no-live-sessions --only "$T/wt-feature-done" --delete-branch --execute >/dev/null 2>&1
+chk "branch deleted with --delete-branch" "$(/usr/bin/git -C "$T/webapp" branch --list feat/checkout-flow | grep -c .)" "0"
+chk "commits survive on remote" "$(/usr/bin/git -C "$T/webapp" branch -r | grep -c feat/checkout-flow)" "1"
+
+echo "== 7. liveness data must be FRESH, not merely non-empty =="
+# The old gate was bool(live_paths or live_names): handing the remover the scan's
+# own liveness file passed silently, which is precisely the incident this exists to
+# prevent -- a session that started after the scan and has so far only read files
+# is invisible to the recency gate, leaving liveness as the only gate that could see it.
+fresh
+echo "/nonexistent/scan-time" > "$W/live-scan.txt"
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7.json"
+R() { python3 $S/remove_worktrees.py "$W/r7.json" --include safe --execute "$@" 2>&1; }
+
+out=$(R --live-paths-file "$W/live-scan.txt"); rc=$?
+chk "reusing the scan's own file: exit" "$rc" "2"
+has "reusing the scan's own file: why" "$out" "is the same file the scan read"
+[ -d "$T/wt-feature-done" ] && ok "reusing the scan's own file: nothing deleted" || bad "reusing the scan's own file: nothing deleted"
+
+cp "$W/live-scan.txt" "$W/live-copy.txt"      # different path, fresh mtime, same content
+out=$(R --live-paths-file "$W/live-copy.txt"); rc=$?
+chk "a copy of it: exit" "$rc" "2"
+has "a copy of it: why" "$out" "identical to the plan's own"
+
+echo "/nonexistent/other" > "$W/live-old.txt"; touch -t 202001010000 "$W/live-old.txt"
+out=$(R --live-paths-file "$W/live-old.txt"); rc=$?
+chk "collected before the scan: exit" "$rc" "2"
+has "collected before the scan: why" "$out" "predates the plan"
+
+echo "/nonexistent/other" > "$W/live-fresh.txt"
+out=$(R --live-paths-file "$W/live-fresh.txt"); rc=$?
+chk "genuinely fresh data: accepted" "$rc" "0"
+[ -d "$T/wt-feature-done" ] && bad "genuinely fresh data: removal proceeds" || ok "genuinely fresh data: removal proceeds"
+
+# A file whose mtime is in the *future* is neither "before the scan" nor "too old" --
+# (now - written) goes negative, which used to sail under every max-age check. That
+# let a liveness file with three-day-stale contents pass simply by being touched
+# with a future timestamp, restoring exactly the blind trust this gate exists to end.
+fresh
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7c.json"
+echo "/nonexistent/other" > "$W/live-future.txt"; touch -t 209901010000 "$W/live-future.txt"
+out=$(python3 $S/remove_worktrees.py "$W/r7c.json" --include safe --execute \
+        --live-paths-file "$W/live-future.txt" 2>&1); rc=$?
+chk "future-mtime liveness file: exit" "$rc" "2"
+has "future-mtime liveness file: why" "$out" "future mtime"
+[ -d "$T/wt-feature-done" ] && ok "future-mtime liveness file: nothing deleted" || bad "future-mtime liveness file: nothing deleted"
+
+# The tolerance is a ceiling, not a fixed grant: the effective future slack is
+# min(FUTURE_MTIME_TOLERANCE_MINUTES, --liveness-max-age). A three-minute-ahead
+# file is inside the default five, but a user who tightens --liveness-max-age to
+# 1 has said one minute is the most staleness they accept -- and used to get five
+# minutes of *forward* slack anyway, a window wider than the backward one they
+# just narrowed.
+fresh
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7d.json"
+echo "/nonexistent/other" > "$W/live-near-future.txt"
+python3 -c "import os,time;os.utime('$W/live-near-future.txt',(time.time()+180,)*2)"
+out=$(python3 $S/remove_worktrees.py "$W/r7d.json" --include safe --execute \
+        --live-paths-file "$W/live-near-future.txt" 2>&1); rc=$?
+chk "3 min ahead, default max-age 5: accepted" "$rc" "0"
+[ -d "$T/wt-feature-done" ] && bad "3 min ahead, default max-age 5: removal proceeds" \
+                            || ok  "3 min ahead, default max-age 5: removal proceeds"
+
+fresh
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7e.json"
+echo "/nonexistent/other" > "$W/live-near-future.txt"
+python3 -c "import os,time;os.utime('$W/live-near-future.txt',(time.time()+180,)*2)"
+out=$(python3 $S/remove_worktrees.py "$W/r7e.json" --include safe --execute \
+        --liveness-max-age 1 --live-paths-file "$W/live-near-future.txt" 2>&1); rc=$?
+chk "same file, --liveness-max-age 1: exit" "$rc" "2"
+has "same file, --liveness-max-age 1: why" "$out" "future mtime"
+[ -d "$T/wt-feature-done" ] && ok "same file, --liveness-max-age 1: nothing deleted" \
+                            || bad "same file, --liveness-max-age 1: nothing deleted"
+
+# The ceiling half of the clamp: min(FUTURE_MTIME_TOLERANCE_MINUTES, max_age_minutes)
+# must never let the forward slack grow past FUTURE_MTIME_TOLERANCE_MINUTES, even
+# when --liveness-max-age is raised well above it. Without this the clamp would only
+# ever be proven to shrink the slack, never to cap it.
+fresh
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7f.json"
+echo "/nonexistent/other" > "$W/live-far-future.txt"
+python3 -c "import os,time;os.utime('$W/live-far-future.txt',(time.time()+1800,)*2)"
+out=$(python3 $S/remove_worktrees.py "$W/r7f.json" --include safe --execute \
+        --liveness-max-age 60 --live-paths-file "$W/live-far-future.txt" 2>&1); rc=$?
+chk "30 min ahead, --liveness-max-age 60: exit" "$rc" "2"
+has "30 min ahead, --liveness-max-age 60: why" "$out" "future mtime"
+[ -d "$T/wt-feature-done" ] && ok "30 min ahead, --liveness-max-age 60: nothing deleted" \
+                            || bad "30 min ahead, --liveness-max-age 60: nothing deleted"
+
+echo "== 7g. --liveness-max-age below 1 is rejected, not silently clamped =="
+# A value < 1 sends future_slack to zero or negative, which used to reject an
+# ordinary past-mtime file with "has a future mtime (-0 min ahead of now)" -- a bad
+# flag value should be told, not guessed at. argparse's type= conversion for
+# --liveness-max-age raises before the plan file is ever opened, so no fixture
+# rebuild is needed here -- "$W/r7g.json" is never read.
+echo "/nonexistent/other" > "$W/live-fresh-g.txt"
+out=$(python3 $S/remove_worktrees.py "$W/r7g.json" --include safe --execute \
+        --liveness-max-age -1 --live-paths-file "$W/live-fresh-g.txt" 2>&1); rc=$?
+chk "--liveness-max-age -1: exit" "$rc" "2"
+has "--liveness-max-age -1: rejected by argparse, not clamped" "$out" "must be at least 1"
+out=$(python3 $S/remove_worktrees.py "$W/r7g.json" --include safe --execute \
+        --liveness-max-age 0 --live-paths-file "$W/live-fresh-g.txt" 2>&1); rc=$?
+chk "--liveness-max-age 0: exit" "$rc" "2"
+has "--liveness-max-age 0: rejected by argparse, not clamped" "$out" "must be at least 1"
+
+fresh
+scan --live-paths-file "$W/live-scan.txt" --json "$W/r7b.json"
+python3 $S/remove_worktrees.py "$W/r7b.json" --include safe --assume-no-live-sessions --execute >/dev/null 2>&1
+[ -d "$T/wt-feature-done" ] && bad "--assume-no-live-sessions still overrides" || ok "--assume-no-live-sessions still overrides"
+
+echo "== 8. a plan is not executed forever, or on another machine =="
+fresh
+scan --assume-no-live-sessions --json "$W/r8.json"
+python3 - "$W/r8.json" "$W/r8-old.json" "$W/r8-host.json" <<'PY'
+import json, sys, time
+plan = json.load(open(sys.argv[1]))
+old = dict(plan, scanned_at=time.time() - 72 * 3600)
+json.dump(old, open(sys.argv[2], "w"))
+json.dump(dict(plan, hostname="some-other-laptop"), open(sys.argv[3], "w"))
+PY
+out=$(python3 $S/remove_worktrees.py "$W/r8-old.json" --include safe --assume-no-live-sessions --execute 2>&1); rc=$?
+chk "three-day-old plan: exit" "$rc" "2"
+has "three-day-old plan: why" "$out" "re-scan rather than acting on it"
+out=$(python3 $S/remove_worktrees.py "$W/r8-host.json" --include safe --assume-no-live-sessions --execute 2>&1)
+has "plan from another machine refused" "$out" "was produced on some-other-laptop"
+[ -d "$T/wt-feature-done" ] && ok "neither plan deleted anything" || bad "neither plan deleted anything"
+
+echo "== 8b. dry-run says so when the plan would be refused at execute time =="
+# The three admission gates (plan age/hostname, liveness present, liveness fresh)
+# used to run only under --execute, so the same plan and the same flags printed
+# "Would remove: N" in dry-run and exited 2 with a refusal under --execute. That
+# preview is what an agent shows a human when asking them to approve a deletion, so
+# it has to describe what execution would actually do. Dry-run still prints the
+# table -- it now says first that --execute would refuse.
+fresh
+scan --assume-no-live-sessions --json "$W/r8b.json"
+python3 - "$W/r8b.json" "$W/r8b-old.json" <<'PY'
+import json, sys, time
+plan = json.load(open(sys.argv[1]))
+json.dump(dict(plan, scanned_at=time.time() - 72 * 3600), open(sys.argv[2], "w"))
+PY
+
+# 1. stale plan: the same refusal reason surfaces in dry-run, on stdout, above the table.
+out=$(python3 $S/remove_worktrees.py "$W/r8b-old.json" --include safe \
+        --assume-no-live-sessions 2>/dev/null); rc=$?
+has "dry-run warns it would be refused"   "$out" "WOULD BE REFUSED AT EXECUTE TIME"
+has "dry-run gives the same reason"       "$out" "re-scan rather than acting on it"
+has "dry-run still shows the table"       "$out" "Would remove:"
+has "dry-run footer points at the reason" "$out" "--execute would refuse this plan"
+chk "dry-run still exits 0"               "$rc"  "0"
+warn_line=$(printf '%s' "$out" | grep -n "WOULD BE REFUSED" | cut -d: -f1)
+table_line=$(printf '%s' "$out" | grep -n "Would remove:" | cut -d: -f1)
+[ -n "$warn_line" ] && [ "$warn_line" -lt "$table_line" ] \
+    && ok  "warning is printed above the table" \
+    || bad "warning is printed above the table (warning line '$warn_line', table line '$table_line')"
+[ -d "$T/wt-feature-done" ] && ok "dry-run deleted nothing" || bad "dry-run deleted nothing"
+
+# 2. missing liveness data reaches dry-run too -- the gate that fires most often.
+out=$(python3 $S/remove_worktrees.py "$W/r8b.json" --include safe 2>/dev/null)
+has "dry-run warns about missing liveness" "$out" "refusing to execute without liveness data"
+
+# 2b. --execute's stderr for the missing-liveness gate is one sentence in one line,
+# exactly as it was before this file grew a dry-run banner. A substring check (as
+# above) is blind to a heading/trailer that got split across two print() calls --
+# that is exactly the defect that shipped here once and slipped past this suite.
+execerr=$(python3 $S/remove_worktrees.py "$W/r8b.json" --include safe --execute 2>&1 >/dev/null)
+chk "execute missing-liveness stderr is byte-exact" "$execerr" \
+  "refusing to execute without liveness data. Re-check what is running right now and pass --live-paths-file / --live-names-file, or state explicitly that you checked with --assume-no-live-sessions."
+chk "execute missing-liveness stderr is a single line" "$(printf '%s' "$execerr" | wc -l | tr -d ' ')" "0"
+
+# 3. an admissible plan gets no banner at all: the warning must mean something.
+out=$(python3 $S/remove_worktrees.py "$W/r8b.json" --include safe \
+        --assume-no-live-sessions 2>/dev/null)
+chk "clean plan: no false warning" "$(printf '%s' "$out" | grep -c 'WOULD BE REFUSED')" "0"
+has "clean plan: ordinary dry-run footer" "$out" "re-run with --execute"
+
+# 4. --execute is unchanged: still stderr, still the first gate only, still exit 2.
+out=$(python3 $S/remove_worktrees.py "$W/r8b-old.json" --include safe \
+        --assume-no-live-sessions --execute 2>&1 >/dev/null); rc=$?
+chk "execute still exits 2"            "$rc"  "2"
+has "execute refusal still on stderr"  "$out" "refusing to execute this plan:"
+chk "execute prints no dry-run banner" "$(printf '%s' "$out" | grep -c 'WOULD BE REFUSED')" "0"
+[ -d "$T/wt-feature-done" ] && ok "execute deleted nothing" || bad "execute deleted nothing"
+
+echo "== 9. the rmtree fallback — the single most dangerous line =="
+# `git worktree remove` failing part-way is not reproducible on demand from the
+# filesystem (anything that stops git from unlinking stops shutil.rmtree too), so
+# the failure is injected with a git shim. What is under test is our fallback, not
+# git's deletion: the branch taken, the note reported, and the final on-disk state.
+mkdir -p "$W/shim"
+cat > "$W/shim/git" <<'SHIM'
+#!/bin/sh
+if [ "$1" = "worktree" ] && [ "$2" = "remove" ]; then
+  echo "error: failed to delete '$3': Directory not empty" >&2
+  exit 255
+fi
+exec /usr/bin/git "$@"
+SHIM
+chmod +x "$W/shim/git"
+fresh
+scan --assume-no-live-sessions --json "$W/r9.json"
+out=$(PATH="$W/shim:$PATH" python3 $S/remove_worktrees.py "$W/r9.json" --include safe \
+        --assume-no-live-sessions --only "$T/wt-feature-done" --execute 2>&1)
+has "fallback branch was taken" "$out" "removed (rmtree + prune)"
+[ -d "$T/wt-feature-done" ] && bad "fallback actually removed the directory" || ok "fallback actually removed the directory"
+chk "fallback pruned the registration" "$(/usr/bin/git -C "$T/webapp" worktree list | grep -c wt-feature-done)" "0"
+
+# The other half of that branch: rmtree itself failing must report, not pretend.
+# The failure is a top-level symlink, which shutil.rmtree refuses by design -- a
+# permission-based failure would not reproduce under a root CI runner, and this is
+# also the exact case that stops a doctored plan pointing the fallback at a symlink
+# into somewhere else.
+fresh
+ln -s "$T/wt-bugfix-shipped" "$T/wt-symlink"
+out=$(PATH="$W/shim:$PATH" python3 -c "
+import sys; sys.path.insert(0, '$S')
+from remove_worktrees import remove_one
+print(remove_one({'path': '$T/wt-symlink', 'repo': '$T/api', 'branch': ''}, True))" 2>&1)
+has "rmtree failure is reported, not swallowed" "$out" "rmtree failed"
+[ -d "$T/wt-bugfix-shipped" ] && ok "rmtree failure leaves the target in place" || bad "rmtree failure leaves the target in place"
+[ -L "$T/wt-symlink" ] && ok "rmtree failure leaves the symlink in place" || bad "rmtree failure leaves the symlink in place"
+
+echo "== 9b. a prune we cannot confirm is a failure, not a success =="
+# `git worktree prune` is repo-wide and says nothing about what it did; re-listing
+# is the only proof. When the listing itself fails, an unchecked exit code parsed
+# as an empty registration set and every stale entry reported "pruned" regardless.
+mkdir -p "$W/shim-list"
+cat > "$W/shim-list/git" <<'SHIM'
+#!/bin/sh
+if [ "$1" = "worktree" ] && [ "$2" = "list" ]; then
+  echo "fatal: not a git repository" >&2
+  exit 128
+fi
+exec /usr/bin/git "$@"
+SHIM
+chmod +x "$W/shim-list/git"
+fresh
+scan --assume-no-live-sessions --json "$W/r9b.json"
+out=$(PATH="$W/shim-list:$PATH" python3 $S/remove_worktrees.py "$W/r9b.json" --include stale \
+        --assume-no-live-sessions --only "$T/wt-vanished" --execute 2>&1)
+has "unconfirmable prune names the exit code" "$out" "could not confirm prune: git worktree list exited 128"
+has "unconfirmable prune counted as failed"   "$out" "Failed: 1"
+has "and not reported as removed"             "$out" "Removed: 0"
+
+echo "== 10. units that a fixture cannot reach =="
+out=$(python3 -c "
+import sys; sys.path.insert(0, '$S')
+from scan_worktrees import Worktree, match_live, is_build_output
+wt = Worktree(path='/x/unit-a', repo='/x')
+print('swallow' if match_live(wt, [], ['unit-app-something']) else 'no-swallow')
+print('match' if match_live(wt, [], ['unit-a-4f21']) else 'no-match')
+print('nested' if is_build_output('packages/web/node_modules/x/y.js') else 'missed')
+print('data' if not is_build_output('config/local.sqlite') else 'wrong')")
+chk "agent name unit-a does not swallow unit-app-something" "$(echo "$out" | sed -n 1p)" "no-swallow"
+chk "agent name unit-a-4f21 does match"                     "$(echo "$out" | sed -n 2p)" "match"
+chk "nested node_modules recognised as build output"        "$(echo "$out" | sed -n 3p)" "nested"
+chk "an ignored sqlite file is data, not build output"      "$(echo "$out" | sed -n 4p)" "data"
+
+echo "== 10b. uncommitted work is disallowed, not flag-overridable =="
+# --allow-dirty and --allow-untracked used to exist on both scripts, and
+# --allow-untracked was additionally carried out of the plan into the remover's own
+# policy while --allow-dirty was not. Both are gone: nothing here can tell
+# node_modules from the only copy of a migration, so the tool reports and the human
+# resolves. These assert the flags are *rejected*, not silently ignored.
+fresh
+out=$(python3 $S/scan_worktrees.py --roots "$T" --maxdepth 2 --quiet \
+        --assume-no-live-sessions --allow-untracked --json "$W/r10.json" 2>&1); rc=$?
+chk "scan rejects --allow-untracked" "$rc" "2"
+out=$(python3 $S/scan_worktrees.py --roots "$T" --maxdepth 2 --quiet \
+        --assume-no-live-sessions --allow-dirty --json "$W/r10.json" 2>&1); rc=$?
+chk "scan rejects --allow-dirty" "$rc" "2"
+scan --assume-no-live-sessions --json "$W/r10.json"
+out=$(python3 $S/remove_worktrees.py "$W/r10.json" --include review \
+        --assume-no-live-sessions --allow-untracked 2>&1); rc=$?
+chk "remover rejects --allow-untracked" "$rc" "2"
+out=$(python3 $S/remove_worktrees.py "$W/r10.json" --include review \
+        --assume-no-live-sessions --allow-dirty 2>&1); rc=$?
+chk "remover rejects --allow-dirty" "$rc" "2"
+
+# The plan no longer carries a policy the remover could adopt without being told.
+chk "plan carries no allow_* policy" "$(python3 -c "
+import json;d=json.load(open('$W/r10.json'))
+print(sum(1 for k in d if k.startswith('allow_')))")" "0"
+
+rsn() { python3 -c "
+import json;d=json.load(open('$W/r10.json'))
+print(' | '.join(next(w['reasons'] for w in d['worktrees'] if w['path'].endswith('/$1'))))"; }
+chk "untracked-only stays protected" "$(python3 -c "
+import json;d=json.load(open('$W/r10.json'))
+print(next(w['verdict'] for w in d['worktrees'] if w['path'].endswith('/wt-untracked')))")" "protected"
+has "untracked reason says what to resolve" "$(rsn wt-untracked)" "then re-scan"
+has "dirty reason says what to resolve"     "$(rsn wt-hotfix)"    "commit, stash or discard"
+
+echo "== 10c. a protected worktree still reports its ignored data in reasons =="
+# The table prints this from ignored_count for every verdict, but the JSON `reasons`
+# used to drop it the moment anything protective fired -- so a consumer reading the
+# plan lost the one fact a human needs before approving a deletion here.
+fresh
+echo "DB_PASSWORD=hunter2" > "$T/wt-hotfix/.env"     # ignored data on a *dirty* worktree
+age "$T" wt-hotfix
+scan --assume-no-live-sessions --json "$W/r10c.json"
+r10c() { python3 -c "
+import json;d=json.load(open('$W/r10c.json'))
+w=next(w for w in d['worktrees'] if w['path'].endswith('/wt-hotfix'))
+print(w['verdict'] if '$1' == 'v' else ' | '.join(w['reasons']))"; }
+chk "still protected"                        "$(r10c v)" "protected"
+has "protective reason survives"             "$(r10c r)" "uncommitted change(s) to tracked files"
+has "ignored-data reason survives alongside" "$(r10c r)" "git-ignored file(s) not recognised as build output"
+has "and names the file"                     "$(r10c r)" ".env"
+
+echo "== 10d. an older plan (allow_* keys, a review-verdict untracked worktree) degrades safely =="
+# Plans written by the version on main carried allow_dirty / allow_untracked, and
+# that version would have written wt-untracked as `review` under --allow-untracked.
+# The remover must not crash reading such a plan, and re-verification -- which does
+# not read allow_* at all any more -- must hold wt-untracked back as protected
+# rather than trusting the stale verdict baked into the plan.
+fresh
+scan --assume-no-live-sessions --json "$W/r10d.json"
+python3 - "$W/r10d.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+plan = json.load(open(path))
+plan["allow_dirty"] = True
+plan["allow_untracked"] = True
+for w in plan["worktrees"]:
+    if w["path"].endswith("/wt-untracked"):
+        w["verdict"] = "review"
+json.dump(plan, open(path, "w"))
+PY
+out=$(python3 $S/remove_worktrees.py "$W/r10d.json" --include review \
+        --assume-no-live-sessions --only "$T/wt-untracked" --execute 2>&1); rc=$?
+chk "old plan with allow_* keys does not crash the remover" "$rc" "3"
+printf '%s' "$out" | grep -qE '⊘ .*/wt-untracked$' \
+    && ok  "wt-untracked held back on re-check" \
+    || bad "wt-untracked held back on re-check (no '⊘ .../wt-untracked' line in: $(printf '%s' "$out" | tr '\n' '|'))"
+has "held back as protected, not trusted as review" "$out" "now protected"
+[ -d "$T/wt-untracked" ] && ok "wt-untracked survives" || bad "wt-untracked survives"
+
+echo "== 10e. a missing or malformed plan file is refused cleanly, not with a traceback =="
+# Every other refusal path in remove_worktrees.py prints a clean message to stderr
+# and returns 2. Opening and json.load-ing the plan used to have no error handling
+# at all, so a missing plan gave a raw FileNotFoundError traceback and a malformed
+# one a raw json.decoder.JSONDecodeError traceback.
+out=$(python3 $S/remove_worktrees.py "$W/does-not-exist.json" --assume-no-live-sessions 2>&1); rc=$?
+chk "nonexistent plan path: exit" "$rc" "2"
+has "nonexistent plan path: clean message" "$out" "not found"
+chk "nonexistent plan path: no traceback" "$(echo "$out" | grep -c Traceback)" "0"
+
+echo "not json" > "$W/bad-plan.json"
+out=$(python3 $S/remove_worktrees.py "$W/bad-plan.json" --assume-no-live-sessions 2>&1); rc=$?
+chk "malformed JSON plan: exit" "$rc" "2"
+has "malformed JSON plan: clean message" "$out" "not valid JSON"
+chk "malformed JSON plan: no traceback" "$(echo "$out" | grep -c Traceback)" "0"
+
+echo "[]" > "$W/list-plan.json"
+out=$(python3 $S/remove_worktrees.py "$W/list-plan.json" --assume-no-live-sessions 2>&1); rc=$?
+chk "plan is a JSON list, not an object: exit" "$rc" "2"
+has "plan is a JSON list, not an object: clean message" "$out" "unexpected shape"
+chk "plan is a JSON list, not an object: no traceback" "$(echo "$out" | grep -c Traceback)" "0"
+
+echo '{"scanned_at": 0}' > "$W/no-worktrees-key.json"
+out=$(python3 $S/remove_worktrees.py "$W/no-worktrees-key.json" --assume-no-live-sessions 2>&1); rc=$?
+chk "plan object missing worktrees key: exit" "$rc" "2"
+has "plan object missing worktrees key: clean message" "$out" "unexpected shape"
+chk "plan object missing worktrees key: no traceback" "$(echo "$out" | grep -c Traceback)" "0"
+
+echo "== 11. a repo sitting at exactly --maxdepth is found =="
+mkdir -p "$W/deep/a/b"; ( cd "$W/deep/a/b" && /usr/bin/git init -q r && cd r && \
+  /usr/bin/git config user.email d@e.com && /usr/bin/git config user.name D && \
+  /usr/bin/git config commit.gpgsign false && echo x > f && /usr/bin/git add . && /usr/bin/git commit -qm i )
+chk "repo at depth 3 with --maxdepth 3" "$(python3 -c "
+import sys; sys.path.insert(0, '$S')
+from scan_worktrees import find_repos
+print(len(find_repos(['$W/deep'], 3)))")" "1"
+
+echo ""
+echo "======================================"
+echo "  PASS: $PASS   FAIL: $FAIL"
+[ $FAIL -eq 0 ] || exit 1

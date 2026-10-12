@@ -1,0 +1,17 @@
+{
+  "name": "model-fit",
+  "displayName": "Model Fit",
+  "version": "3.0.0",
+  "description": "Before the first real task of a session, a quick Haiku check asks whether the session model fits it, on four tiers: Haiku, Sonnet, Opus, Fable. On a mismatch you get a Switch or Stay dialog before anything runs. It respects your cap and your availableModels setting and, in auto, probes each model once a day; a transient error counts as available.",
+  "author": { "name": "Maksym Skuibida" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "highestModel": {
+      "type": "string",
+      "title": "Highest model",
+      "description": "The strongest model model-fit may suggest. auto: check which models your plan and settings allow, and never suggest one you can't use. Pick a cap (fable, opus, sonnet, haiku) if your plan lacks a model or you want to cost-limit suggestions.",
+      "options": ["auto", "fable", "opus", "sonnet", "haiku"],
+      "default": "auto"
+    }
+  }
+}

@@ -1,0 +1,113 @@
+name: regression
+
+# Gates for four plugins. worktree-cleanup: its regression suite. model-fit, project-panel and ask-guard:
+# the Claude Code CLI validates the manifests and the mods, then runs each mod's own tests. Every plugin: versions
+# are consistent, and bumped on PRs that change what users receive (scripts/check-versions.py).
+#
+# The worktree-cleanup suite is the only gate on that code. The plugin's own history is the argument
+# for running it here: two of the three defects in its second commit silently disabled
+# a safety gate and were found by *executing* the tool against a fixture, not by
+# reading it. Nothing else obliges a reviewer to run it before merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Daily: catches upstream AI-DLC renaming a field project-panel parses (job upstream-aidlc).
+    - cron: "17 6 * * *"
+
+jobs:
+  regression:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The version guard diffs the PR against its base branch, which needs full history.
+          fetch-depth: 0
+
+      - name: Identify git and python
+        run: git --version && python3 --version
+
+      - name: Configure git identity
+        # The fixture creates repos and commits; a runner has no global identity.
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+          git config --global init.defaultBranch main
+
+      - name: Check plugin versions
+        # Users only receive an update when a plugin's version string changes. Consistency runs on
+        # every event; on a PR the guard also requires a bump for any plugin changed against its base.
+        run: |
+          python3 -m unittest discover scripts/tests
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/check-versions.py --base "origin/${{ github.base_ref }}"
+          else
+            python3 scripts/check-versions.py
+          fi
+
+      - name: Run the regression suite
+        run: bash plugins/worktree-cleanup/skills/worktree-cleanup/tests/regression.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the Claude Code CLI
+        # Pinned on purpose: the mod API is early-access and moves between releases, so a
+        # new CLI must be adopted by bumping this version, not by a CI run that broke overnight.
+        # 2.1.295 is also the oldest build that knows the models model-fit routes to.
+        run: npm install -g @anthropic-ai/claude-code@2.1.295
+
+      - name: Check the classifier prompt matches the one the evals measure
+        # plugins/model-fit/hooks/classify.ts must carry evals/prompts/candidate.txt byte for byte.
+        run: node plugins/model-fit/evals/check-prompt-sync.mjs
+
+      - name: Hold the Python prompt builder to the TypeScript one
+        # evals/run.py builds the prompt the evals send; it must equal what the plugin sends.
+        run: python3 -m unittest discover -s plugins/model-fit/evals/tests -p 'test_*.py'
+
+      - name: Smoke-test the eval harness (dry run, no model calls)
+        run: |
+          cd plugins/model-fit/evals
+          python3 run.py --dry-run --skip-viewer --only 1,97 --reps 1 --iteration 99 --overwrite
+
+      - name: Validate and test model-fit
+        # Not best effort: a model-fit mod that fails either command fails the job.
+        run: |
+          claude plugin validate plugins/model-fit
+          claude plugin test plugins/model-fit
+
+      - name: Validate and test project-panel
+        # Not best effort, same as model-fit.
+        run: |
+          claude plugin validate plugins/project-panel
+          claude plugin test plugins/project-panel
+
+      - name: Validate and test ask-guard
+        # Not best effort, same as model-fit.
+        run: |
+          claude plugin validate plugins/ask-guard
+          claude plugin test plugins/ask-guard
+
+      - name: Validate the marketplace and the worktree-cleanup plugin
+        run: |
+          claude plugin validate .
+          claude plugin validate plugins/worktree-cleanup
+
+  upstream-aidlc:
+    # project-panel's AI-DLC provider is keyed on upstream's state-file field names,
+    # and upstream v2 moves fast: parse main's live template daily and on main.
+    # Kept out of pull requests so a network blip or an upstream change does not
+    # turn an unrelated PR red.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Parse upstream AI-DLC main's state template
+        run: node --experimental-strip-types plugins/project-panel/tests/check-upstream.ts

@@ -1,0 +1,39 @@
+{
+  "name": "mskuibida-tooling",
+  "owner": {
+    "name": "Maksym Skuibida"
+  },
+  "description": "Maksym Skuibida's personal Claude Code tooling — small, opinionated plugins.",
+  "plugins": [
+    {
+      "name": "response-format",
+      "source": "./plugins/response-format",
+      "description": "A house style for Claude's replies: one self-contained, fully linked, ask-first report at hand-back or when you are needed, quiet mid-flight, decisions through the question UI, and a hard bias against unverified claims.",
+      "version": "2.1.0"
+    },
+    {
+      "name": "worktree-cleanup",
+      "source": "./plugins/worktree-cleanup",
+      "description": "Find and remove orphaned git worktrees across many repos, gated on unpushed work, live sessions, and recent activity — re-verified at the moment of deletion, not at scan time.",
+      "version": "2.0.0"
+    },
+    {
+      "name": "model-fit",
+      "source": "./plugins/model-fit",
+      "description": "Before the first real task of a session, a quick Haiku check asks whether the session model fits it, on four tiers (Haiku, Sonnet, Opus, Fable); on a mismatch you get a Switch or Stay dialog before anything runs. It respects your cap and availableModels setting and, in auto, probes each model once a day; a transient error counts as available.",
+      "version": "3.0.0"
+    },
+    {
+      "name": "project-panel",
+      "source": "./plugins/project-panel",
+      "description": "A side pane for any repo with a plan: its sections, their items and what blocks the next one, with progress rings. Providers: AI-DLC v2, and a task ledger (WORKPLAN.md) read against its pull or merge requests (GitHub through gh, GitLab through glab, self-hosted included), with each pull request's review state and what it asks of you. Opens with /panel.",
+      "version": "0.10.1"
+    },
+    {
+      "name": "ask-guard",
+      "source": "./plugins/ask-guard",
+      "description": "Keeps the question dialog readable: a question the model writes longer than 250 characters (configurable) is sent back with word to put the context in a markdown message first and ask in one line. Other plugins' dialogs pass untouched.",
+      "version": "0.1.0"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "project-panel",
+  "displayName": "Project Panel",
+  "version": "0.10.1",
+  "description": "A side pane for any repo with a plan: sections, items and what blocks the next one. Providers: AI-DLC v2, and a task ledger (WORKPLAN.md) read against its pull or merge requests (GitHub through gh, GitLab through glab, self-hosted included), with each pull request's review state.",
+  "author": { "name": "Maksym Skuibida" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "panel": {
+      "type": "string",
+      "title": "Panel",
+      "description": "auto: open the pane by itself when a plan is detected (desktop app only), /panel opens it anywhere. command: open it only with /panel or a button. off: never open it.",
+      "options": ["auto", "command", "off"],
+      "default": "auto"
+    },
+    "stageBranchPattern": {
+      "type": "string",
+      "title": "Stage branch pattern (AI-DLC)",
+      "description": "AI-DLC provider. Regex a stage session's branch matches; named groups `ticket` and `stages`. A bound session on another branch is shown as a side job. The default is a 3-segment <owner>/<ticket>/<stages> convention; set it to empty to treat every session as a side job.",
+      "default": "^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$"
+    },
+    "foldSeparator": {
+      "type": "string",
+      "title": "Fold separator (AI-DLC)",
+      "description": "AI-DLC provider. Separates stage slugs in a branch that carries several stages at once (dev/SHOP-7/refined-mockups--domain-design).",
+      "default": "--"
+    },
+    "forge": {
+      "type": "string",
+      "title": "Forge",
+      "description": "Where pull or merge requests are read from. auto: github.com is GitHub; any other host is GitLab when glab is logged in to it, GitHub Enterprise when gh is. github / gitlab: take the origin's host as that forge without probing. none: read no pull or merge requests (progress comes from the ledger alone).",
+      "options": ["auto", "github", "gitlab", "none"],
+      "default": "auto"
+    },
+    "reviewCommands": {
+      "type": "string",
+      "title": "Review commands",
+      "description": "Whether Needs attention and Next name the pr-review plugin's commands (/pr-review:review-pr N, /pr-review:address-review N, /pr-review:request-review N). auto: when the repository's .claude/settings.json enables a pr-review plugin. on: always. off: never (the review state still shows).",
+      "options": ["auto", "on", "off"],
+      "default": "auto"
+    },
+    "slackDomain": {
+      "type": "string",
+      "title": "Slack workspace domain",
+      "description": "The Slack workspace's domain, the part before .slack.com (acme for acme.slack.com). With it, a PR's pr-review Slack thread is a link; without it the panel only shows that the thread exists. No Slack call is ever made.",
+      "default": ""
+    },
+    "fsPollSeconds": {
+      "type": "number",
+      "title": "File poll (seconds)",
+      "description": "How often the open pane checks the plan's files and the git branch for changes made outside the session. Minimum 2; 0 turns the poll off (tool calls, turn ends and Refresh still re-read).",
+      "default": 10
+    },
+    "prPollSeconds": {
+      "type": "number",
+      "title": "Remote poll (seconds)",
+      "description": "How often the open pane asks a provider whether its remote state (pull or merge requests) changed. Minimum 30; 0 turns the poll off. AI-DLC asks too: its stages are read against the default branch and the open pull or merge requests (a repo with no origin is never asked). A provider with no remote state is never asked.",
+      "default": 180
+    },
+    "summaryModel": {
+      "type": "string",
+      "title": "Enrichment model",
+      "description": "Full model id for side-job titles, captions and session summaries (milestone 4+). A full id, not the `haiku` alias: the alias resolves to whatever the engine's table says, which may be an older Haiku.",
+      "default": "claude-haiku-5-5"
+    }
+  }
+}

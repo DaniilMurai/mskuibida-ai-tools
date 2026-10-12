@@ -1,0 +1,30 @@
+{
+  "skill_name": "model-fit-classifier",
+  "evals": [
+    {
+      "id": 1,
+      "name": "rename-across-files",
+      "prompt": "Rename the function getUser to fetchUser in every file under src/ and update the imports.",
+      "expected": { "kind": "task", "enough": true, "tier": "haiku" },
+      "tier_uncertain": false,
+      "assertions": ["kind is task", "enough is true", "tier is haiku"]
+    },
+    {
+      "id": 2,
+      "name": "overdraw-race",
+      "prompt": "Make concurrent withdrawals unable to overdraw an account in our payments service.",
+      "expected": { "kind": "task", "enough": true, "tier": "opus" },
+      "tier_uncertain": false,
+      "assertions": ["kind is task", "enough is true", "tier is opus"]
+    },
+    {
+      "id": 3,
+      "name": "continue-the-plan",
+      "prompt": "Continue with the plan.",
+      "context": ["docs/plan.md\n1. Add a settings page with a dark-mode toggle.\n2. Wire the toggle to the user profile endpoint."],
+      "expected": { "kind": "task", "enough": true, "tier": "sonnet" },
+      "tier_uncertain": true,
+      "assertions": ["kind is task", "enough is true"]
+    }
+  ]
+}

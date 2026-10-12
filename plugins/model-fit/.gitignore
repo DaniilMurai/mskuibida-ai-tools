@@ -1,0 +1,6 @@
+# Written by the engine on every load; regenerated, never edited.
+.claude-plugin/types/
+
+# Eval harness output (plugins/model-fit/evals/run.py).
+evals/workspace/
+evals/workspace-holdout/
