@@ -6,6 +6,7 @@ import { buildModel, fingerprintOf, runAction } from '../src/model'
 import { createRefreshEngine } from '../src/refresh'
 import type { RefreshEngine, RefreshPorts, Snapshot } from '../src/refresh'
 import { renderPane } from '../src/render'
+import { manifestPath, versionOfManifest } from '../src/version'
 import { t } from '../src/strings/en'
 import type { PanelModel, PanelOptions } from '../types'
 
@@ -153,7 +154,8 @@ function refreshPortsOf($: EngineInterface, settings: Settings): RefreshPorts {
 }
 
 /** Where the register closure keeps its refresh engine; the helpers below take it as a plain argument. */
-type EngineSlot = { engine: RefreshEngine | null }
+/** The session's refresh engine, and the plugin's own version once its manifest has been read (for the pane's foot). */
+type EngineSlot = { engine: RefreshEngine | null; version?: Promise<string> }
 
 function bindEngine($: EngineInterface, settings: Settings, slot: EngineSlot, startDir: string): RefreshEngine {
   slot.engine?.stop()
@@ -355,7 +357,14 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const [model, expanded, now] = await Promise.all([read($, modelAtom), read($, expandedAtom), $.clock.now()])
+    // The manifest is read once, the first time the pane draws; a failed read is asked again on the next draw.
+    slot.version ??= $.fs
+      .read(manifestPath($.plugin.root))
+      .then(versionOfManifest, () => {
+        slot.version = undefined
+        return ''
+      })
+    const [model, expanded, now, version] = await Promise.all([read($, modelAtom), read($, expandedAtom), $.clock.now(), slot.version])
     // A pane being drawn is a pane on screen: let a stopped engine notice (no state is written here).
     slot.engine?.noteRendered(now)
     void slot.engine?.wake().catch(() => undefined)
@@ -382,6 +391,7 @@ export const register: Register = (on, options) => {
       },
     },
     // M2 hook point data: the clock the header's "checked {ago}" reads.
-    { now, checkedAt: slot.engine?.checkedAt() ?? 0 })
+    { now, checkedAt: slot.engine?.checkedAt() ?? 0 },
+    version)
   })
 }

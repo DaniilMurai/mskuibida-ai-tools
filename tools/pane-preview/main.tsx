@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { renderPane } from '../../plugins/project-panel/src/render'
 import { item, ledgerModel, section, sideJobModel, stageModel, idleModel } from '../../plugins/project-panel/tests/world'
 import type { Gate, PanelModel } from '../../plugins/project-panel/types'
+import manifest from '../../plugins/project-panel/.claude-plugin/plugin.json'
 import { ADVANCE, desktopKit } from './kit'
 
 // The panel's modules are compiled with `h` as their JSX factory (the engine's); here it is React's.
@@ -114,6 +115,7 @@ function Pane({ theme, width, model }: { theme: 'dark' | 'light'; width: number;
       onFillNext: command => console.log('put in prompt:', command),
     },
     { now: NOW, checkedAt: NOW - 2_000 },
+    manifest.version,
   )
   return (
     <div className={`pane ${theme}`} style={{ width }}>

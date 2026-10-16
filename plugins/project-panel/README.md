@@ -91,6 +91,11 @@ title. Proposed sections (a ledger's suggested products) sit under one dim "Prop
 A section with no items and nothing counted has no ring and a dim title. A linked title is a `Link` around a truncating `Text`, in a
 clipping, shrinking wrapper.
 
+**Version mark (0.14.0).** The pane's last line, dim and on the right, is `project-panel 0.14.0`: the version in the
+`plugin.json` the engine loaded the mod from (`$.plugin.root`), read once when the pane first draws. It says which build
+is drawing the pane, so a look can be told from an older one after an update. When the manifest cannot be read there is
+no mark, and the next draw asks again.
+
 **Freshness.** `renderPane` takes an optional clock (`{ now, checkedAt }`) as its last argument. With one the stamp reads
 `checked 12s ago`; without it, `read 12:03`, the time the plan was read. The clock and the error line below come from
 the refresh engine (`src/refresh.ts`), which fills `freshness` on the model; `hooks/register.tsx` passes the clock. When the latest re-read or remote
@@ -715,6 +720,7 @@ src/render.tsx                    renderPane: any PanelModel -> pane tree (deter
 src/render/                       its blocks: header, now (card, Next, actions), attention, plan (list, phase cards), item, ring (rings + strip),
                                   stepper (the phase stepper, isPhased), look (the desktop's pills and status icons), kit
 src/freshness.ts                  the "checked 12s ago" stamp (pure; the caller hands in the clock)
+src/version.ts                    the plugin's own version from its manifest, for the pane's foot (pure)
 src/strings/en.ts                 every user-facing string (a mod imports code files only, so not .json)
 src/providers/ledger.ts           the ledger Provider (detect, load, pin/rebuild actions)
 src/providers/ledger/             the pure core (parse, match, progress, next, drift, discover, hash, ai) and its
@@ -774,6 +780,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.14.0** — a dim `project-panel <version>` mark at the foot of the pane, read from the manifest the mod was loaded from, so you can tell which build is drawing it.
 - **0.13.0** — the desktop look (pills, tinted cards, status icons, ring-first section rows); a session is a stage by its AI-DLC binding alone, whatever its branch.
 - **0.12.0** — desktop phase views: the phase stepper on a one-column pane, phase cards in the wide pane's plan column.
 - **0.11.1** — Construction's row says `not included yet` until Units exist.

@@ -36,7 +36,8 @@ const COLUMN_GAP = 2
  * `surface` decides the ring, not the table's keys: the terminal's table answers
  * an `Svg` constructor at run time though its type has none, and draws nothing from it.
  * `clock` (the engine's `now`, its last check) turns the stamp into "checked 12s ago";
- * without it the stamp is the model's "read 12:03".
+ * without it the stamp is the model's "read 12:03". `version`, the plugin's own, is the dim
+ * mark at the foot ('' draws none).
  */
 export function renderPane(
   table: Kit,
@@ -46,11 +47,21 @@ export function renderPane(
   expanded: Record<string, boolean>,
   handlers: Handlers,
   clock?: Clock,
+  version = '',
 ): El {
   const kit: Kit = surface === 'terminal' ? { ...table, Svg: undefined } : table
   const width = Number.isFinite(columns) ? columns : 60
   const ctx: Ctx = { kit, surface, bp: breakpoint(width), columns: width, handlers }
   const { Box, Text } = kit
+  // The build drawing the pane, dim at its foot, so a look can be told from an older one ('' hides it).
+  const mark = t('pane.version', { version })
+  const footer = mark !== '' && (
+    <Box justifyContent="flex-end">
+      <Text dimColor wrap="truncate-end">
+        {mark}
+      </Text>
+    </Box>
+  )
 
   if (model === null) {
     const empty = t('pane.empty')
@@ -62,6 +73,7 @@ export function renderPane(
             {empty}
           </Text>
         )}
+        {footer}
       </Box>
     )
   }
@@ -94,6 +106,7 @@ export function renderPane(
           {right}
         </Box>
       )}
+      {footer}
     </Box>
   )
 }
