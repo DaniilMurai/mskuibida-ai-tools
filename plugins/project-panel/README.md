@@ -338,7 +338,7 @@ stages `<phase>.<stage>` from 1 in the state file's order, skipped rows included
 means the same stage whatever is skipped. Unit rows carry none.
 
 Until Units Generation has finished and produced Units, Construction's seven stages are not a size anyone knows: the section
-is listed with its stages but carries no count or ring, and the plan counts only the other phases. Once the Units exist
+is listed with its stages but carries no count or ring (its row says `not included yet`, in `local only`'s amber), and the plan counts only the other phases. Once the Units exist
 (or when Units Generation is skipped), Construction counts again, as below.
 
 ### Construction by Unit (0.10.0)
@@ -732,6 +732,7 @@ loads the mod from a dev folder (`claude --plugin-dir plugins/project-panel`); t
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.11.1** — Construction's row says `not included yet` until Units exist.
 - **0.11.0** — phase and `<phase>.<stage>` numbers; stages finished but local only count as done; Construction is not counted until Units exist.
 - **0.7.1** — "in review" instead of "in PR #N", "up next" for a stage nothing is written for yet, pushed work never "local only", and PR lists that survive a flaky network.
 - **M3 (0.7.0)** — PRs per stage for the AI-DLC provider: two truths (merged / in PR / local only), PR chips with review and CI, folds across stages, deterministic reopens, gates between stages (PR not merged, CI failing, changes requested, behind main; a park waiting on a PR sits beside it), the Now card's main line, and a remote fingerprint.
