@@ -425,6 +425,19 @@ describe('layout', () => {
 
 describe('sections and items', () => {
   for (const surface of SURFACES) {
+    test(`an uncounted section says "not included yet" in place of a count on ${surface}`, async ($, on) => {
+      const model = stageModel()
+      const construction = model.sections.find(one => one.id === 'CONSTRUCTION')!
+      construction.isUncounted = true
+      delete construction.counts
+      delete construction.percent
+      const { ui } = await draw($, on, model, surface)
+      expect(await shown(ui as Probe)).toContain('not included yet')
+      await ui.unmount()
+      const counted = await draw($, on, stageModel(), surface)
+      expect(await shown(counted.ui as Probe)).not.toContain('not included yet')
+    })
+
     test(`numbers on ${surface}: the phase before its title, <phase>.<stage> before each stage`, async ($, on) => {
       const model = stageModel()
       model.sections.forEach((one, at) => {

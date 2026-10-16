@@ -68,6 +68,7 @@ export const en = {
 
   'section.count': '{done}/{total}',
   'section.skipped': 'skipped',
+  'section.notIncluded': 'not included yet',
   'section.proposedHeading': 'Proposed',
   'section.doneFold': '{count} done, show',
   'section.doneHide': 'Hide done',

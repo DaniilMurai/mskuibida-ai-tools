@@ -392,6 +392,11 @@ function sectionTail(ctx: Ctx, section: Section, countWidth: number): El | false
     const word = t('section.skipped')
     return word !== '' && <Text dimColor>{word}</Text>
   }
+  // Work with no size yet: said in the colour of "local only", not left blank.
+  if (section.isUncounted === true) {
+    const word = t('section.notIncluded')
+    return word !== '' && <Text color="warning">{word}</Text>
+  }
   const isBuilt = section.status === 'built'
   const text = countText(section)
   const hasRing = section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
