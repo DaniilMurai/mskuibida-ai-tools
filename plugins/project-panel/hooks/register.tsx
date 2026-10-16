@@ -364,7 +364,11 @@ export const register: Register = (on, options) => {
         slot.version = undefined
         return ''
       })
-    const [model, expanded, now, version] = await Promise.all([read($, modelAtom), read($, expandedAtom), $.clock.now(), slot.version])
+    const [model, expanded, version] = await Promise.all([read($, modelAtom), read($, expandedAtom), slot.version])
+    // No clock read here: a render that reads the clock is invalidated by it, and every redraw retires the drawn
+    // buttons' press handles, so a click landing across one was lost (the second click worked). The stamp's "now"
+    // is the engine's latest clock reading, which its polls move; it redraws the pane when the text would change.
+    const now = slot.engine?.now() || model?.readAt || 0
     // A pane being drawn is a pane on screen: let a stopped engine notice (no state is written here).
     slot.engine?.noteRendered(now)
     void slot.engine?.wake().catch(() => undefined)

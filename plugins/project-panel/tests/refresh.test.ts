@@ -877,6 +877,31 @@ describe('freshness stamp', () => {
     expect(engine.checkedAt()).toBe(before)
   })
 
+  test('now() is the latest clock reading, which the quiet ticks move: the pane draws its stamp from it, not the clock', async () => {
+    const { world, engine } = await running()
+    expect(engine.now()).toBe(engine.checkedAt())
+    await world.clock.advance(10_000)
+    expect(engine.now()).toBe(world.clock.time)
+    expect(engine.now()).toBe(engine.checkedAt())
+  })
+
+  test('while the plan fails to read, the ticks still move now(), and the stamp ages with a redraw only when its text changes', async () => {
+    const { world, engine } = await running()
+    const checked = engine.checkedAt()
+    world.loadError = true
+    await engine.readNow()
+    engine.noteRendered(engine.now())
+    const redraws = world.invalidations
+    // The state file is unchanged on disk, so each tick is a quiet one: no check is claimed, but time moves.
+    await world.clock.advance(10_000)
+    expect(engine.checkedAt()).toBe(checked)
+    expect(engine.now()).toBe(world.clock.time)
+    expect(world.invalidations).toBe(redraws + 1)
+    // One tick, one new text ("20s ago" after "10s ago"): one redraw each, never more.
+    await world.clock.advance(10_000)
+    expect(world.invalidations).toBe(redraws + 2)
+  })
+
   test('a remote tick that worked counts too', async () => {
     const { world, engine } = await running({ fingerprint: 'pr:1' })
     const before = engine.checkedAt()
