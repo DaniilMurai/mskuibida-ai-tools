@@ -27,7 +27,7 @@
       "name": "project-panel",
       "source": "./plugins/project-panel",
       "description": "A side pane for any repo with a plan: its sections, their items and what blocks the next one, with progress rings. Providers: AI-DLC v2, and a task ledger (WORKPLAN.md) read against its pull or merge requests (GitHub through gh, GitLab through glab, self-hosted included), with each pull request's review state and what it asks of you. Opens with /panel.",
-      "version": "0.12.0"
+      "version": "0.13.0"
     },
     {
       "name": "ask-guard",

@@ -1,7 +1,8 @@
 // The Now card: what the session is on, what is next, and the provider's actions.
 import { t } from '../strings/en'
 import type { ContextLine, Item, PanelModel, Section } from '../../types'
-import { safely, toneColor, uniqueIds } from './kit'
+import { CARD_FILL, CARD_LINE, isRich, safely, tint, toneColor, uniqueIds } from './kit'
+import { pill, statusIcon } from './look'
 import type { Ctx, El } from './kit'
 import { itemLook } from './item'
 
@@ -28,12 +29,13 @@ export function showsCurrentItem(model: PanelModel): boolean {
   return model.header.mode !== 'side-job' && model.header.mode !== 'idle' && currentOf(model) !== null
 }
 
+/** A card's small dim label ("Now", "Next"); the desktop sets it in capitals, as an eyebrow. */
 function dimLabel(ctx: Ctx, text: string): El | false {
   const { Text } = ctx.kit
   return (
     text !== '' && (
       <Text bold dimColor wrap="truncate-end">
-        {text}
+        {isRich(ctx) ? text.toUpperCase() : text}
       </Text>
     )
   )
@@ -113,21 +115,24 @@ export function nowCard(ctx: Ctx, model: PanelModel): El | false {
             </Box>
           )}
         </Box>,
-        <Box gap={1}>
-          <Box flexShrink={0}>
-            <Text bold color={look.color} dimColor={look.color === undefined}>
-              {look.glyph}
-            </Text>
-          </Box>
+        <Box gap={1} alignItems="center">
+          {isRich(ctx) ? (
+            statusIcon(ctx, current.item, look.glyph, word)
+          ) : (
+            <Box flexShrink={0}>
+              <Text bold color={look.color} dimColor={look.color === undefined}>
+                {look.glyph}
+              </Text>
+            </Box>
+          )}
           <Box flexShrink={1}>
             <Text bold wrap="wrap">
               {current.item.title}
             </Text>
           </Box>
+          {isRich(ctx) && <Box flexGrow={1} />}
           {word !== '' && (
-            <Box flexShrink={0}>
-              <Text color={look.wordColor}>{word}</Text>
-            </Box>
+            <Box flexShrink={0}>{isRich(ctx) ? pill(ctx, word, look.wordColor ?? 'claude') : <Text color={look.wordColor}>{word}</Text>}</Box>
           )}
         </Box>,
         dimCaption(ctx, base),
@@ -137,8 +142,11 @@ export function nowCard(ctx: Ctx, model: PanelModel): El | false {
   }
 
   const next = nextBlock(ctx, model)
+  // The desktop's card is a faint lift with a faint line; a side job keeps its warning edge, which says it is one.
+  const rich = isRich(ctx)
+  const border = rich && mode !== 'side-job' ? CARD_LINE : MODE_BORDER[mode]
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={MODE_BORDER[mode]} paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={border} backgroundColor={rich ? CARD_FILL : undefined} paddingX={1}>
       {top}
       {next !== false && (
         <Box flexDirection="column" marginTop={1}>
@@ -156,6 +164,7 @@ function nextBlock(ctx: Ctx, model: PanelModel): El | false {
   if (!next || next.command === '') return false
   const label = t('next.label')
   const fill = t('next.fill')
+  if (isRich(ctx)) return richNext(ctx, model, next.command, next.reason, label, fill)
   const text = (
     <Box flexDirection="column" flexShrink={1}>
       <Box gap={1}>
@@ -204,6 +213,43 @@ function nextBlock(ctx: Ctx, model: PanelModel): El | false {
     <Box gap={1} justifyContent="space-between">
       {text}
       {button}
+    </Box>
+  )
+}
+
+/**
+ * The desktop's Next: the label, the command as a grey pill and the reason on one wrapping line, then the button
+ * across the card's width (primary, save on a side job).
+ */
+function richNext(ctx: Ctx, model: PanelModel, command: string, reason: string, label: string, fill: string): El {
+  const { Box, Text, Button } = ctx.kit
+  return (
+    <Box flexDirection="column" gap={1}>
+      <Box gap={1} flexWrap="wrap">
+        {label !== '' && <Box flexShrink={0}>{dimLabel(ctx, label)}</Box>}
+        <Box flexShrink={1}>
+          <Text bold color="claude" backgroundColor={tint(undefined, '24')} wrap="truncate-end">
+            {`\u00a0${command}\u00a0`}
+          </Text>
+        </Box>
+        {reason !== '' && (
+          <Box flexShrink={1}>
+            <Text wrap="wrap">{reason}</Text>
+          </Box>
+        )}
+      </Box>
+      {fill !== '' && (
+        <Box flexDirection="column">
+          <Button
+            key="next:fill"
+            hotkey="p"
+            variant={model.header.mode === 'side-job' ? 'secondary' : 'primary'}
+            onPress={safely(() => ctx.handlers.onFillNext(command))}
+          >
+            {fill}
+          </Button>
+        </Box>
+      )}
     </Box>
   )
 }

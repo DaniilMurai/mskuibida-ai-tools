@@ -3,7 +3,10 @@ import type { On } from 'claude-code'
 import type { Engine } from 'claude-code/testing'
 
 import { renderPane } from '../src/render'
+import { CARD_FILL, CARD_LINE, tint } from '../src/render/kit'
+import { iconSource } from '../src/render/look'
 import { foldRow, foldedDone, openCap } from '../src/render/item'
+import { bare, padded, ringsOf } from './rich'
 import { MOUNT, foldedModel, idleModel, item, ledgerModel, section, seedModel, sideJobModel, stageModel } from './world'
 import type { PanelModel } from '../types'
 
@@ -25,6 +28,9 @@ const localWidth = (columns: number) => (columns >= 80 ? Math.floor(columns * 0.
 /** True when the Now card and Attention use their stacked (narrow) layouts. */
 const isStacked = (columns: number) => localWidth(columns) < 48
 
+/** A section heading's text: the terminal's carries the chevron; the desktop's has it in a Text of its own before the ring. */
+const headingText = (surface: string, isOpen: boolean, title: string) => (surface === 'terminal' ? `${isOpen ? '▾' : '▸'} ${title}` : title)
+
 type Found = { type?: string; text: string; props: Record<string, unknown> }
 type Probe = { findAll: (query: { type?: string; key?: string; text?: string | RegExp }) => Promise<Found[]> }
 type Node = { type: string; props: Record<string, unknown>; children?: (Node | string)[] }
@@ -32,7 +38,7 @@ type Node = { type: string; props: Record<string, unknown>; children?: (Node | s
 /** Every Text and Button of the drawing, in document order, as shown. */
 async function shown(ui: Probe): Promise<string[]> {
   const all = await ui.findAll({})
-  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => el.text)
+  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => bare(el.text))
 }
 
 /** Mounts the Pane over a model held in memory, `columns` wide. */
@@ -101,9 +107,15 @@ describe('header', () => {
       expect((await ui.find({ key: 'refresh' }))?.props.plain).toBeUndefined()
       expect(textOf(row1!)).toContain('SHOP-MVP-RESTART')
       expect(textOf(row1!)).not.toContain('checked just now')
-      expect(textOf(row1!)).not.toContain('Side job')
-      expect(textOf(row2!)).toContain('Side job')
-      expect(textOf(row2!)).toContain('checked just now')
+      if (surface === 'terminal') {
+        expect(textOf(row1!)).not.toContain('Side job')
+        expect(textOf(row2!)).toContain('Side job')
+        expect(textOf(row2!)).toContain('checked just now')
+      } else {
+        // The desktop has one row at every width: the title, the badge as a pill and ↻; the stamp is dim under it.
+        expect(textOf(row1!)).toContain(padded('Side job'))
+        expect(textOf(row2!)).toBe('checked just now')
+      }
       await ui.unmount()
     })
 
@@ -113,10 +125,17 @@ describe('header', () => {
         const [row1, row2] = kids(headerOf(await tree(ui)))
 
         expect((await ui.find({ key: 'refresh' }))?.text).toBe('↻ Refresh')
-        expect(textOf(row1!)).toContain('Side job')
-        expect(textOf(row1!)).toContain('checked just now')
-        // Nothing else follows row 1: the next block is the Now card.
-        expect(row2 === undefined || textOf(row2).includes('Side job') === false).toBe(true)
+        if (surface === 'terminal') {
+          expect(textOf(row1!)).toContain('Side job')
+          expect(textOf(row1!)).toContain('checked just now')
+          // Nothing else follows row 1: the next block is the Now card.
+          expect(row2 === undefined || textOf(row2).includes('Side job') === false).toBe(true)
+        } else {
+          // The desktop: the badge pill on row 1, the stamp on the dim line under it.
+          expect(textOf(row1!)).toContain(padded('Side job'))
+          expect(textOf(row1!)).not.toContain('checked just now')
+          expect(textOf(row2!)).toBe('checked just now')
+        }
         await ui.unmount()
       })
     }
@@ -151,15 +170,17 @@ describe('header', () => {
       // ...with an explicit shrink of 1 and a small floor...
       expect(trail!.at(-2)!.props.flexShrink).toBe(1)
       expect(trail!.at(-2)!.props.minWidth).toBe(8)
-      // ...and every other child of row 1 is the empty spacer or the Refresh button, which never shrinks.
+      // ...and every other child of row 1 is the empty spacer, the Refresh button, which never shrinks, and on the desktop the badge pill, which does not either.
       const others = kids(row1!).filter(box => !textOf(box).includes(title))
-      expect(others.length).toBe(2)
+      const isDesktop = surface !== 'terminal'
+      expect(others.length).toBe(isDesktop ? 3 : 2)
       for (const box of others) {
-        expect(box.props.flexGrow === 1 && textOf(box) === '' ? true : box.props.flexShrink === 0 && textOf(box) === '↻').toBe(true)
+        const isBadge = isDesktop && textOf(box) === padded('Side job') && box.props.flexShrink === 0
+        expect(box.props.flexGrow === 1 && textOf(box) === '' ? true : isBadge || (box.props.flexShrink === 0 && textOf(box) === '↻')).toBe(true)
       }
-      // ↻ is on row 1; the badge and the stamp are not.
+      // ↻ is on row 1; the stamp is not, and the badge only on the desktop.
       expect(textOf(row1!)).toContain('↻')
-      expect(textOf(row1!)).not.toContain('Side job')
+      expect(textOf(row1!).includes('Side job')).toBe(isDesktop)
       expect(textOf(row2!)).toContain('checked just now')
       await ui.unmount()
     })
@@ -204,11 +225,15 @@ describe('header', () => {
       const head = headerOf(root)
       expect(chains(head, isText(error)).length).toBe(1)
       expect((await (ui as Probe).findAll({ type: 'Text', text: error }))[0]?.props.color).toBe('error')
-      // The first attention row, counted: error + 2 gates + 1 drift.
-      expect(lines).toContain('Needs attention (4)')
-      const attention = lines.slice(lines.indexOf('Needs attention (4)'))
-      expect(attention.slice(0, 2)).toEqual(['Needs attention (4)', '!'])
-      expect(attention[2]).toBe(error)
+      // The attention card's title is in the text colour on the desktop (the card is tinted in the tone); its glyph keeps the tone.
+      expect((await (ui as Probe).findAll({ type: 'Text', text: error }))[1]?.props.color).toBe(surface === 'terminal' ? 'error' : undefined)
+      expect((await (ui as Probe).findAll({ type: 'Text', text: '!' }))[1]?.props.color).toBe('error')
+      // The first attention row, counted: error + 2 gates + 1 drift. The desktop's heading is the words, then the count as a pill.
+      const heading = surface === 'terminal' ? ['Needs attention (4)'] : ['Needs attention', '4']
+      expect(lines).toContain(heading[0])
+      const attention = lines.slice(lines.indexOf(heading[0]!))
+      expect(attention.slice(0, heading.length + 1)).toEqual([...heading, '!'])
+      expect(attention[heading.length + 1]).toBe(error)
       await ui.unmount()
     })
 
@@ -241,11 +266,13 @@ describe('now card and next', () => {
         const { ui } = await draw($, on, stageModel(), surface, columns)
         const root = await tree(ui)
         const lines = await shown(ui as Probe)
+        const rich = surface !== 'terminal'
 
-        expect(lines).toContain('Now')
+        // The desktop sets the card's small labels in capitals.
+        expect(lines).toContain(rich ? 'NOW' : 'Now')
         expect(lines).toContain('Inception, 5 of 8')
         expect(lines).toContain('domain-design')
-        expect(lines).toContain('Next')
+        expect(lines).toContain(rich ? 'NEXT' : 'Next')
         expect((await ui.find({ type: 'Text', text: '/aidlc' }))?.props.color).toBe('claude')
         expect((await ui.find({ type: 'Text', text: '/aidlc' }))?.props.bold).toBe(true)
         expect(lines).toContain('Execute Domain Design')
@@ -253,12 +280,13 @@ describe('now card and next', () => {
         expect(fill?.text).toBe('Put in prompt')
         expect(fill?.props.hotkey).toBe('p')
         expect(fill?.props.variant).toBe('primary')
-        // The card is round-bordered in the mode's colour.
-        const [card] = chains(root, node => node.type === 'Box' && node.props.borderStyle === 'round' && node.props.borderColor === 'claude')
+        // The card is round-bordered in the mode's colour; the desktop's is a faint line over a faint fill.
+        const [card] = chains(root, node => node.type === 'Box' && node.props.borderStyle === 'round' && node.props.borderColor === (rich ? CARD_LINE : 'claude') && textOf(node).includes(rich ? 'NOW' : ''))
         expect(card).toBeDefined()
-        // A narrow column stacks the button under the text, a wider one puts it beside.
-        const together = commonBox(root, isText('/aidlc'), isButton('next:fill'))
-        expect(together.props.flexDirection).toBe(isStacked(columns) ? 'column' : undefined)
+        if (rich) expect(card!.at(-1)!.props.backgroundColor).toBe(CARD_FILL)
+        // A narrow column stacks the button under the text, a wider one puts it beside. The desktop stacks it at every width.
+        const together = commonBox(root, isText(rich ? padded('/aidlc') : '/aidlc'), isButton('next:fill'))
+        expect(together.props.flexDirection).toBe(rich || isStacked(columns) ? 'column' : undefined)
         await ui.unmount()
       })
     }
@@ -287,12 +315,16 @@ describe('now card and next', () => {
       const root = await tree(ui)
       const lines = await shown(ui as Probe)
 
-      expect(lines).toContain('This session')
+      const rich = surface !== 'terminal'
+      expect(lines).toContain(rich ? 'THIS SESSION' : 'This session')
       expect(lines).toContain('Side job, not a stage of this plan')
       expect(lines).toContain('This session is not bound to a stage of shop-mvp-restart.')
-      expect(lines).not.toContain('Now')
+      expect(lines).not.toContain(rich ? 'NOW' : 'Now')
       expect((await ui.find({ key: 'next:fill' }))?.props.variant).toBe('secondary')
-      expect(chains(root, node => node.props.borderStyle === 'round' && node.props.borderColor === 'warning').length).toBeGreaterThan(0)
+      // A side job keeps its warning edge on the desktop too (and gets the card's fill).
+      const warned = chains(root, node => node.props.borderStyle === 'round' && node.props.borderColor === 'warning')
+      expect(warned.length).toBeGreaterThan(0)
+      if (rich) expect(warned[0]!.at(-1)!.props.backgroundColor).toBe(CARD_FILL)
       await ui.unmount()
     })
 
@@ -300,7 +332,7 @@ describe('now card and next', () => {
       const { ui } = await draw($, on, sideJobModel(), surface)
       const lines = await shown(ui as Probe)
 
-      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe('▾ Inception')
+      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe(headingText(surface, true, 'Inception'))
       expect(lines).toContain('practices-discovery')
       expect(lines).toContain('units-generation')
       expect(lines).toContain('3/3 ✓')
@@ -314,7 +346,7 @@ describe('now card and next', () => {
       const { ui } = await draw($, on, idleModel(), surface)
       const lines = await shown(ui as Probe)
 
-      expect(lines).toContain('Workspace')
+      expect(lines).toContain(surface === 'terminal' ? 'Workspace' : 'WORKSPACE')
       expect(lines).toContain('Nothing in flight')
       expect(lines).toContain('This workspace has no intent in flight.')
       expect(lines).toContain('Idle')
@@ -333,8 +365,8 @@ describe('now card and next', () => {
       for (const one of model.sections) for (const each of one.items) each.isCurrent = false
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      expect(lines).toContain('Next up')
-      expect(lines).not.toContain('Now')
+      expect(lines).toContain(surface === 'terminal' ? 'Next up' : 'NEXT UP')
+      expect(lines).not.toContain(surface === 'terminal' ? 'Now' : 'NOW')
       expect(lines).toContain('start T18 - Bot onboarding')
       await ui.unmount()
     })
@@ -347,6 +379,7 @@ describe('now card and next', () => {
 
       const lines = await shown(ui as Probe)
       expect(lines).not.toContain('Next')
+      expect(lines).not.toContain('NEXT')
       expect(await ui.find({ key: 'next:fill' })).toBeUndefined()
       expect(lines.some(line => line === '')).toBe(false)
       await ui.unmount()
@@ -397,7 +430,7 @@ describe('layout', () => {
       const wide = await split(stageModel(), WIDE)
       expect(wide).toBeDefined()
       // The left column holds the Now card, the plan is its sibling and takes the rest.
-      expect(textOf(wide!.left)).toContain('Now')
+      expect(textOf(wide!.left)).toContain(surface === 'terminal' ? 'Now' : 'NOW')
       expect(textOf(wide!.left)).not.toContain('Plan')
       expect(wide!.right.props.flexGrow).toBe(1)
       expect(wide!.right.props.flexShrink).toBe(1)
@@ -413,10 +446,12 @@ describe('layout', () => {
         const { ui } = await draw($, on, ledgerModel(), surface, columns)
         const lines = await shown(ui as Probe)
         const at = (text: string) => lines.indexOf(text)
-        expect(at('REMINDERS')).toBeLessThan(at('Now'))
-        expect(at('Now')).toBeLessThan(at('Pin sections'))
-        expect(at('Pin sections')).toBeLessThan(at('Needs attention (2)'))
-        expect(at('Needs attention (2)')).toBeLessThan(at('Plan'))
+        const now = surface === 'terminal' ? 'Now' : 'NOW'
+        const needs = surface === 'terminal' ? 'Needs attention (2)' : 'Needs attention'
+        expect(at('REMINDERS')).toBeLessThan(at(now))
+        expect(at(now)).toBeLessThan(at('Pin sections'))
+        expect(at('Pin sections')).toBeLessThan(at(needs))
+        expect(at(needs)).toBeLessThan(at('Plan'))
         await ui.unmount()
       }
     })
@@ -448,8 +483,8 @@ describe('sections and items', () => {
       })
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe('▾ 2 Inception')
-      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe('▸ 3 Construction')
+      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe(headingText(surface, true, '2 Inception'))
+      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe(headingText(surface, false, '3 Construction'))
       expect(lines).toContain('2.1')
       expect(lines).toContain('2.5')
       expect(lines).toContain('domain-design')
@@ -462,13 +497,13 @@ describe('sections and items', () => {
       expect(lines).toContain('practices-discovery')
       expect(lines).toContain('units-generation')
       expect(lines).not.toContain('u1')
-      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe('▾ Inception')
-      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe('▸ Construction')
+      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe(headingText(surface, true, 'Inception'))
+      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe(headingText(surface, false, 'Construction'))
 
       await ui.press({ key: 'section:INCEPTION' })
       lines = await shown(ui as Probe)
       expect(lines).not.toContain('practices-discovery')
-      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe('▸ Inception')
+      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe(headingText(surface, false, 'Inception'))
 
       await ui.press({ key: 'section:INCEPTION' })
       expect(await shown(ui as Probe)).toContain('practices-discovery')
@@ -477,7 +512,7 @@ describe('sections and items', () => {
       lines = await shown(ui as Probe)
       expect(lines).toContain('u1')
       expect(lines).toContain('per unit: billing, catalog')
-      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe('▾ Construction')
+      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe(headingText(surface, true, 'Construction'))
       await ui.unmount()
     })
 
@@ -504,12 +539,23 @@ describe('sections and items', () => {
       await ui.unmount()
     })
 
-    test(`the current item has the › gutter, a bold title and its glyph on ${surface}`, async ($, on) => {
+    test(`the current item has the › gutter (a tint on the desktop), a bold title and its glyph on ${surface}`, async ($, on) => {
       const { ui } = await draw($, on, stageModel(), surface)
       const marks = await (ui as Probe).findAll({ type: 'Text', text: '›' })
-      expect(marks.length).toBe(1)
-      expect(marks[0]?.props.color).toBe('claude')
-      expect(marks[0]?.props.bold).toBe(true)
+      if (surface === 'terminal') {
+        expect(marks.length).toBe(1)
+        expect(marks[0]?.props.color).toBe('claude')
+        expect(marks[0]?.props.bold).toBe(true)
+      } else {
+        // No › on the desktop: the current row alone is tinted in the accent, and its icon says it is in progress.
+        expect(marks).toEqual([])
+        const tinted = chains(await tree(ui), node => node.type === 'Box' && node.props.backgroundColor === tint('claude', '1a'))
+        expect(tinted.length).toBe(1)
+        expect(textOf(tinted[0]!.at(-1)!)).toContain('domain-design')
+        const icon = chains(tinted[0]!.at(-1)!, node => node.type === 'Svg')[0]!.at(-1)!
+        expect(icon.props.alt).toBe('in progress')
+        expect(icon.props.source).toBe(iconSource('live', '◐'))
+      }
       const titles = await (ui as Probe).findAll({ type: 'Text', text: 'domain-design' })
       expect(titles.some(title => title.props.bold === true)).toBe(true)
       await ui.unmount()
@@ -522,14 +568,29 @@ describe('sections and items', () => {
 
       // The attention list comes first; the plan's card is the last occurrence.
       const at = lines.lastIndexOf('Parked at domain-design')
+      const caption = 'The workflow was parked 2026-09-04 01:19. Resume it with /aidlc.'
       expect(at).toBeGreaterThan(lines.lastIndexOf('domain-design'))
       expect(at).toBeLessThan(lines.indexOf('units-generation'))
-      expect(lines[at + 1]).toBe('The workflow was parked 2026-09-04 01:19. Resume it with /aidlc.')
-      const [card] = chains(root, node => node.props.borderStyle === 'round' && node.props.borderColor === 'warning' && node.props.marginLeft === 4)
-      expect(card).toBeDefined()
-      expect(textOf(card!.at(-1)!)).toContain('‖')
-      expect(textOf(card!.at(-1)!)).toContain('Parked at domain-design')
-      expect((await (ui as Probe).findAll({ type: 'Text', text: 'Parked at domain-design' })).every(row => row.props.color === 'warning')).toBe(true)
+      if (surface === 'terminal') {
+        expect(lines[at + 1]).toBe(caption)
+        const [card] = chains(root, node => node.props.borderStyle === 'round' && node.props.borderColor === 'warning' && node.props.marginLeft === 4)
+        expect(card).toBeDefined()
+        expect(textOf(card!.at(-1)!)).toContain('‖')
+        expect(textOf(card!.at(-1)!)).toContain('Parked at domain-design')
+        expect((await (ui as Probe).findAll({ type: 'Text', text: 'Parked at domain-design' })).every(row => row.props.color === 'warning')).toBe(true)
+      } else {
+        // The desktop's plan gate is one quiet line (glyph, title in the tone): no border, no caption. The caption is in the attention card.
+        expect(lines[at + 1]).toBe('units-generation')
+        expect(lines.filter(line => line === caption)).toHaveLength(1)
+        expect(lines.indexOf(caption)).toBeLessThan(lines.indexOf('Plan'))
+        const line = chains(root, node => node.type === 'Box' && node.props.marginLeft === 5 && textOf(node) === '‖Parked at domain-design')[0]?.at(-1)
+        expect(line).toBeDefined()
+        expect(line!.props.borderStyle).toBeUndefined()
+        const titles = await (ui as Probe).findAll({ type: 'Text', text: 'Parked at domain-design' })
+        expect(titles).toHaveLength(2)
+        expect(titles[0]?.props.color).toBeUndefined()
+        expect(titles[1]?.props.color).toBe('warning')
+      }
       await ui.unmount()
     })
 
@@ -540,7 +601,7 @@ describe('sections and items', () => {
 
       const lines = await shown(ui as Probe)
       expect(lines.lastIndexOf('Parked')).toBeLessThan(lines.indexOf('practices-discovery'))
-      expect(lines.lastIndexOf('Parked')).toBeGreaterThan(lines.indexOf('▾ Inception'))
+      expect(lines.lastIndexOf('Parked')).toBeGreaterThan(surface === 'terminal' ? lines.indexOf('▾ Inception') : lines.lastIndexOf('Inception'))
       await ui.unmount()
     })
 
@@ -568,14 +629,21 @@ describe('sections and items', () => {
       ]
       model.gates = [{ id: 'ci', kind: 'ci-failing', tone: 'error', title: 'CI failing on PR #7', sectionId: 'S', afterItemId: 'redo' }]
 
+      const rich = surface !== 'terminal'
       let { ui } = await draw($, on, model, surface, MEDIUM)
       let lines = await shown(ui as Probe)
       for (const word of ['awaiting', 'revising', 'failed', 'partial', 'in progress', 'skipped']) expect(lines).toContain(word)
       const glyph = async (title: string) => {
         const root = await tree(ui)
-        const row = chains(root, node => node.type === 'Box' && node.props.paddingLeft === 2 && textOf(node).includes(title))
+        const row = chains(root, node => node.type === 'Box' && node.props.paddingLeft === (rich ? 1 : 2) && textOf(node).includes(title))
         const texts = chains(row[0]!.at(-1)!, node => node.type === 'Text' && textOf(node) !== '›').map(chain => chain.at(-1)!)
         return texts[0]!
+      }
+      // The desktop's icon: its markup says the kind (the amber ring with the glyph in it for ? and ↻), its alt the word, else what the glyph means.
+      const icon = async (title: string) => {
+        const root = await tree(ui)
+        const row = chains(root, node => node.type === 'Box' && node.props.paddingLeft === 1 && kids(node).some(box => textOf(box) === title))
+        return chains(row[0]!.at(-1)!, node => node.type === 'Svg')[0]!.at(-1)!
       }
       const expectations: [string, string, string | undefined][] = [
         ['gate', '?', 'warning'],
@@ -587,15 +655,34 @@ describe('sections and items', () => {
         ['next-up', '○', undefined],
         ['finished', '✓', 'success'],
       ]
-      for (const [title, mark, color] of expectations) {
-        const look = await glyph(title)
-        expect([title, textOf(look), look.props.color]).toEqual([title, mark, color])
+      if (rich) {
+        const icons: [string, string, string, string][] = [
+          ['gate', 'mark', '?', 'awaiting'],
+          ['redo', 'mark', '↻', 'revising'],
+          ['left-out', 'skipped', '', 'skipped'],
+          ['broke', 'failed', '', 'failed'],
+          ['half', 'live', '◐', 'partial'],
+          ['going', 'live', '◐', 'in progress'],
+          ['next-up', 'planned', '', 'planned'],
+          ['finished', 'done', '', 'done'],
+        ]
+        for (const [title, kind, mark, alt] of icons) {
+          const svg = await icon(title)
+          expect([title, svg.props.alt, svg.props.width, svg.props.height]).toEqual([title, alt, 14, 14])
+          expect([title, svg.props.source]).toEqual([title, iconSource(kind as Parameters<typeof iconSource>[0], mark)])
+        }
+      } else {
+        for (const [title, mark, color] of expectations) {
+          const look = await glyph(title)
+          expect([title, textOf(look), look.props.color]).toEqual([title, mark, color])
+        }
+        expect((await glyph('next-up')).props.dimColor).toBe(true)
       }
-      expect((await glyph('next-up')).props.dimColor).toBe(true)
       expect((await ui.find({ type: 'Text', text: 'left-out' }))?.props.dimColor).toBe(true)
       expect((await ui.find({ type: 'Text', text: 'finished' }))?.props.dimColor).toBe(true)
       // A tone-error gate with no kind of its own is ⊘ in red.
-      const ci = (await (ui as Probe).findAll({ type: 'Text', text: 'CI failing on PR #7' }))[0]
+      // (The desktop's attention title is in the text colour; its plan gate line is in the tone.)
+      const ci = (await (ui as Probe).findAll({ type: 'Text', text: 'CI failing on PR #7' }))[rich ? 1 : 0]
       expect(ci?.props.color).toBe('error')
       expect(lines).toContain('⊘')
       await ui.unmount()
@@ -605,8 +692,14 @@ describe('sections and items', () => {
       lines = await shown(ui as Probe)
       // ('awaiting' is the current item: the Now card says it.)
       for (const word of ['revising', 'failed', 'partial', 'skipped']) expect(lines).not.toContain(word)
-      expect(lines).toContain('↻')
-      expect(lines).toContain('✕')
+      if (rich) {
+        // The icons stay, and still say the word in their alt.
+        const alts = (await (ui as Probe).findAll({ type: 'Svg' })).map(svg => svg.props.alt)
+        expect(alts).toEqual(expect.arrayContaining(['revising', 'failed', 'partial', 'skipped']))
+      } else {
+        expect(lines).toContain('↻')
+        expect(lines).toContain('✕')
+      }
       await ui.unmount()
     })
 
@@ -636,13 +729,17 @@ describe('sections and items', () => {
       ]
       const { ui } = await draw($, on, model, surface)
 
-      const chip = await ui.find({ type: 'Text', text: '[#12]' })
+      // The terminal brackets a chip; the desktop draws it as a pill with a space of padding each side and a grey fill.
+      const rich = surface !== 'terminal'
+      const chipText = (label: string) => (rich ? padded(label) : `[${label}]`)
+      const chip = await ui.find({ type: 'Text', text: chipText('#12') })
       expect(chip?.props.color).toBe('success')
       expect(chip?.props.dimColor).toBe(true)
-      expect(await ui.find({ type: 'Text', text: '[]' })).toBeUndefined()
+      expect(chip?.props.backgroundColor).toBe(rich ? tint(undefined, '24') : undefined)
+      expect((await (ui as Probe).findAll({ type: 'Text', text: rich ? '[' : '[]' })).filter(one => one.type === 'Text' && one.text.includes('[')).map(one => one.text)).toEqual([])
       const links = await (ui as Probe).findAll({ type: 'Link' })
       expect(links.map(link => link.props.href)).toEqual(['https://example.com/ship', 'https://example.com/api'])
-      expect(links.map(link => link.props.label)).toEqual(['ship', '[api]'])
+      expect(links.map(link => link.props.label)).toEqual(['ship', chipText('api')])
       await ui.unmount()
     })
 
@@ -659,15 +756,16 @@ describe('sections and items', () => {
           }),
         ]),
       ]
+      const chip = (label: string) => (surface === 'terminal' ? `[${label}]` : label)
       let { ui } = await draw($, on, model, surface, NARROW)
       let lines = await shown(ui as Probe)
-      expect(lines).toContain('[#12]')
+      expect(lines).toContain(chip('#12'))
       expect(lines).toContain('+2')
-      expect(lines).not.toContain('[api]')
+      expect(lines).not.toContain(chip('api'))
       await ui.unmount()
       ;({ ui } = await draw($, on, model, surface, MEDIUM))
       lines = await shown(ui as Probe)
-      expect(lines).toEqual(expect.arrayContaining(['[#12]', '[api]', '[x]']))
+      expect(lines).toEqual(expect.arrayContaining([chip('#12'), chip('api'), chip('x')]))
       expect(lines).not.toContain('+2')
       await ui.unmount()
     })
@@ -680,8 +778,8 @@ describe('sections and items', () => {
       expect(lines).toContain('┘')
       expect(lines.indexOf('┐')).toBeLessThan(lines.indexOf('┘'))
       expect((await ui.find({ type: 'Text', text: '┐' }))?.props.color).toBe('claude')
-      expect(lines.filter(line => line === '[#31]').length).toBe(2)
-      expect((await ui.find({ type: 'Text', text: '[reopened]' }))?.props.color).toBe('warning')
+      expect(lines.filter(line => line === (surface === 'terminal' ? '[#31]' : '#31')).length).toBe(2)
+      expect((await ui.find({ type: 'Text', text: surface === 'terminal' ? '[reopened]' : padded('reopened') }))?.props.color).toBe('warning')
       await ui.unmount()
     })
 
@@ -760,23 +858,49 @@ describe('needs attention', () => {
         const root = await tree(ui)
         const lines = await shown(ui as Probe)
 
-        expect(lines).toContain('Needs attention (3)')
-        const list = lines.slice(lines.indexOf('Needs attention (3)')).slice(0, 9)
-        expect(list).toEqual([
-          'Needs attention (3)',
-          '?',
-          '3 questions unanswered',
-          'Inception, after refined-mockups',
-          '⊘',
-          'PR #31 not merged',
-          'Inception, after refined-mockups',
-          '≠',
-          'user-stories reopened after approval',
-        ])
-        // The tone colours the title and the glyph.
-        expect((await (ui as Probe).findAll({ type: 'Text', text: 'PR #31 not merged' }))[0]?.props.color).toBe('error')
-        expect((await (ui as Probe).findAll({ type: 'Text', text: '3 questions unanswered' }))[0]?.props.color).toBe('warning')
-        expect((await ui.find({ type: 'Text', text: 'user-stories reopened after approval' }))?.props.color).toBe('warning')
+        const rich = surface !== 'terminal'
+        if (!rich) {
+          expect(lines).toContain('Needs attention (3)')
+          const list = lines.slice(lines.indexOf('Needs attention (3)')).slice(0, 9)
+          expect(list).toEqual([
+            'Needs attention (3)',
+            '?',
+            '3 questions unanswered',
+            'Inception, after refined-mockups',
+            '⊘',
+            'PR #31 not merged',
+            'Inception, after refined-mockups',
+            '≠',
+            'user-stories reopened after approval',
+          ])
+        } else {
+          // The heading and the count as a pill; each card's caption sits under its title line, before the command.
+          const list = lines.slice(lines.indexOf('Needs attention')).slice(0, 12)
+          expect(list).toEqual([
+            'Needs attention',
+            '3',
+            '?',
+            '3 questions unanswered',
+            'Inception, after refined-mockups',
+            'Answer them in the stage questions file.',
+            '⊘',
+            'PR #31 not merged',
+            'Inception, after refined-mockups',
+            'domain-design starts once #31 lands on main.',
+            '≠',
+            'user-stories reopened after approval',
+          ])
+        }
+        // The tone colours the title and the glyph on the terminal; on the desktop the glyph alone (the title is in the text colour).
+        const toneOf = (color: string) => (rich ? undefined : color)
+        expect((await (ui as Probe).findAll({ type: 'Text', text: 'PR #31 not merged' }))[0]?.props.color).toBe(toneOf('error'))
+        expect((await (ui as Probe).findAll({ type: 'Text', text: '3 questions unanswered' }))[0]?.props.color).toBe(toneOf('warning'))
+        expect((await ui.find({ type: 'Text', text: 'user-stories reopened after approval' }))?.props.color).toBe(toneOf('warning'))
+        if (rich) {
+          expect((await ui.find({ type: 'Text', text: '⊘' }))?.props.color).toBe('error')
+          expect((await ui.find({ type: 'Text', text: '?' }))?.props.color).toBe('warning')
+          expect((await ui.find({ type: 'Text', text: '≠' }))?.props.color).toBe('warning')
+        }
         // A narrow column: title line, then the where line; wider: one row, the where on the right.
         const pr = chains(root, isText('PR #31 not merged'))[0]!
         const where = chains(root, isText('Inception, after refined-mockups'))[1]!
@@ -792,8 +916,12 @@ describe('needs attention', () => {
       const cardsOf = (color: string) => chains(root, node => node.props.borderStyle === 'round' && node.props.borderColor === color && node.props.marginLeft !== 4)
       const inAttention = (color: string) => cardsOf(color).filter(chain => textOf(chain.at(-1)!).includes('PR #31 not merged') || textOf(chain.at(-1)!).includes('3 questions') || textOf(chain.at(-1)!).includes('reopened after approval'))
       if (surface === 'desktop') {
-        expect(inAttention('error').length).toBe(1)
-        expect(inAttention('warning').length).toBe(2)
+        // Tinted, not a theme key: a faint line and a fill of the tone's mid-tone.
+        expect(inAttention(tint('error', '66')).length).toBe(1)
+        expect(inAttention(tint('warning', '66')).length).toBe(2)
+        for (const color of ['error', 'warning']) for (const chain of inAttention(tint(color, '66'))) expect(chain.at(-1)!.props.backgroundColor).toBe(tint(color, '17'))
+        expect(inAttention('error').length).toBe(0)
+        expect(inAttention('warning').length).toBe(0)
       } else {
         expect(inAttention('error').length).toBe(0)
         expect(inAttention('warning').length).toBe(0)
@@ -814,7 +942,7 @@ describe('needs attention', () => {
       })
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      const from = lines.indexOf('Needs attention (6)')
+      const from = lines.indexOf(surface === 'terminal' ? 'Needs attention (6)' : 'Needs attention')
       const glyphOf = (title: string) => lines[lines.indexOf(title, from) - 1]
       expect(['one', 'two', 'three', 'four', 'five', 'six'].map(glyphOf)).toEqual(['‖', '?', '?', '⊘', '‖', '‖'])
       await ui.unmount()
@@ -829,9 +957,10 @@ describe('needs attention', () => {
       })
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      const from = lines.indexOf('Needs attention (2)')
-      expect(lines.slice(from, from + 5)).toEqual(['Needs attention (2)', '‖', 'orphan', '‖', 'in-section'])
-      expect(lines[from + 5]).toBe('Inception')
+      const from = lines.indexOf(surface === 'terminal' ? 'Needs attention (2)' : 'Needs attention')
+      const heading = surface === 'terminal' ? ['Needs attention (2)'] : ['Needs attention', '2']
+      expect(lines.slice(from, from + heading.length + 4)).toEqual([...heading, '‖', 'orphan', '‖', 'in-section'])
+      expect(lines[from + heading.length + 4]).toBe('Inception')
       await ui.unmount()
     })
 
@@ -845,7 +974,8 @@ describe('needs attention', () => {
       const model = stageModel({ gates: [], drift: [{ id: 'd1', label: 'behind main', tone: 'warning' }, { id: 'd2', label: '', tone: 'neutral' }] })
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      expect(lines).toContain('Needs attention (1)')
+      if (surface === 'terminal') expect(lines).toContain('Needs attention (1)')
+      else expect(lines.slice(lines.indexOf('Needs attention'), lines.indexOf('Needs attention') + 2)).toEqual(['Needs attention', '1'])
       expect(lines.filter(line => line === '≠').length).toBe(1)
       await ui.unmount()
     })
@@ -875,8 +1005,9 @@ describe('ledger', () => {
         expect(lines).toContain('T17 QA failed on #55')
         expect(lines).toContain('Telegram bot, after T17 Group chats')
         // Failed, partial and planned items, with chips.
-        expect(lines).toContain('✕')
-        expect(lines).toContain('[#52]')
+        if (surface === 'terminal') expect(lines).toContain('✕')
+        else expect((await (ui as Probe).findAll({ type: 'Svg' })).some(svg => svg.props.alt === 'failed')).toBe(true)
+        expect(lines).toContain(surface === 'terminal' ? '[#52]' : '#52')
         await ui.unmount()
       })
     }
@@ -892,7 +1023,7 @@ describe('ledger', () => {
       expect(lines).toContain('T15 Inline actions')
       expect(lines).toContain('T18 Bot onboarding')
       // The fold row is the first thing in the list, right after the heading.
-      expect(lines.indexOf('✓ 6 done, show')).toBeGreaterThan(lines.indexOf('▾ Telegram bot'))
+      expect(lines.indexOf('✓ 6 done, show')).toBeGreaterThan(lines.indexOf(headingText(surface, true, 'Telegram bot')))
       expect(lines.indexOf('✓ 6 done, show')).toBeLessThan(lines.indexOf('T15 Inline actions'))
 
       await ui.press({ key: 'more:tg' })
@@ -903,7 +1034,7 @@ describe('ledger', () => {
       expect((await ui.find({ type: 'Button', key: 'less:tg' }))?.text).toBe('Hide done')
       // Hide done takes the place of the "show" row: at the top of the list.
       expect(lines.indexOf('Hide done')).toBeLessThan(lines.indexOf('T10 Link account'))
-      expect(lines.indexOf('Hide done')).toBeGreaterThan(lines.indexOf('▾ Telegram bot'))
+      expect(lines.indexOf('Hide done')).toBeGreaterThan(lines.indexOf(headingText(surface, true, 'Telegram bot')))
 
       await ui.press({ key: 'less:tg' })
       lines = await shown(ui as Probe)
@@ -999,13 +1130,13 @@ describe('ledger', () => {
         const strip = (found: Found[]) => found.filter(svg => svg.props.height === 6)
         expect(strip(small.svgs)).toEqual([])
         expect(strip(medium.svgs).map(svg => [svg.props.width, svg.props.alt])).toEqual([[64, '11 of 13 done']])
-        // On the wide pane a plan of five phases is a row of phase cards, each with its strip at the card's 86 px.
+        // On the wide pane a plan of five phases is a row of phase cards, each with its strip at the card's 72 px.
         expect(strip(wide.svgs).map(svg => [svg.props.width, svg.props.alt])).toEqual([
-          [86, '8 of 8 done'],
-          [86, '6 of 6 done'],
-          [86, '11 of 13 done'],
-          [86, '6 of 10 done'],
-          [86, '0 of 3 done'],
+          [72, '8 of 8 done'],
+          [72, '6 of 6 done'],
+          [72, '11 of 13 done'],
+          [72, '6 of 10 done'],
+          [72, '0 of 3 done'],
         ])
         const source = String(strip(medium.svgs)[0]?.props.source)
         // done green, accent for partial, track for the rest; 2 px gaps, rounded.
@@ -1063,18 +1194,23 @@ describe('progress rings', () => {
   test('desktop: a 40 px donut with the % inside in the plan heading, 16 px per section row', async ($, on) => {
     const { ui } = await draw($, on, stageModel(), 'desktop')
 
-    // The phase stepper first (no size of its own: it fits its slot), then the rings.
-    const [phases, ...rings] = await (ui as Probe).findAll({ type: 'Svg' })
+    // The phase stepper first (no size of its own: it fits its slot), then the rings (and the item icons and placeholders, which are not rings).
+    const all = await (ui as Probe).findAll({ type: 'Svg' })
+    const phases = all[0]
     expect(phases?.props.width).toBeUndefined()
     expect(phases?.props.alt).toBe('Phases: Initialization done, Ideation done, Inception 50% done, current, Construction 0% done, Operation skipped')
-    // Plan (overall), Initialization, Ideation, Inception, Construction; Operation is skipped.
-    expect(rings.map(ring => [ring.props.width, ring.props.height, ring.props.alt])).toEqual([
-      [40, 40, '50% done'],
+    // Plan (overall), then Initialization, Ideation, Inception, Construction; Operation is skipped and has a dashed placeholder instead.
+    const big = ringsOf(all, 40)
+    const small = ringsOf(all, 16)
+    expect(big.map(ring => [ring.props.width, ring.props.height, ring.props.alt])).toEqual([[40, 40, '50% done']])
+    expect(small.map(ring => [ring.props.width, ring.props.height, ring.props.alt])).toEqual([
       [16, 16, '100% done'],
       [16, 16, '100% done'],
       [16, 16, '50% done'],
       [16, 16, '0% done'],
     ])
+    expect(all.filter(svg => svg.props.width === 16 && svg.props.alt === 'skipped')).toHaveLength(1)
+    const rings = [...big, ...small]
     const source = String(rings[0]?.props.source)
     expect(source.startsWith('<svg')).toBe(true)
     expect((source.match(/<circle/g) ?? []).length).toBe(2)
@@ -1157,8 +1293,11 @@ describe('progress rings', () => {
   for (const surface of ['vscode', 'mobile'] as const) {
     test(`${surface} has Svg too`, async ($, on) => {
       const { ui } = await draw($, on, stageModel(), surface)
-      // The phase stepper and five rings.
-      expect((await (ui as Probe).findAll({ type: 'Svg' })).length).toBe(6)
+      // The phase stepper, the plan's ring and a ring per counted section (and the icons, which are not rings).
+      const all = await (ui as Probe).findAll({ type: 'Svg' })
+      expect(all.filter(svg => svg.props.width === undefined)).toHaveLength(1)
+      expect(ringsOf(all, 40)).toHaveLength(1)
+      expect(ringsOf(all, 16)).toHaveLength(4)
       await ui.unmount()
     })
   }
@@ -1169,7 +1308,7 @@ describe('breakpoint boundaries', () => {
     test(`47 is narrow and 48 is medium on ${surface}`, async ($, on) => {
       let { ui } = await draw($, on, sideJobModel(), surface, 47)
       expect((await ui.find({ key: 'refresh' }))?.text).toBe('↻')
-      // Narrow: the stamp is on row 2, an in-progress item shows no status word.
+      // Narrow: the stamp is on row 2, an in-progress item shows no status word. (The desktop's stamp is under row 1 at every width.)
       expect(textOf(kids(headerOf(await tree(ui)))[0]!)).not.toContain('checked just now')
       await ui.unmount()
       ;({ ui } = await draw($, on, stageModel(), surface, 47))
@@ -1178,7 +1317,8 @@ describe('breakpoint boundaries', () => {
 
       ;({ ui } = await draw($, on, sideJobModel(), surface, 48))
       expect((await ui.find({ key: 'refresh' }))?.text).toBe('↻ Refresh')
-      expect(textOf(kids(headerOf(await tree(ui)))[0]!)).toContain('checked just now')
+      expect(textOf(kids(headerOf(await tree(ui)))[0]!).includes('checked just now')).toBe(surface === 'terminal')
+      expect(textOf(kids(headerOf(await tree(ui)))[surface === 'terminal' ? 0 : 1]!)).toContain('checked just now')
       await ui.unmount()
       ;({ ui } = await draw($, on, stageModel(), surface, 48))
       expect((await shown(ui as Probe)).filter(line => line === 'in progress').length).toBe(2)
@@ -1209,7 +1349,7 @@ describe('the wide left column lays out for its own width', () => {
   async function shape($: Engine, on: On, surface: string, columns: number) {
     const { ui } = await draw($, on, foldedModel(), surface, columns)
     const root = await tree(ui)
-    const next = commonBox(root, isText('/aidlc'), isButton('next:fill'))
+    const next = commonBox(root, isText(surface === 'terminal' ? '/aidlc' : padded('/aidlc')), isButton('next:fill'))
     const pr = chains(root, isText('PR #31 not merged'))[0]!
     const where = chains(root, isText('Inception, after refined-mockups'))[1]!
     const attention = pr.filter(node => where.includes(node)).at(-1)!
@@ -1224,8 +1364,10 @@ describe('the wide left column lays out for its own width', () => {
 
     test(`the one-row variants come back at 125 columns and not at 124 on ${surface}`, async ($, on) => {
       expect(await shape($, on, surface, 124)).toEqual({ next: 'column', attention: 'column' })
-      expect(await shape($, on, surface, 125)).toEqual({ next: undefined, attention: undefined })
-      expect(await shape($, on, surface, 160)).toEqual({ next: undefined, attention: undefined })
+      // The desktop's Next is stacked at every width (the label, command and reason wrap, the button below); only the attention rows change.
+      const next = surface === 'terminal' ? undefined : 'column'
+      expect(await shape($, on, surface, 125)).toEqual({ next, attention: undefined })
+      expect(await shape($, on, surface, 160)).toEqual({ next, attention: undefined })
     })
 
     test(`the plan column can shrink on ${surface}`, async ($, on) => {
@@ -1354,8 +1496,12 @@ describe('robustness', () => {
       const model = stageModel()
       model.sections = [section('S', 'Work', 'active', [item('a', 'planned')], { percent: Number.NaN })]
       const { ui } = await draw($, on, model, surface)
-      if (surface === 'desktop') expect((await (ui as Probe).findAll({ type: 'Svg' })).filter(svg => svg.props.width === 16)).toEqual([])
-      else expect((await shown(ui as Probe)).filter(line => line === '○')).toEqual(['○'])
+      if (surface === 'desktop') {
+        // No ring; a dashed placeholder of the ring's size holds its place (no alt: nothing to say).
+        const small = (await (ui as Probe).findAll({ type: 'Svg' })).filter(svg => svg.props.width === 16)
+        expect(ringsOf(small, 16)).toEqual([])
+        expect(small.map(svg => svg.props.alt)).toEqual([''])
+      } else expect((await shown(ui as Probe)).filter(line => line === '○')).toEqual(['○'])
       await ui.unmount()
     })
 
@@ -1366,7 +1512,7 @@ describe('robustness', () => {
       })
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
-      expect(lines).toContain('Now')
+      expect(lines).toContain(surface === 'terminal' ? 'Now' : 'NOW')
       expect(lines.filter(line => line === 'left-out').length).toBe(2)
       expect(lines.some(line => / of \d+$/.test(line) && line.startsWith('Work,'))).toBe(false)
       await ui.unmount()
@@ -1388,7 +1534,9 @@ describe('robustness', () => {
       const { ui } = await draw($, on, model, surface)
       const lines = await shown(ui as Probe)
       expect(lines).not.toContain('Next up')
+      expect(lines).not.toContain('NEXT UP')
       expect(lines).not.toContain('Now')
+      expect(lines).not.toContain('NOW')
       expect(chains(await tree(ui), node => node.props.borderStyle === 'round' && node.props.borderColor === 'claude')).toEqual([])
       await ui.unmount()
     })
@@ -1408,10 +1556,10 @@ describe('robustness', () => {
       expect(keys).toEqual(expect.arrayContaining(['section:X', 'section:X~1', 'section:Y', 'action:sync', 'action:sync~1', 'action:other']))
       expect(new Set(keys).size).toBe(keys.length)
       // Each toggles on its own.
-      expect((await ui.find({ key: 'section:X~1' }))?.text).toBe('▸ Second')
+      expect((await ui.find({ key: 'section:X~1' }))?.text).toBe(headingText(surface, false, 'Second'))
       await ui.press({ key: 'section:X~1' })
-      expect((await ui.find({ key: 'section:X~1' }))?.text).toBe('▾ Second')
-      expect((await ui.find({ key: 'section:X' }))?.text).toBe('▾ First')
+      expect((await ui.find({ key: 'section:X~1' }))?.text).toBe(headingText(surface, true, 'Second'))
+      expect((await ui.find({ key: 'section:X' }))?.text).toBe(headingText(surface, true, 'First'))
       // The gate belongs to the first section only.
       expect((await shown(ui as Probe)).filter(line => line === 'Held').length).toBe(2)
       await ui.unmount()
@@ -1425,10 +1573,11 @@ describe('robustness', () => {
       })
       const { ui } = await draw($, on, model, surface, NARROW)
       const root = await tree(ui)
-      const [trail] = chains(root, node => node.type === 'Text' && textOf(node).startsWith('[a-chip'))
+      const rich = surface !== 'terminal'
+      const [trail] = chains(root, node => node.type === 'Text' && textOf(node).startsWith(rich ? '\u00a0a-chip' : '[a-chip'))
       const chip = trail!.at(-1)!
       expect(textOf(chip).length).toBeLessThanOrEqual(22)
-      expect(textOf(chip).endsWith('…]')).toBe(true)
+      expect(textOf(chip).endsWith(rich ? '…\u00a0' : '…]')).toBe(true)
       expect(chip.props.wrap).toBe('truncate-end')
       // It shrinks first (more than the title, which keeps its room) but never below 6 columns.
       expect(trail!.at(-2)!.props.flexShrink).toBeGreaterThan(1)
@@ -1455,13 +1604,19 @@ describe('robustness', () => {
       const model = sideJobModel()
       model.header.title = 'a-very-long-intent-name-that-would-never-fit-in-the-medium-pane-either'
       const { ui } = await draw($, on, model, surface, 48)
-      const [row1] = kids(headerOf(await tree(ui)))
+      const [row1, stamp] = kids(headerOf(await tree(ui)))
       const byText = (text: string) => kids(row1!).find(box => textOf(box) === text)!
       expect(kids(row1!)[0]!.props.flexShrink).toBe(1)
       expect(kids(row1!)[0]!.props.minWidth).toBe(8)
-      for (const box of [byText('Side job'), byText('checked just now')]) {
-        expect(box.props.flexShrink).toBeGreaterThan(0)
-        expect(box.props.flexShrink).toBeLessThan(1)
+      if (surface === 'terminal') {
+        for (const box of [byText('Side job'), byText('checked just now')]) {
+          expect(box.props.flexShrink).toBeGreaterThan(0)
+          expect(box.props.flexShrink).toBeLessThan(1)
+        }
+      } else {
+        // The desktop's pill never shrinks (only the title gives way); the stamp is its own dim line under the row.
+        expect(byText(padded('Side job')).props.flexShrink).toBe(0)
+        expect(textOf(stamp!)).toBe('checked just now')
       }
       expect(byText('↻ Refresh').props.flexShrink).toBe(0)
       await ui.unmount()
@@ -1510,7 +1665,7 @@ describe('the open-items cap', () => {
     return stageModel({ sections: [section('S', 'Work', 'active', items)], gates: extra.gates ?? [], next: undefined })
   }
   // (From the section's heading on: the current item is also named by the Now card above.)
-  const tasksIn = (lines: string[]) => lines.slice(Math.max(0, lines.indexOf('▾ Work'))).filter(line => /^t\d+$/.test(line))
+  const tasksIn = (lines: string[]) => lines.slice(Math.max(0, lines.findIndex(line => line === '▾ Work' || line === 'Work'))).filter(line => /^t\d+$/.test(line))
 
   for (const surface of SURFACES) {
     for (const [columns, shownCount, rest] of [
@@ -1685,11 +1840,12 @@ describe('ledger-real fixes', () => {
       })
       const { ui } = await draw($, on, model, surface, MEDIUM)
       const root = await tree(ui)
-      const shrink = (label: string) => chains(root, isText(label))[0]!.at(-2)!.props.flexShrink
-      expect(shrink('[#12]')).toBe(0)
-      expect(shrink('[12345678]')).toBe(0)
-      expect(shrink('[123456789]')).toBeGreaterThan(0)
-      expect(chains(root, isText('[123456789]'))[0]!.at(-2)!.props.minWidth).toBe(6)
+      const chip = (label: string) => (surface === 'terminal' ? `[${label}]` : padded(label))
+      const shrink = (label: string) => chains(root, isText(chip(label)))[0]!.at(-2)!.props.flexShrink
+      expect(shrink('#12')).toBe(0)
+      expect(shrink('12345678')).toBe(0)
+      expect(shrink('123456789')).toBeGreaterThan(0)
+      expect(chains(root, isText(chip('123456789')))[0]!.at(-2)!.props.minWidth).toBe(6)
       await ui.unmount()
     })
 
@@ -1711,8 +1867,11 @@ describe('ledger-real fixes', () => {
       const { ui } = await draw($, on, model, surface)
       const root = await tree(ui)
       const heading = chains(root, isButton('section:E'))[0]!.at(-3)!
-      if (surface === 'desktop') expect(chains(heading, node => node.type === 'Svg')).toEqual([])
-      else expect(chains(heading, node => node.type === 'Text' && '○◔◑◕●'.includes(textOf(node)) && textOf(node) !== '')).toEqual([])
+      if (surface === 'desktop') {
+        // No ring: a dashed placeholder (no alt) holds its place.
+        expect(chains(heading, node => node.type === 'Svg' && String(node.props.alt).endsWith('% done'))).toEqual([])
+        expect(chains(heading, node => node.type === 'Svg').map(chain => chain.at(-1)!.props.alt)).toEqual([''])
+      } else expect(chains(heading, node => node.type === 'Text' && '○◔◑◕●'.includes(textOf(node)) && textOf(node) !== '')).toEqual([])
       expect((await ui.find({ key: 'section:E' }))?.props.dimColor).toBe(true)
       expect((await ui.find({ key: 'section:S' }))?.props.dimColor).not.toBe(true)
       await ui.unmount()
@@ -1730,7 +1889,8 @@ describe('ledger-real fixes', () => {
       // On S it sits under row 2 (the badge and stamp).
       ;({ ui } = await draw($, on, sideJobModel(), surface, NARROW))
       const rows = kids(headerOf(await tree(ui)))
-      expect(textOf(rows[1]!)).toContain('Side job')
+      // (The desktop's row 1 holds the badge; its stamp is the line under it.)
+      expect(textOf(rows[surface === 'terminal' ? 1 : 0]!)).toContain('Side job')
       expect(textOf(rows[2]!)).toBe('Inception · domain-design')
       await ui.unmount()
 

@@ -8,6 +8,7 @@ import type { Engine } from 'claude-code/testing'
 
 import { itemLook } from '../src/render/item'
 import { gateGlyph } from '../src/render/kit'
+import { bare, padded } from './rich'
 import { MOUNT, item, section, seedModel, stageModel } from './world'
 import type { Chip, Gate, PanelModel, ReviewState } from '../types'
 
@@ -150,7 +151,8 @@ describe('review state, drawn', () => {
         const ui = await draw($, on, reviewModel(), surface, columns)
         const texts = await shown(ui)
         for (const [, review, word] of WORDS) {
-          const hit = texts.find(el => el.type === 'Text' && el.text === word)
+          // The desktop's status word is a pill: padded, in the same colour.
+          const hit = texts.find(el => el.type === 'Text' && el.text === (surface === 'terminal' ? word : padded(word)))
           expect(hit).toBeDefined()
           expect(hit?.props.color).toBe(itemLook({ status: 'open', landing: 'in-pr', statusWord: word, review }).wordColor)
         }
@@ -159,10 +161,12 @@ describe('review state, drawn', () => {
 
       test(`the viewer's rows are under Needs attention only, the plan gate in both, at ${name} on ${surface}`, async ($, on) => {
         const ui = await draw($, on, reviewModel(), surface, columns)
-        const texts = (await shown(ui)).map(el => el.text)
+        const texts = (await shown(ui)).map(el => bare(el.text))
         for (const row of rows) expect(texts.filter(text => text === row.title)).toHaveLength(1)
         expect(texts.filter(text => text === 'PR #35 not merged')).toHaveLength(2)
-        expect(texts).toContain('Needs attention (4)')
+        // The desktop's heading is the words alone with the count as a pill after it.
+        if (surface === 'terminal') expect(texts).toContain('Needs attention (4)')
+        else expect(texts.slice(texts.indexOf('Needs attention'), texts.indexOf('Needs attention') + 2)).toEqual(['Needs attention', '4'])
         // A row about an item names the item itself, not what comes after it.
         expect(texts).toContain('Inception, stage-you')
         expect(texts).toContain('Inception, after stage-changes')
@@ -187,9 +191,9 @@ describe('review state, drawn', () => {
 
       test(`the Slack thread chip shows beside the PR chip from medium up, at ${name} on ${surface}`, async ($, on) => {
         const ui = await draw($, on, reviewModel(), surface, columns)
-        const texts = (await shown(ui)).map(el => el.text)
+        const texts = (await shown(ui)).map(el => bare(el.text))
         if (columns < 48) expect(texts).toContain('+1')
-        else expect(texts).toContain('[Slack thread]')
+        else expect(texts).toContain(surface === 'terminal' ? '[Slack thread]' : 'Slack thread')
         await ui.unmount()
       })
     }

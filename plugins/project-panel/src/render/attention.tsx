@@ -3,10 +3,11 @@
 // row with a command offers it as a button that puts it in the prompt.
 import { t } from '../strings/en'
 import type { Gate, PanelModel } from '../../types'
-import { gateColor, gateGlyph, safely, toneColor, uniqueIds } from './kit'
+import { gateColor, gateGlyph, isRich, safely, tint, toneColor, uniqueIds } from './kit'
+import { pill } from './look'
 import type { Ctx, El } from './kit'
 
-type Row = { id: string; glyph: string; color: string | undefined; title: string; where: string; isBold: boolean; href?: string; command?: string }
+type Row = { id: string; glyph: string; color: string | undefined; title: string; where: string; isBold: boolean; href?: string; command?: string; caption?: string }
 
 /**
  * The gate's section, or "Section, after item" when it holds after an item of it. A row about the viewer is
@@ -36,6 +37,7 @@ export function rowsOf(model: PanelModel): Row[] {
       isBold: true,
       ...(gate.href !== undefined && gate.href !== '' ? { href: gate.href } : {}),
       ...(gate.command !== undefined && gate.command !== '' ? { command: gate.command } : {}),
+      ...(gate.caption !== undefined && gate.caption !== '' && gate.isAttentionOnly !== true ? { caption: gate.caption } : {}),
     })
   }
   for (const flag of model.drift) {
@@ -70,7 +72,7 @@ function rowEl(ctx: Ctx, row: Row, key: string): El {
     </Box>
   )
   const titleText = (
-    <Text bold={row.isBold} color={row.color} wrap="wrap">
+    <Text bold={row.isBold} color={isRich(ctx) ? undefined : row.color} wrap="wrap">
       {row.title}
     </Text>
   )
@@ -99,6 +101,17 @@ function rowEl(ctx: Ctx, row: Row, key: string): El {
       false
     )
   const command = commandEl(ctx, row, key)
+  // The desktop's card also says why, as the plan's gate card did: the gate's caption, dim, under the title.
+  const caption =
+    isRich(ctx) && row.caption !== undefined ? (
+      <Box paddingLeft={2} flexShrink={1}>
+        <Text dimColor wrap="wrap">
+          {row.caption}
+        </Text>
+      </Box>
+    ) : (
+      false
+    )
   const line =
     ctx.bp === 'S' ? (
       <Box flexDirection="column" flexShrink={1}>
@@ -117,16 +130,24 @@ function rowEl(ctx: Ctx, row: Row, key: string): El {
       </Box>
     )
   const body =
-    command === false ? (
+    command === false && caption === false ? (
       line
     ) : (
       <Box flexDirection="column" flexShrink={1} flexGrow={1} minWidth={0}>
         {line}
+        {caption}
         {command}
       </Box>
     )
+  // The desktop fills the card with a tint of its tone under a faint line of it; the title is in the text colour.
+  const rich = isRich(ctx)
   return isBoxed ? (
-    <Box borderStyle="round" borderColor={row.color ?? 'subtle'} paddingX={1}>
+    <Box
+      borderStyle="round"
+      borderColor={rich ? tint(row.color, '66') : (row.color ?? 'subtle')}
+      backgroundColor={rich ? tint(row.color, '17') : undefined}
+      paddingX={1}
+    >
       {body}
     </Box>
   ) : (
@@ -139,14 +160,25 @@ export function attention(ctx: Ctx, model: PanelModel): El | false {
   const rows = rowsOf(model)
   if (rows.length === 0) return false
   const keys = uniqueIds(rows.map(row => row.id))
-  const heading = t('attention.title', { count: String(rows.length) })
+  // The desktop: the heading in the text colour with the count as a pill beside it, the cards a little apart.
+  const rich = isRich(ctx)
+  const heading = rich ? t('attention.heading') : t('attention.title', { count: String(rows.length) })
+  const tone = rows.some(row => row.color === 'error') ? 'error' : 'warning'
   return (
-    <Box flexDirection="column">
-      {heading !== '' && (
-        <Text bold dimColor wrap="truncate-end">
-          {heading}
-        </Text>
-      )}
+    <Box flexDirection="column" gap={rich ? 1 : 0}>
+      {heading !== '' &&
+        (rich ? (
+          <Box gap={1}>
+            <Text bold wrap="truncate-end">
+              {heading}
+            </Text>
+            {pill(ctx, String(rows.length), tone)}
+          </Box>
+        ) : (
+          <Text bold dimColor wrap="truncate-end">
+            {heading}
+          </Text>
+        ))}
       {rows.map((row, index) => rowEl(ctx, row, keys[index]!))}
     </Box>
   )

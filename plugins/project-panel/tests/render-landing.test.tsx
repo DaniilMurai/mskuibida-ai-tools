@@ -7,6 +7,8 @@ import type { Engine } from 'claude-code/testing'
 
 import { renderPane } from '../src/render'
 import { foldGutters, itemLook } from '../src/render/item'
+import { iconSource } from '../src/render/look'
+import { bare, padded } from './rich'
 import { MOUNT, item, section, seedModel, stageModel } from './world'
 import type { Chip, Gate, Item, PanelModel } from '../types'
 
@@ -63,7 +65,7 @@ async function tree(ui: { drawn: () => Promise<unknown> }): Promise<Node> {
 /** Every Text and Button of the drawing, in document order, as shown. */
 async function shown(ui: unknown): Promise<string[]> {
   const all = await (ui as Probe).findAll({})
-  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => el.text)
+  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => bare(el.text))
 }
 
 /** The drawing as lines of text: a column stacks its children, a row sets them side by side. For reading, not for asserting. */
@@ -204,38 +206,56 @@ describe('the three landings', () => {
         ])
         const { ui } = await draw($, on, model, surface, columns)
         const root = await tree(ui)
+        const rich = surface !== 'terminal'
+        // The desktop's row is 1 cell in from the edge and starts with the icon; the terminal's is 2 in, with the › gutter first.
         const rowOf = (title: string) => {
-          const hit = chains(root, node => node.type === 'Box' && node.props.paddingLeft === 2 && kids(node).some(box => textOf(box) === title))[0]!
+          const hit = chains(root, node => node.type === 'Box' && node.props.paddingLeft === (rich ? 1 : 2) && kids(node).some(box => textOf(box) === title))[0]!
           return hit.at(-1)!
         }
+        // The terminal's glyph and colour; the desktop's icon: its markup (the landing's kind) and its alt (the word, else the kind's meaning).
         const glyphOf = (title: string) => {
           const cells = kids(rowOf(title))
+          if (rich) {
+            const svg = chains(cells[0]!, node => node.type === 'Svg')[0]!.at(-1)!
+            return { source: svg.props.source, alt: svg.props.alt }
+          }
           const text = chains(cells[1]!, node => node.type === 'Text')[0]!.at(-1)!
           return { glyph: textOf(text), color: text.props.color }
         }
 
-        expect(glyphOf('merged-one')).toEqual({ glyph: '✓', color: 'success' })
-        expect(glyphOf('pr-one')).toEqual({ glyph: '◐', color: 'claude' })
-        expect(glyphOf('pr-plain')).toEqual({ glyph: '◐', color: 'claude' })
-        expect(glyphOf('local-quiet')).toEqual({ glyph: '◌', color: 'warning' })
-        expect(glyphOf('local-worded')).toEqual({ glyph: '◌', color: 'warning' })
+        if (rich) {
+          expect(glyphOf('merged-one')).toEqual({ source: iconSource('done'), alt: 'done' })
+          expect(glyphOf('pr-one')).toEqual({ source: iconSource('live', '◐'), alt: 'in PR #33' })
+          expect(glyphOf('pr-plain')).toEqual({ source: iconSource('live', '◐'), alt: 'awaiting' })
+          expect(glyphOf('local-quiet')).toEqual({ source: iconSource('local', '◌'), alt: 'local only' })
+          expect(glyphOf('local-worded')).toEqual({ source: iconSource('local', '◌'), alt: 'local only' })
+        } else {
+          expect(glyphOf('merged-one')).toEqual({ glyph: '✓', color: 'success' })
+          expect(glyphOf('pr-one')).toEqual({ glyph: '◐', color: 'claude' })
+          expect(glyphOf('pr-plain')).toEqual({ glyph: '◐', color: 'claude' })
+          expect(glyphOf('local-quiet')).toEqual({ glyph: '◌', color: 'warning' })
+          expect(glyphOf('local-worded')).toEqual({ glyph: '◌', color: 'warning' })
+        }
 
+        // The word is bare on the terminal, a padded pill on the desktop; the desktop's row has no glyph Text.
         const row = (title: string) => textOf(rowOf(title))
+        const mark = (glyph: string) => (rich ? '' : glyph)
+        const word = (text: string) => (rich ? padded(text) : text)
         if (columns < 48) {
           // S draws no word on a row, except "local only": nothing else on a narrow row says the work is not pushed.
-          for (const title of ['pr-one', 'pr-plain', 'local-quiet']) expect(row(title)).toBe(`${glyphOf(title).glyph}${title}`)
-          expect(row('local-worded')).toBe('◌local-wordedlocal only')
+          for (const [title, glyph] of [['pr-one', '◐'], ['pr-plain', '◐'], ['local-quiet', '◌']] as const) expect(row(title)).toBe(`${mark(glyph)}${title}`)
+          expect(row('local-worded')).toBe(`${mark('◌')}local-worded${word('local only')}`)
         } else {
-          expect(row('merged-one')).toBe('✓merged-one')
-          expect(row('pr-one')).toBe('◐pr-onein PR #33')
-          expect(row('pr-plain')).toBe('◐pr-plainawaiting')
-          expect(row('local-quiet')).toBe('◌local-quiet')
-          expect(row('local-worded')).toBe('◌local-wordedlocal only')
+          expect(row('merged-one')).toBe(`${mark('✓')}merged-one`)
+          expect(row('pr-one')).toBe(`${mark('◐')}pr-one${word('in PR #33')}`)
+          expect(row('pr-plain')).toBe(`${mark('◐')}pr-plain${word('awaiting')}`)
+          expect(row('local-quiet')).toBe(`${mark('◌')}local-quiet`)
+          expect(row('local-worded')).toBe(`${mark('◌')}local-worded${word('local only')}`)
         }
         // The word's colour follows the landing.
         if (columns >= 48) {
-          expect((await ui.find({ type: 'Text', text: 'in PR #33' }))?.props.color).toBe('claude')
-          expect((await ui.find({ type: 'Text', text: 'local only' }))?.props.color).toBe('warning')
+          expect((await ui.find({ type: 'Text', text: word('in PR #33') }))?.props.color).toBe('claude')
+          expect((await ui.find({ type: 'Text', text: word('local only') }))?.props.color).toBe('warning')
         }
         await ui.unmount()
       })
@@ -251,13 +271,16 @@ describe('the Now card', () => {
       test(`a local current item says "local only, this worktree" and the base line at ${name} on ${surface}`, async ($, on) => {
         const { ui } = await draw($, on, scenarioModel(), surface, columns)
         const lines = await shown(ui)
+        const rich = surface !== 'terminal'
 
         // The Now card names the item with the card's own wording, not the row's statusWord.
         expect(lines).toContain('local only, this worktree')
         expect(lines).toContain('main: refined-mockups in PR #33')
-        const nowLines = lines.slice(0, lines.indexOf('Next'))
+        const nowLines = lines.slice(0, lines.indexOf(rich ? 'NEXT' : 'Next'))
         expect(nowLines.indexOf('domain-design')).toBeLessThan(nowLines.indexOf('main: refined-mockups in PR #33'))
-        expect((await ui.find({ type: 'Text', text: 'local only, this worktree' }))?.props.color).toBe('warning')
+        // The desktop's word is a pill, and its icon says the same in its alt.
+        expect((await ui.find({ type: 'Text', text: rich ? padded('local only, this worktree') : 'local only, this worktree' }))?.props.color).toBe('warning')
+        if (rich) expect((await (ui as Probe).findAll({ type: 'Svg' })).some(svg => svg.props.alt === 'local only, this worktree')).toBe(true)
         expect((await ui.find({ type: 'Text', text: 'main: refined-mockups in PR #33' }))?.props.dimColor).toBe(true)
         expect((await ui.find({ type: 'Text', text: 'main: refined-mockups in PR #33' }))?.props.wrap).toBe('wrap')
         await ui.unmount()
@@ -270,7 +293,14 @@ describe('the Now card', () => {
       const lines = await shown(ui)
       expect(lines.filter(line => line === 'in PR #33').length).toBe(2)
       expect(lines).not.toContain('local only, this worktree')
-      expect((await ui.find({ type: 'Text', text: '◐' }))?.props.color).toBe('claude')
+      if (surface === 'terminal') expect((await ui.find({ type: 'Text', text: '◐' }))?.props.color).toBe('claude')
+      else {
+        // The desktop draws the icon instead of the glyph: in the Now card and in the row, both worded.
+        const icons = (await (ui as Probe).findAll({ type: 'Svg' })).filter(svg => svg.props.alt === 'in PR #33')
+        expect(icons.length).toBe(2)
+        for (const icon of icons) expect(icon.props.source).toBe(iconSource('live', '◐'))
+        expect(await ui.find({ type: 'Text', text: '◐' })).toBeUndefined()
+      }
       await ui.unmount()
     })
 
@@ -314,7 +344,7 @@ describe('a group of consecutive items', () => {
         expect(lines.filter(line => line !== '' && '┐│┘'.includes(line))).toEqual(['┐', '│', '┘'])
         expect((await ui.find({ type: 'Text', text: '┐' }))?.props.color).toBe('claude')
         // The chip sits on the first member only; the others hold the bracket and the word.
-        expect(lines.filter(line => line === '[#9]').length).toBe(1)
+        expect(lines.filter(line => line === (surface === 'terminal' ? '[#9]' : '#9')).length).toBe(1)
         expect(lines.some(line => /fold|reopen/i.test(line))).toBe(false)
         await ui.unmount()
       })
@@ -369,12 +399,17 @@ describe('links', () => {
         for (const link of links) expect(link.props.href).toBe(PR33)
 
         const root = await tree(ui)
-        for (const trail of chains(root, node => node.type === 'Link' && node.props.label === 'PR #33 not merged')) {
+        const trails = chains(root, node => node.type === 'Link' && node.props.label === 'PR #33 not merged')
+        expect(trails.length).toBe(2)
+        // The Attention row comes first, the plan's gate after it. The terminal's both bold in the tone; the desktop's
+        // Attention title is in the text colour (the card is tinted), its plan gate a quiet line in the tone.
+        const looks = surface === 'terminal' ? [{ color: 'warning', bold: true }, { color: 'warning', bold: true }] : [{ color: undefined, bold: true }, { color: 'warning', bold: undefined }]
+        trails.forEach((trail, at) => {
           const text = chains(trail.at(-1)!, node => node.type === 'Text')[0]!.at(-1)!
-          expect(text.props.color).toBe('warning')
-          expect(text.props.bold).toBe(true)
+          expect(text.props.color).toBe(looks[at]!.color)
+          expect(text.props.bold).toBe(looks[at]!.bold)
           expect(textOf(text)).toBe('PR #33 not merged')
-        }
+        })
         // The gate with no href stays plain text.
         expect((await (ui as Probe).findAll({ type: 'Link' })).some(link => link.props.label === 'Parked at domain-design')).toBe(false)
         expect(await shown(ui)).toContain('Parked at domain-design')
@@ -384,9 +419,11 @@ describe('links', () => {
       test(`a chip with an href keeps its tone at ${name} on ${surface}`, async ($, on) => {
         const { ui } = await draw($, on, scenarioModel(), surface, columns)
         const root = await tree(ui)
+        // The terminal brackets a chip; the desktop draws it as a padded pill.
+        const chip = (label: string) => (surface === 'terminal' ? `[${label}]` : padded(label))
         for (const [label, tone, href] of [
-          ['[#32]', 'success', PR32],
-          ['[#33]', 'accent', PR33],
+          [chip('#32'), 'success', PR32],
+          [chip('#33'), 'accent', PR33],
         ] as const) {
           const [trail] = chains(root, node => node.type === 'Link' && node.props.label === label)
           expect(trail).toBeDefined()
@@ -419,11 +456,18 @@ describe('the refined-mockups-in-PR scenario', () => {
         const text = dump(await tree(ui)).join('\n')
 
         // Items in plan order, each with its glyph.
-        expect(text).toContain('✓ user-stories')
-        expect(text).toContain('◐ refined-mockups')
-        expect(text).toContain('◌ domain-design')
+        if (surface === 'terminal') {
+          expect(text).toContain('✓ user-stories')
+          expect(text).toContain('◐ refined-mockups')
+          expect(text).toContain('◌ domain-design')
+        } else {
+          // The desktop draws an icon (no glyph): the same three landings, in the icons' alts.
+          for (const title of ['user-stories', 'refined-mockups', 'domain-design']) expect(text).toContain(title)
+          const alts = (await (ui as Probe).findAll({ type: 'Svg' })).map(svg => svg.props.alt)
+          expect(alts).toEqual(expect.arrayContaining(['done', 'in PR #33', 'local only']))
+        }
         // Chips follow their titles; S keeps just the first chip (the PR chip) and none here has a second.
-        expect(lines).toEqual(expect.arrayContaining(['[#32]', '[#33]']))
+        expect(lines).toEqual(expect.arrayContaining(surface === 'terminal' ? ['[#32]', '[#33]'] : ['#32', '#33']))
         if (columns >= 48) expect(lines).toEqual(expect.arrayContaining(['in PR #33', 'local only']))
         else {
           expect(lines).not.toContain('in PR #33')
@@ -438,7 +482,13 @@ describe('the refined-mockups-in-PR scenario', () => {
         // Now card and the attention list.
         expect(lines).toContain('local only, this worktree')
         expect(lines).toContain('main: refined-mockups in PR #33')
-        expect(lines).toContain('Needs attention (2)')
+        if (surface === 'terminal') expect(lines).toContain('Needs attention (2)')
+        else {
+          // The heading, then the count as a pill.
+          const heading = lines.indexOf('Needs attention')
+          expect(heading).toBeGreaterThanOrEqual(0)
+          expect(lines[heading + 1]).toBe('2')
+        }
         await ui.unmount()
       })
     }

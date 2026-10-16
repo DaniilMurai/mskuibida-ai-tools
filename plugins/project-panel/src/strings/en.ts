@@ -50,6 +50,7 @@ export const en = {
   'next.fill': 'Put in prompt',
 
   'attention.title': 'Needs attention ({count})',
+  'attention.heading': 'Needs attention',
   'attention.whereAfter': '{section}, after {item}',
   'attention.whereOn': '{section}, {item}',
 
@@ -59,6 +60,15 @@ export const en = {
 
   'ring.alt': '{percent}% done',
   'strip.alt': '{done} of {total} done',
+  'icon.alt.done': 'done',
+  'icon.alt.stale': 'stale',
+  'icon.alt.live': 'in progress',
+  'icon.alt.local': 'local only',
+  'icon.alt.current': 'current',
+  'icon.alt.planned': 'planned',
+  'icon.alt.skipped': 'skipped',
+  'icon.alt.failed': 'failed',
+  'icon.alt.mark': 'needs a look',
   'stepper.alt': 'Phases: {phases}',
   'stepper.alt.done': '{title} done',
   'stepper.alt.skipped': '{title} skipped',

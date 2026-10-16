@@ -12,3 +12,6 @@ plugins/*/evals/**/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*.jsonl
 plugins/*/evals/**/session-tools/
 # types the engine lays beside a mod it loads from a dev folder; regenerated per build
 plugins/*/.claude-plugin/types/
+# pane-preview: its own install, and what it builds
+tools/pane-preview/node_modules/
+tools/pane-preview/out/
