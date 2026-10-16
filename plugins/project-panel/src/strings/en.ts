@@ -15,6 +15,7 @@ export const en = {
   // ── chrome ────────────────────────────────────────────────────────────────
   'pane.title': 'Project',
   'pane.empty': 'No plan found for this session yet.',
+  'pane.version': 'project-panel {version}',
 
   'command.description': 'Open the project panel: sections, items and what blocks the next one',
   'command.opened': 'Project panel opened.',
