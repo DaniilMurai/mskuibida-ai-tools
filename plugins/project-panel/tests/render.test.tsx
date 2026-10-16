@@ -986,7 +986,14 @@ describe('ledger', () => {
         const strip = (found: Found[]) => found.filter(svg => svg.props.height === 6)
         expect(strip(small.svgs)).toEqual([])
         expect(strip(medium.svgs).map(svg => [svg.props.width, svg.props.alt])).toEqual([[64, '11 of 13 done']])
-        expect(strip(wide.svgs).map(svg => [svg.props.width, svg.props.alt])).toEqual([[96, '11 of 13 done']])
+        // On the wide pane a plan of five phases is a row of phase cards, each with its strip at the card's 86 px.
+        expect(strip(wide.svgs).map(svg => [svg.props.width, svg.props.alt])).toEqual([
+          [86, '8 of 8 done'],
+          [86, '6 of 6 done'],
+          [86, '11 of 13 done'],
+          [86, '6 of 10 done'],
+          [86, '0 of 3 done'],
+        ])
         const source = String(strip(medium.svgs)[0]?.props.source)
         // done green, accent for partial, track for the rest; 2 px gaps, rounded.
         expect(source).toContain('#4eba65')
@@ -1043,7 +1050,10 @@ describe('progress rings', () => {
   test('desktop: a 40 px donut with the % inside in the plan heading, 16 px per section row', async ($, on) => {
     const { ui } = await draw($, on, stageModel(), 'desktop')
 
-    const rings = await (ui as Probe).findAll({ type: 'Svg' })
+    // The phase stepper first (no size of its own: it fits its slot), then the rings.
+    const [phases, ...rings] = await (ui as Probe).findAll({ type: 'Svg' })
+    expect(phases?.props.width).toBeUndefined()
+    expect(phases?.props.alt).toBe('Phases: Initialization done, Ideation done, Inception 50% done, current, Construction 0% done, Operation skipped')
     // Plan (overall), Initialization, Ideation, Inception, Construction; Operation is skipped.
     expect(rings.map(ring => [ring.props.width, ring.props.height, ring.props.alt])).toEqual([
       [40, 40, '50% done'],
@@ -1134,7 +1144,8 @@ describe('progress rings', () => {
   for (const surface of ['vscode', 'mobile'] as const) {
     test(`${surface} has Svg too`, async ($, on) => {
       const { ui } = await draw($, on, stageModel(), surface)
-      expect((await (ui as Probe).findAll({ type: 'Svg' })).length).toBe(5)
+      // The phase stepper and five rings.
+      expect((await (ui as Probe).findAll({ type: 'Svg' })).length).toBe(6)
       await ui.unmount()
     })
   }

@@ -5,9 +5,15 @@ import { safely, uniqueIds } from './kit'
 import type { Ctx, El } from './kit'
 import { foldGutters, foldRow, gateCard, itemRow, openCap } from './item'
 import { clampPercent, mixOf, ring, strip } from './ring'
+import { PX_PER_CELL, isEmptySection, numbered } from './stepper'
 
 const BIG_RING = 40
 const SMALL_RING = 16
+const CARD_RING = 20
+/** A phase card's narrowest width in cells; the row wraps below it. */
+const CARD_MIN = 16
+/** The card's strip, in px: its narrowest inner width (less the border and padding). */
+const CARD_STRIP = Math.round((CARD_MIN - 4) * PX_PER_CELL)
 const LONG_AFTER = { S: 6, M: 10, L: 16 } as const
 const OPEN_CAP = { S: 8, M: 12, L: 20 } as const
 const STRIP_FROM_ITEMS = 10
@@ -112,7 +118,11 @@ function foldedPlan(ctx: Ctx, model: PanelModel): El {
   )
 }
 
-export function plan(ctx: Ctx, model: PanelModel, expanded: Record<string, boolean>): El {
+/**
+ * `asPhases` (the wide pane's plan column, on an Svg surface, for a plan of a handful of phases) draws
+ * the section headings as a row of phase cards, with the open phases' items under them.
+ */
+export function plan(ctx: Ctx, model: PanelModel, expanded: Record<string, boolean>, asPhases = false): El {
   const { Box } = ctx.kit
   // A provider may fold the whole plan (a side job); the person's own choice wins.
   const isFoldable = model.isPlanCollapsed !== undefined
@@ -120,6 +130,7 @@ export function plan(ctx: Ctx, model: PanelModel, expanded: Record<string, boole
   if (!isOpen) return foldedPlan(ctx, model)
   // A repeated section id gets a distinct key (and fold state); its gates belong to the first.
   const ids = uniqueIds(model.sections.map(section => section.id))
+  if (asPhases) return phasePlan(ctx, model, ids, expanded, isFoldable)
   // One width for every count, from the widest ("18/18 ✓"), so the rings and counts line up.
   const countWidth = Math.max(0, ...model.sections.map(section => Array.from(countText(section)).length))
   const firstProposed = model.sections.findIndex(section => section.isProposed === true)
@@ -142,6 +153,87 @@ export function plan(ctx: Ctx, model: PanelModel, expanded: Record<string, boole
   )
 }
 
+/** The wide pane's phase view: the heading, orphan gates, a row of phase cards, each open phase's items, then any proposed sections. */
+function phasePlan(ctx: Ctx, model: PanelModel, ids: string[], expanded: Record<string, boolean>, isFoldable: boolean): El {
+  const { Box, Text } = ctx.kit
+  const gatesOf = (index: number): Gate[] => {
+    const section = model.sections[index]!
+    return ids[index] === section.id ? planGates(model).filter(gate => gate.sectionId === section.id) : []
+  }
+  // A card is its phase's heading: the same fold key, so a phase open in one column stays open in two.
+  const phases = model.sections
+    .map((section, index) => ({ section, id: ids[index]!, index, isOpen: isSectionOpen(section, ids[index]!, expanded) }))
+    .filter(phase => phase.section.isProposed !== true)
+  const firstProposed = model.sections.findIndex(section => section.isProposed === true)
+  return (
+    <Box flexDirection="column">
+      {planHeading(ctx, model, isFoldable ? true : undefined)}
+      {orphanGates(model).map(gate => gateCard(ctx, gate))}
+      <Box flexWrap="wrap" gap={1}>
+        {phases.map(phase =>
+          phaseCard(ctx, phase.section, phase.id, phase.isOpen, gatesOf(phase.index), () => ctx.handlers.onToggle(phase.id, !phase.isOpen)),
+        )}
+      </Box>
+      {phases
+        .filter(phase => phase.isOpen)
+        .map(phase => (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold wrap="truncate-end">
+              {numbered(phase.section)}
+            </Text>
+            {sectionBody(ctx, phase.section, phase.id, gatesOf(phase.index), expanded)}
+          </Box>
+        ))}
+      {model.sections.map((section, index) => section.isProposed === true && sectionEl(ctx, section, ids[index]!, [], expanded, 0, index === firstProposed))}
+    </Box>
+  )
+}
+
+/** One phase: its ring, the hidden-gate mark and its count; its title, the press that opens it; its strip. */
+function phaseCard(ctx: Ctx, section: Section, id: string, isOpen: boolean, gates: Gate[], press: () => void | Promise<void>): El {
+  const { Box, Text, Button } = ctx.kit
+  const isSkipped = section.status === 'skipped'
+  const isBuilt = section.status === 'built'
+  const hasRing = !isSkipped && section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
+  const count = isSkipped ? t('section.skipped') : countText(section)
+  // The open phase draws its gates in its items; a closed one only marks that it holds some.
+  const hidden = isOpen ? [] : gates
+  const hasError = hidden.some(gate => gate.tone === 'error')
+  return (
+    <Box
+      key={'phase:' + id}
+      flexDirection="column"
+      flexGrow={1}
+      minWidth={CARD_MIN}
+      borderStyle="round"
+      borderColor={isOpen ? 'claude' : 'subtle'}
+      hover={{ borderColor: 'claude' }}
+      paddingX={1}
+    >
+      <Box gap={1}>
+        {hasRing && ring(ctx, section.percent ?? 0, CARD_RING, false)}
+        <Box flexGrow={1} />
+        {hidden.length > 0 && (
+          <Text bold color={hasError ? 'error' : 'warning'}>
+            {hasError ? '⊘' : '‖'}
+          </Text>
+        )}
+        {count !== '' && (
+          <Text dimColor={!isBuilt} color={isBuilt ? 'success' : undefined}>
+            {count}
+          </Text>
+        )}
+      </Box>
+      <Button plain key={'section:' + id} dimColor={isSkipped || isEmptySection(section)} onPress={safely(press)}>
+        <Text bold={isOpen} wrap="truncate-end">
+          {numbered(section)}
+        </Text>
+      </Button>
+      {!isSkipped && strip(ctx, mixOf(section.items), CARD_STRIP)}
+    </Box>
+  )
+}
+
 /** Done/total as the section's count column says it ("3/3 ✓" when built); '' when there is nothing to say. */
 function countText(section: Section): string {
   if (section.isProposed === true || section.status === 'skipped') return ''
@@ -150,9 +242,6 @@ function countText(section: Section): string {
   if (count === '') return isBuilt ? '✓' : ''
   return isBuilt ? `${count} ✓` : count
 }
-
-/** A section with no items and nothing counted: no ring, a dim title. */
-const isEmptySection = (section: Section): boolean => section.items.length === 0 && !(section.counts && section.counts.total > 0)
 
 function sectionEl(
   ctx: Ctx,
@@ -188,9 +277,23 @@ function sectionEl(
     )
   }
 
-  const isOpen = expanded[id] ?? !section.isCollapsed
+  const isOpen = isSectionOpen(section, id, expanded)
   const heading = sectionHeading(ctx, section, id, isOpen, isOpen ? [] : gates, countWidth)
   if (!isOpen) return <Box flexDirection="column">{heading}</Box>
+  return (
+    <Box flexDirection="column">
+      {heading}
+      {sectionBody(ctx, section, id, gates, expanded)}
+    </Box>
+  )
+}
+
+/** The person's fold, else the provider's. */
+const isSectionOpen = (section: Section, id: string, expanded: Record<string, boolean>): boolean => expanded[id] ?? !section.isCollapsed
+
+/** An open section under its heading (or under its phase card): caption, gates, the fold rows and the items. */
+function sectionBody(ctx: Ctx, section: Section, id: string, gates: Gate[], expanded: Record<string, boolean>): El {
+  const { Box, Text } = ctx.kit
 
   // Gates belong to the first item with their id, so a repeated id never doubles a gate.
   const owner = new Map<string, number>()
@@ -222,7 +325,6 @@ function sectionEl(
 
   return (
     <Box flexDirection="column">
-      {heading}
       {section.caption !== undefined && section.caption !== '' && (
         <Box paddingLeft={2}>
           <Text dimColor wrap="wrap">
@@ -255,9 +357,6 @@ function foldButton(ctx: Ctx, key: string, label: string, press: () => void | Pr
     </Box>
   )
 }
-
-/** The phase's number before its title ("3 Inception"); the title alone when it has none. */
-const numbered = (section: Section): string => (section.ordinal === undefined || section.ordinal === '' ? section.title : `${section.ordinal} ${section.title}`)
 
 /** ▾/▸ + title on the left; on the right the hidden-gate mark, the strip, the ring and the count (✓ when built), or "skipped". */
 function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean, hiddenGates: Gate[], countWidth: number): El {

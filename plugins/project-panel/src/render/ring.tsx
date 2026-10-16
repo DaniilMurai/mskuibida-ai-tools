@@ -21,13 +21,13 @@ export function ringGlyph(percent: number): string {
  * Fixed mid-tones, not currentColor: the surface draws an Svg as an image,
  * where currentColor need not follow the theme. All read on light and dark.
  */
-const RING_TRACK = '#8a8a8a'
-const RING_ARC = '#d97757'
-const RING_DONE = '#4eba65'
-const RING_FAIL = '#ef6f64'
+export const RING_TRACK = '#8a8a8a'
+export const RING_ARC = '#d97757'
+export const RING_DONE = '#4eba65'
+export const RING_FAIL = '#ef6f64'
 // Nothing reaches 4.5:1 on both #ffffff and #1f1e1c (that needs a luminance both <= 0.183 and >= 0.234).
 // #7e7e7e is the balance point: 4.06:1 on white, 4.10:1 on the dark background; the number is large and bold.
-const RING_TEXT = '#7e7e7e'
+export const RING_TEXT = '#7e7e7e'
 
 /** A two-circle donut: a faint track and the arc from 12 o'clock, round caps; `isLabelled` draws the % inside. */
 export function ringSource(percent: number, size: number, isLabelled: boolean): string {

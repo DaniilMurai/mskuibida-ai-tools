@@ -8,6 +8,10 @@
 // progress and sections). From 80 columns, with sections, the Now card, actions
 // and attention sit in a left column and the plan in a right one.
 //
+// On the Svg surfaces a plan of a handful of phases (2 to 7) gets two more
+// views: in one column, the phase stepper under the header; in two, phase cards
+// over the open phases' items in place of the section headings.
+//
 // Copy comes from `t()` or from the model (display text a provider resolved).
 // A string that is '' hides its element; nothing is substituted. Glyphs are
 // not copy. The pieces live in ./render/.
@@ -21,6 +25,7 @@ import { breakpoint } from './render/kit'
 import type { Ctx, El, Handlers, Kit } from './render/kit'
 import { actionsRow, nowCard } from './render/now'
 import { orphanGates, plan } from './render/plan'
+import { isPhased, stepper } from './render/stepper'
 
 export type { Handlers, Kit } from './render/kit'
 
@@ -67,7 +72,8 @@ export function renderPane(
   const leftWidth = Math.floor(width * LEFT_SHARE) - COLUMN_GAP
   const leftCtx: Ctx = isTwoColumn ? { ...ctx, bp: breakpoint(leftWidth), columns: leftWidth } : ctx
   const left = [nowCard(leftCtx, model), actionsRow(leftCtx, model), rowsOf(model).length > 0 && attention(leftCtx, model)]
-  const right = hasPlan && plan(ctx, model, expanded)
+  const isPhaseView = kit.Svg !== undefined && isPhased(model)
+  const right = hasPlan && plan(ctx, model, expanded, isTwoColumn && isPhaseView)
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -83,6 +89,7 @@ export function renderPane(
         </Box>
       ) : (
         <Box flexDirection="column" gap={1}>
+          {isPhaseView && stepper(ctx, model)}
           {left}
           {right}
         </Box>
