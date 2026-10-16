@@ -403,6 +403,44 @@ describe('Construction drawn as Units', () => {
     expect(model.overall.label).toBeUndefined()
   })
 
+  test('until Units Generation has finished and made Units, Construction is not counted at all', async () => {
+    const pending = stateText().replace('- [x] units-generation — EXECUTE', '- [ ] units-generation — EXECUTE')
+    const t: VirtualTree = { files: { [s.paths.statePath]: pending, [`${s.ROOT}/aidlc/spaces/default/intents/active-intent`]: `${s.INTENT}\n` } }
+    const model = await load(t)
+    const section = construction(model)
+    expect(section.isUncounted).toBe(true)
+    expect(section.counts).toBeUndefined()
+    expect(section.percent).toBeUndefined()
+    // The rows are still listed, so the person sees what is coming; the plan counts only the other phases.
+    expect(section.items.map(item => item.id)).toContain('code-generation')
+    const others = model.sections.filter(one => one.id !== 'CONSTRUCTION').flatMap(one => one.items).filter(item => item.status !== 'skipped')
+    expect(model.overall.counts.total).toBe(others.length)
+  })
+
+  test('once Units exist, Construction counts again, by its Units', async () => {
+    const model = await load(tree(stateText()))
+    expect(construction(model).isUncounted).toBeUndefined()
+    expect(construction(model).counts?.total).toBe(6)
+  })
+
+  test('a skipped Units Generation leaves Construction counted by its stages', async () => {
+    const skipped = stateText().replace('- [x] units-generation — EXECUTE', '- [S] units-generation — SKIP: one unit')
+    const t: VirtualTree = { files: { [s.paths.statePath]: skipped, [`${s.ROOT}/aidlc/spaces/default/intents/active-intent`]: `${s.INTENT}\n` } }
+    const section = construction(await load(t))
+    expect(section.isUncounted).toBeUndefined()
+    expect(section.counts?.total).toBe(7)
+  })
+
+  test('phases and stages are numbered by lifecycle (Initialization is 0), stages from 1: 3, and 3.6', async () => {
+    const model = await load(tree(stateText()))
+    expect(construction(model).ordinal).toBe('3')
+    // This fixture lists only two phases; each keeps its place in the lifecycle.
+    expect(model.sections.map(one => one.ordinal)).toEqual(['2', '3'])
+    // The Units have no stage number; build-and-test is the sixth row of Construction.
+    expect(construction(model).items.find(item => item.id === 'unit:api-core')?.ordinal).toBeUndefined()
+    expect(construction(model).items.find(item => item.id === 'build-and-test')?.ordinal).toBe('3.6')
+  })
+
   test('code-generation out of scope keeps the stage rows', async () => {
     const skipped = stateText().replace('- [ ] code-generation — EXECUTE', '- [S] code-generation — SKIP: no code')
     const section = construction(await load(tree(skipped)))

@@ -425,6 +425,23 @@ describe('layout', () => {
 
 describe('sections and items', () => {
   for (const surface of SURFACES) {
+    test(`numbers on ${surface}: the phase before its title, <phase>.<stage> before each stage`, async ($, on) => {
+      const model = stageModel()
+      model.sections.forEach((one, at) => {
+        one.ordinal = String(at)
+        one.items.forEach((row, index) => {
+          row.ordinal = `${at}.${index + 1}`
+        })
+      })
+      const { ui } = await draw($, on, model, surface)
+      const lines = await shown(ui as Probe)
+      expect((await ui.find({ key: 'section:INCEPTION' }))?.text).toBe('▾ 2 Inception')
+      expect((await ui.find({ key: 'section:CONSTRUCTION' }))?.text).toBe('▸ 3 Construction')
+      expect(lines).toContain('2.1')
+      expect(lines).toContain('2.5')
+      expect(lines).toContain('domain-design')
+    })
+
     test(`folds on ${surface}: the active section is open, the rest closed, a press flips`, async ($, on) => {
       const { ui } = await draw($, on, stageModel(), surface)
 

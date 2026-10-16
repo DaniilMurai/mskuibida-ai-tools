@@ -93,8 +93,8 @@ describe('the regression: refined-mockups in PR #33, domain-design only in this 
 
   test('only merged counts as done: overall, the section ring and the section status', async () => {
     const { model } = await aload(regression())
-    expect(model.overall.counts).toEqual({ done: 2, open: 2, planned: 4, total: 8 })
-    expect(model.overall.percent).toBe(25)
+    expect(model.overall.counts).toEqual({ done: 2, open: 2, planned: 2, total: 6 })
+    expect(model.overall.percent).toBe(33)
     const inception = sectionOf(model, 'INCEPTION')
     expect(inception.counts).toEqual({ done: 2, total: 6 })
     expect(inception.percent).toBe(33)
@@ -105,8 +105,8 @@ describe('the regression: refined-mockups in PR #33, domain-design only in this 
   test('the model is plain data: it round-trips, and absent fields are absent, not undefined', async () => {
     const { model } = await aload(regression())
     expect(JSON.parse(JSON.stringify(model))).toEqual(model)
-    expect(Object.keys(itemOf(model, 'requirements-analysis')).sort()).toEqual(['chips', 'id', 'isCurrent', 'landing', 'status', 'title'])
-    expect(Object.keys(itemOf(model, 'units-generation')).sort()).toEqual(['chips', 'id', 'isCurrent', 'status', 'title'])
+    expect(Object.keys(itemOf(model, 'requirements-analysis')).sort()).toEqual(['chips', 'id', 'isCurrent', 'landing', 'ordinal', 'status', 'title'])
+    expect(Object.keys(itemOf(model, 'units-generation')).sort()).toEqual(['chips', 'id', 'isCurrent', 'ordinal', 'status', 'title'])
   })
 
   test('the commands: argv only, the PR list once, no model', async () => {
@@ -439,7 +439,7 @@ describe('one truth', () => {
     const w = aworld({ isRepo: false, local: state({ 'user-stories': 'x', 'refined-mockups': 'x', 'domain-design': '-' }) })
     const { model, s } = await aload(w)
     expect(s.lines()).toEqual([`git -C ${REPO} rev-parse --show-toplevel`])
-    expect(itemOf(model, 'refined-mockups')).toEqual({ id: 'refined-mockups', title: 'refined-mockups', status: 'done', isCurrent: false, chips: [] })
+    expect(itemOf(model, 'refined-mockups')).toEqual({ id: 'refined-mockups', title: 'refined-mockups', ordinal: '2.3', status: 'done', isCurrent: false, chips: [] })
     expect(model.overall.counts.done).toBe(2)
     expect(model.header).not.toHaveProperty('base')
     expect(model.gates).toEqual([])
@@ -479,7 +479,9 @@ describe('the intent is not on main yet', () => {
     expect(model.header.base).toBe('This intent is not on main yet')
     expect(itemOf(model, 'requirements-analysis')).toMatchObject({ landing: 'local', status: 'open', statusWord: 'local only' })
     expect(itemOf(model, 'user-stories')).toMatchObject({ landing: 'local' })
-    expect(model.overall.counts.done).toBeUndefined()
+    // Nothing is merged, but requirements-analysis is finished here: it counts, still drawn as local only.
+    expect(itemOf(model, 'requirements-analysis').isFinishedLocal).toBe(true)
+    expect(model.overall.counts.done).toBe(1)
     expect(sectionOf(model, 'INCEPTION').status).toBe('planned')
   })
 

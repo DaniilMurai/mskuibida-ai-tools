@@ -43,7 +43,7 @@ describe('up next', () => {
     const item = itemOf(model, 'domain-design')
     expect(item).toMatchObject({ status: 'planned', statusWord: 'up next', isCurrent: true, chips: [] })
     expect(item).not.toHaveProperty('landing')
-    expect(model.overall.counts).toEqual({ done: 2, open: 1, planned: 5, total: 8 })
+    expect(model.overall.counts).toEqual({ done: 2, open: 1, planned: 3, total: 6 })
     expect(model.gates.map(gate => [gate.kind, gate.afterItemId])).toEqual([
       ['pr-not-merged', 'refined-mockups'],
       ['parked', 'refined-mockups'],

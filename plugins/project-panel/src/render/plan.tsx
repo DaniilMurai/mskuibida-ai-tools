@@ -256,6 +256,9 @@ function foldButton(ctx: Ctx, key: string, label: string, press: () => void | Pr
   )
 }
 
+/** The phase's number before its title ("3 Inception"); the title alone when it has none. */
+const numbered = (section: Section): string => (section.ordinal === undefined || section.ordinal === '' ? section.title : `${section.ordinal} ${section.title}`)
+
 /** ▾/▸ + title on the left; on the right the hidden-gate mark, the strip, the ring and the count (✓ when built), or "skipped". */
 function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean, hiddenGates: Gate[], countWidth: number): El {
   const { Box, Text, Button } = ctx.kit
@@ -264,7 +267,7 @@ function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean,
     <Box gap={1}>
       <Box flexShrink={1}>
         <Button plain key={'section:' + id} dimColor={section.status === 'skipped' || isEmptySection(section)} onPress={safely(() => ctx.handlers.onToggle(id, !isOpen))}>
-          <Text bold={section.status === 'active'} wrap="truncate-end">{`${isOpen ? '▾' : '▸'} ${section.title}`}</Text>
+          <Text bold={section.status === 'active'} wrap="truncate-end">{`${isOpen ? '▾' : '▸'} ${numbered(section)}`}</Text>
         </Button>
       </Box>
       <Box flexGrow={1} />
