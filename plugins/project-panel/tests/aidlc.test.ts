@@ -89,7 +89,8 @@ describe('real sample, bound session on its stage branch', () => {
       ['INITIALIZATION', 'Initialization', 'built', { done: 3, total: 3 }, 100],
       ['IDEATION', 'Ideation', 'built', { done: 4, total: 4 }, 100],
       ['INCEPTION', 'Inception', 'active', { done: 4, total: 8 }, 50],
-      ['CONSTRUCTION', 'Construction', 'planned', { done: 0, total: 7 }, 0],
+      // units-generation is not done: Construction has no size yet, so it carries no count or ring.
+      ['CONSTRUCTION', 'Construction', 'planned', undefined, undefined],
       ['OPERATION', 'Operation', 'skipped', { done: 0, total: 0 }, undefined],
     ])
     expect(section(model, 'CONSTRUCTION').caption).toBeUndefined() // Per unit: [TBD]
@@ -133,7 +134,8 @@ describe('real sample, bound session on its stage branch', () => {
 
   test('overall counts executed items by status, percent over them', async () => {
     const model = await load(real.tree, real.ROOT, real.sessions.live)
-    expect(model.overall).toEqual({ percent: 50, counts: { done: 11, open: 1, planned: 10, total: 22 } })
+    // Construction's seven stages are not counted until Units Generation has made Units: 15 stages, 11 done.
+    expect(model.overall).toEqual({ percent: 73, counts: { done: 11, open: 1, planned: 3, total: 15 } })
   })
 
   test('the Parked fields make one parked gate right after domain-design, date formatted', async () => {

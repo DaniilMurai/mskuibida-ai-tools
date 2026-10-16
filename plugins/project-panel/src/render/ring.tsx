@@ -78,7 +78,7 @@ export function mixOf(items: Item[]): Mix {
   for (const item of items) {
     if (item.status === 'skipped') continue
     mix.total += 1
-    if (item.status === 'done') mix.done += 1
+    if (item.status === 'done' || item.isFinishedLocal === true) mix.done += 1
     else if (item.status === 'open' || item.status === 'partial' || item.status === 'reopened') mix.live += 1
     else if (item.status === 'failed') mix.failed += 1
     else mix.rest += 1

@@ -215,6 +215,11 @@ export function itemRow(ctx: Ctx, item: Item, fold: string): El {
             {look.glyph}
           </Text>
         </Box>
+        {item.ordinal !== undefined && item.ordinal !== '' && (
+          <Box flexShrink={0}>
+            <Text dimColor>{item.ordinal}</Text>
+          </Box>
+        )}
         <Box flexShrink={1} minWidth={Math.min(Array.from(item.title).length, 12)} overflow="hidden">
           {item.href !== undefined && item.href !== '' ? (
             <Link href={item.href} label={item.title}>

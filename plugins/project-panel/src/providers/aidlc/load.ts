@@ -266,13 +266,37 @@ function sectionsOf(
   two: Two | null,
   units: UnitView | null,
 ): Section[] {
-  return parsed.phases.map(phase => {
+  const isWaitingOnUnits = unitsPending(parsed, units)
+  return parsed.phases.map((phase, index) => {
     const local = parsed.phaseProgress[phase.key] ?? 'pending'
     const progress = phaseProgressOf(local, phase.key, two)
-    return units && phase.key === 'CONSTRUCTION' && hasUnitRows(phase)
-      ? unitSectionOf(phase, progress, currentStage, view, units)
-      : sectionOf(phase, progress, currentStage, view)
+    const known = PHASE_ORDER.indexOf(phase.key)
+    const phaseNo = known >= 0 ? known : PHASE_ORDER.length + index
+    const section =
+      units && phase.key === 'CONSTRUCTION' && hasUnitRows(phase)
+        ? unitSectionOf(phase, progress, currentStage, view, units, phaseNo)
+        : sectionOf(phase, progress, currentStage, view, phaseNo)
+    section.ordinal = String(phaseNo)
+    if (isWaitingOnUnits && phase.key === 'CONSTRUCTION') {
+      // Construction is seven stages only on paper until Units Generation has cut the intent into Units: nothing of
+      // it is counted yet, in its own row or the plan's.
+      delete section.counts
+      delete section.percent
+      section.isUncounted = true
+    }
+    return section
   })
+}
+
+/**
+ * Construction has no size until Units Generation has produced the Units: the stage is in scope and not completed,
+ * and no Unit list is readable. When the stage is skipped or absent, or the list will not parse after the stage
+ * completed, Construction's own stages stand and are counted.
+ */
+function unitsPending(parsed: ParsedState, units: UnitView | null): boolean {
+  if (units !== null) return false
+  const stage = parsed.phases.flatMap(phase => phase.stages).find(row => row.slug === UNITS_STAGE)
+  return stage !== undefined && stage.isExecuted && stage.marker !== 'skipped' && stage.marker !== 'completed'
 }
 
 /**
@@ -285,26 +309,37 @@ function phaseProgressOf(local: PhaseStatus, key: string, two: Two | null): Phas
   return two.main.phaseProgress[key] ?? local
 }
 
-function stageItem(stage: ParsedStage, currentStage: string, view: Derived | null): Item {
+/** upstream's lifecycle, in order, numbered from 0 (Initialization is phase 0): a phase keeps its number even when the state file lists only some of them. */
+const PHASE_ORDER: readonly string[] = ['INITIALIZATION', 'IDEATION', 'INCEPTION', 'CONSTRUCTION', 'OPERATION']
+
+/** A stage's place in the plan: `<phase>.<stage>`, both counted from 1 in the state file's order (skipped rows count). */
+const ordinalOf = (phaseNo: number, stageNo: number): string => `${phaseNo}.${stageNo}`
+
+function stageItem(stage: ParsedStage, currentStage: string, view: Derived | null, ordinal: string): Item {
   const facts = view?.items.get(stage.slug)
   return {
     id: stage.slug,
     title: stage.slug,
+    ordinal,
     status: facts?.status ?? itemStatus(stage),
     isCurrent: stage.slug === currentStage,
     chips: facts?.chips ?? [],
     ...(facts?.landing === undefined ? {} : { landing: facts.landing }),
+    ...(facts?.isFinishedLocal === true ? { isFinishedLocal: true } : {}),
     ...(facts?.statusWord === undefined ? {} : { statusWord: facts.statusWord }),
     ...(facts?.group === undefined ? {} : { group: facts.group }),
     ...(facts?.review === undefined ? {} : { review: facts.review }),
   }
 }
 
-function sectionOf(phase: ParsedPhase, progress: PhaseStatus, currentStage: string, view: Derived | null): Section {
-  const items = phase.stages.map(stage => stageItem(stage, currentStage, view))
+function sectionOf(phase: ParsedPhase, progress: PhaseStatus, currentStage: string, view: Derived | null, phaseNo: number): Section {
+  const items = phase.stages.map((stage, at) => stageItem(stage, currentStage, view, ordinalOf(phaseNo, at + 1)))
   const perUnit = phase.perUnit === '' || phase.perUnit === '[TBD]' ? '' : t('aidlc.phase.perUnit', { units: phase.perUnit })
   return withCounts(phase, progress, items, perUnit, () => 1)
 }
+
+/** Done for the counts: merged or checked off, or finished here and not landed yet (◌ "local only"). */
+const isCountedDone = (item: Item): boolean => item.status === 'done' || item.isFinishedLocal === true
 
 /** The section's counts, ring and status from its items; `weightOf` weighs the ring (each item 1 but a Unit). */
 function withCounts(
@@ -315,11 +350,13 @@ function withCounts(
   weightOf: (item: Item) => number,
 ): Section {
   const executed = items.filter(item => item.status !== 'skipped')
-  const done = executed.filter(item => item.status === 'done').length
+  const done = executed.filter(isCountedDone).length
   const total = executed.length
 
+  // The section's status is where the default branch stands: work finished only here does not make it partial.
+  const landed = executed.filter(item => item.status === 'done').length
   let status = SECTION_STATUS[progress]
-  if (progress !== 'active' && done > 0 && done < total) status = 'partial'
+  if (progress !== 'active' && landed > 0 && landed < total) status = 'partial'
 
   const section: Section = {
     id: phase.key,
@@ -342,7 +379,7 @@ function weightedPercent(items: Item[], weightOf: (item: Item) => number): numbe
   for (const item of items) {
     const weight = weightOf(item)
     all += weight
-    if (item.status === 'done') done += weight
+    if (isCountedDone(item)) done += weight
   }
   return all > 0 ? Math.round((done / all) * 100) : null
 }
@@ -354,9 +391,13 @@ function weightedPercent(items: Item[], weightOf: (item: Item) => number): numbe
  */
 function overallOf(sections: Section[], units: UnitView | null): PanelModel['overall'] {
   const counts: PanelModel['overall']['counts'] = { total: 0 }
-  const executed = sections.flatMap(section => section.items).filter(item => item.status !== 'skipped')
+  const executed = sections
+    .filter(section => section.isUncounted !== true)
+    .flatMap(section => section.items)
+    .filter(item => item.status !== 'skipped')
   for (const item of executed) {
-    counts[item.status] = (counts[item.status] ?? 0) + 1
+    const key = isCountedDone(item) ? 'done' : item.status
+    counts[key] = (counts[key] ?? 0) + 1
     counts.total += 1
   }
   const overall: PanelModel['overall'] = { counts }
@@ -393,6 +434,9 @@ type UnitView = {
 }
 
 const unitItemId = (name: string) => `unit:${name}`
+
+/** The stage that cuts an intent into Units. */
+const UNITS_STAGE = 'units-generation'
 
 /** Unit rows replace the per-unit stage rows only while code-generation, the one that builds a Unit, is in scope. */
 function hasUnitRows(phase: ParsedPhase): boolean {
@@ -477,6 +521,7 @@ function unitSectionOf(
   currentStage: string,
   view: Derived | null,
   units: UnitView,
+  phaseNo: number,
 ): Section {
   const label = (name: string) => {
     const unit = units.units.find(one => one.name === name)
@@ -506,8 +551,9 @@ function unitSectionOf(
     return item
   })
   const onceItems = phase.stages
-    .filter(stage => !PER_UNIT_STAGES.includes(stage.slug))
-    .map(stage => stageItem(stage, currentStage, view))
+    .map((stage, at) => ({ stage, ordinal: ordinalOf(phaseNo, at + 1) }))
+    .filter(({ stage }) => !PER_UNIT_STAGES.includes(stage.slug))
+    .map(({ stage, ordinal }) => stageItem(stage, currentStage, view, ordinal))
   const pointsOf = (unit: Unit) => units.points.get(unit.name)?.points ?? 0
   const donePoints = units.units.filter(unit => units.progress.get(unit.name)?.phase === 'done').reduce((sum, unit) => sum + pointsOf(unit), 0)
   const allPoints = units.units.reduce((sum, unit) => sum + pointsOf(unit), 0)

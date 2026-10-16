@@ -204,6 +204,16 @@ export type Item = {
   /** Where the item's progress lives (M3); drives the glyph: ✓ merged, ◐ in-pr, ◌ local. */
   landing?: Landing
   /**
+   * Finished (checked off) in this working tree but not landed anywhere (landing `local`): the status is still
+   * open and the row is drawn ◌ "local only", yet counts, rings and the plan's percent take it as done.
+   */
+  isFinishedLocal?: boolean
+  /**
+   * Where the item sits in the plan's numbering ("3.2": the third phase's second stage); '' or absent = unnumbered.
+   * Not display text: the renderer draws it dim beside the title.
+   */
+  ordinal?: string
+  /**
    * Display text that replaces the status word on the row ("in PR #33",
    * "local only"); '' hides the word. Absent = the status's own word.
    */
@@ -228,6 +238,13 @@ export type Section = {
   status: SectionStatus
   /** Default fold; the person's own choice (state `expanded`) wins. */
   isCollapsed: boolean
+  /** The phase's number in the plan ("3"); absent = unnumbered. Not display text: drawn dim beside the title. */
+  ordinal?: string
+  /**
+   * The section's items stand for work that is not defined yet (Construction before its Units exist): they carry no
+   * count or ring and are left out of the plan's totals.
+   */
+  isUncounted?: boolean
   /** Suggested by the provider, not declared in the plan: the row is dimmed and tagged. */
   isProposed?: boolean
   items: Item[]

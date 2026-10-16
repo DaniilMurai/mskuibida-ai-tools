@@ -153,6 +153,8 @@ export type ItemFacts = {
   status: ItemStatus
   chips: Chip[]
   landing?: Landing
+  /** Finished here, not landed (landing `local`): counts as done. */
+  isFinishedLocal?: boolean
   statusWord?: string
   group?: string
   /** The open PR's review state (landing in-pr), when the status word says it. */
@@ -350,6 +352,7 @@ export function derive(local: ParsedState, two: Two): Derived {
       items.set(row.slug, {
         status: status === 'done' ? 'open' : status,
         landing,
+        ...(status === 'done' && landing === 'local' ? { isFinishedLocal: true } : {}),
         statusWord: t(word),
         chips: m === 'completed' ? mergedChip : [],
       })

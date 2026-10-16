@@ -59,7 +59,7 @@ describe('a stage reopened on this session\'s fold branch, before any PR', () =>
 
   test('a reopened stage does not count as done', async () => {
     const { model } = await aload(reopenedHere())
-    expect(model.overall.counts).toEqual({ done: 2, reopened: 1, open: 1, planned: 4, total: 8 })
+    expect(model.overall.counts).toEqual({ done: 2, reopened: 1, open: 1, planned: 2, total: 6 })
   })
 
   test('the fold branch is still behind main after its last stage', async () => {
