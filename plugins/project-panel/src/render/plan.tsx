@@ -1,19 +1,20 @@
 // The Plan block: the overall ring and summary, then every section.
 import { t } from '../strings/en'
 import type { Gate, PanelModel, Section } from '../../types'
-import { safely, uniqueIds } from './kit'
+import { CARD_FILL, isRich, safely, uniqueIds } from './kit'
+import { emptyRing } from './look'
 import type { Ctx, El } from './kit'
 import { foldGutters, foldRow, gateCard, itemRow, openCap } from './item'
 import { clampPercent, mixOf, ring, strip } from './ring'
-import { PX_PER_CELL, isEmptySection, numbered } from './stepper'
+import { isEmptySection, numbered } from './stepper'
 
 const BIG_RING = 40
 const SMALL_RING = 16
 const CARD_RING = 20
-/** A phase card's narrowest width in cells; the row wraps below it. */
-const CARD_MIN = 16
-/** The card's strip, in px: its narrowest inner width (less the border and padding). */
-const CARD_STRIP = Math.round((CARD_MIN - 4) * PX_PER_CELL)
+/** A phase card's narrowest width in cells: five share a wide pane's plan column, and the row wraps below it. */
+const CARD_MIN = 10
+/** The card's strip, in px. */
+const CARD_STRIP = 72
 const LONG_AFTER = { S: 6, M: 10, L: 16 } as const
 const OPEN_CAP = { S: 8, M: 12, L: 20 } as const
 const STRIP_FROM_ITEMS = 10
@@ -48,7 +49,7 @@ export function planHeading(ctx: Ctx, model: PanelModel, isOpen?: boolean): El {
       {title !== '' && (
         <Box flexShrink={0}>
           {isOpen === undefined ? (
-            <Text bold dimColor>
+            <Text bold dimColor={!isRich(ctx)}>
               {title}
             </Text>
           ) : (
@@ -60,7 +61,7 @@ export function planHeading(ctx: Ctx, model: PanelModel, isOpen?: boolean): El {
       )}
       {summary !== '' && (
         <Box flexShrink={1}>
-          <Text bold wrap="wrap">
+          <Text bold={!isRich(ctx)} dimColor={isRich(ctx)} wrap="wrap">
             {summary}
           </Text>
         </Box>
@@ -209,6 +210,7 @@ function phaseCard(ctx: Ctx, section: Section, id: string, isOpen: boolean, gate
       minWidth={CARD_MIN}
       borderStyle="round"
       borderColor={isOpen ? 'claude' : 'subtle'}
+      backgroundColor={isOpen ? CARD_FILL : undefined}
       hover={{ borderColor: 'claude' }}
       paddingX={1}
     >
@@ -364,11 +366,23 @@ function foldButton(ctx: Ctx, key: string, label: string, press: () => void | Pr
 function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean, hiddenGates: Gate[], countWidth: number): El {
   const { Box, Text, Button } = ctx.kit
   const hasError = hiddenGates.some(gate => gate.tone === 'error')
+  // The desktop draws the ring before the title (a dashed one where nothing is counted), the count alone on the right.
+  const rich = isRich(ctx)
+  const chevron = isOpen ? '▾' : '▸'
+  const lead = rich && (hasRingOf(section) ? ring(ctx, section.percent ?? 0, SMALL_RING, false) : emptyRing(ctx, SMALL_RING, emptyAlt(section)))
   return (
-    <Box gap={1}>
+    <Box gap={1} alignItems="center">
+      {rich && (
+        <Box flexShrink={0}>
+          <Text dimColor>{chevron}</Text>
+        </Box>
+      )}
+      {lead}
       <Box flexShrink={1}>
         <Button plain key={'section:' + id} dimColor={section.status === 'skipped' || isEmptySection(section)} onPress={safely(() => ctx.handlers.onToggle(id, !isOpen))}>
-          <Text bold={section.status === 'active'} wrap="truncate-end">{`${isOpen ? '▾' : '▸'} ${numbered(section)}`}</Text>
+          <Text bold={section.status === 'active'} wrap="truncate-end">
+            {rich ? numbered(section) : `${chevron} ${numbered(section)}`}
+          </Text>
         </Button>
       </Box>
       <Box flexGrow={1} />
@@ -379,16 +393,24 @@ function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean,
           </Text>
         )}
         {!isOpen && ctx.bp !== 'S' && section.items.length >= STRIP_FROM_ITEMS && !isFinished(section) && strip(ctx, mixOf(section.items), ctx.bp === 'L' ? 96 : 64)}
-        {sectionTail(ctx, section, countWidth)}
+        {sectionTail(ctx, section, countWidth, !isRich(ctx))}
       </Box>
     </Box>
   )
 }
 
+/** What a dashed ring says: skipped, not included yet, or nothing (a section with nothing counted). */
+const emptyAlt = (section: Section): string =>
+  section.status === 'skipped' ? t('section.skipped') : section.isUncounted === true ? t('section.notIncluded') : ''
+
+/** A ring is drawn for a counted section that is not skipped. */
+const hasRingOf = (section: Section): boolean =>
+  section.status !== 'skipped' && section.isUncounted !== true && section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
+
 /** Built or at 100%: the ring and "n/n ✓" already say it, so no strip. */
 const isFinished = (section: Section): boolean => section.status === 'built' || (section.percent ?? 0) >= 100
 
-function sectionTail(ctx: Ctx, section: Section, countWidth: number): El | false {
+function sectionTail(ctx: Ctx, section: Section, countWidth: number, withRing = true): El | false {
   const { Box, Text } = ctx.kit
   if (section.status === 'skipped') {
     const word = t('section.skipped')
@@ -401,7 +423,7 @@ function sectionTail(ctx: Ctx, section: Section, countWidth: number): El | false
   }
   const isBuilt = section.status === 'built'
   const text = countText(section)
-  const hasRing = section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
+  const hasRing = withRing && hasRingOf(section)
   if (!hasRing && text === '') return false
   return (
     <Box gap={1}>

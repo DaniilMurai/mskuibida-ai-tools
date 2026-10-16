@@ -4,7 +4,7 @@
 // (./plan). The terminal never gets it: its Plan block says the same in glyphs.
 import { t } from '../strings/en'
 import type { PanelModel, Section } from '../../types'
-import { clip } from './kit'
+import { CARD_FILL, CARD_LINE, clip } from './kit'
 import type { Ctx, El } from './kit'
 import { RING_ARC, RING_DONE, RING_TEXT, RING_TRACK, clampPercent } from './ring'
 
@@ -14,14 +14,14 @@ const MAX_PHASES = 7
  * CSS px per cell of the desktop's code font, to size an Svg for a width given in cells. An estimate
  * only: an Svg with no `width` prop shrinks to its slot, so a guess on the wide side costs nothing.
  */
-export const PX_PER_CELL = 7.2
+export const PX_PER_CELL = 8.4
 
 const NODE_R = 9
 const NODE_Y = 14
 const LABEL_Y = 42
 const HEIGHT = 50
 /** Average advance of the 10.5 px label font, for cutting a title to the room between nodes. */
-const LABEL_PX_PER_CHAR = 5.6
+const LABEL_PX_PER_CHAR = 5.2
 const FONT = '-apple-system, system-ui, sans-serif'
 
 /** A section with no items and nothing counted: no ring, a dim title. */
@@ -151,9 +151,11 @@ export function stepper(ctx: Ctx, model: PanelModel): El | false {
   if (Svg === undefined || !isPhased(model)) return false
   const sections = phasesOf(model)
   const current = currentPhase(sections)
-  const width = Math.max(200, Math.round(ctx.columns * PX_PER_CELL))
+  // The card's border and padding take about four columns.
+  const width = Math.max(200, Math.round((ctx.columns - 4) * PX_PER_CELL))
+  // On a card of its own, as the Now card is.
   return (
-    <Box flexShrink={0}>
+    <Box flexShrink={0} borderStyle="round" borderColor={CARD_LINE} backgroundColor={CARD_FILL} paddingX={1}>
       <Svg source={stepperSource(sections, current, width)} alt={stepperAlt(sections, current)} />
     </Box>
   )

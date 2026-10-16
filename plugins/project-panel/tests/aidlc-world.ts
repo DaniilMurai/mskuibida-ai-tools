@@ -123,6 +123,8 @@ export type AWorld = {
   localSha: string
   isLsRemoteUp: boolean
   hasOrigin: boolean
+  /** The session has its AI-DLC binding to the intent (default true): what makes it a stage session. */
+  isBound?: boolean
   /** Extra files of the working tree, by absolute path. */
   extra: Record<string, string>
   /** Stages marked started in `local` that have written nothing yet (no artifact file). */
@@ -202,7 +204,9 @@ export function ascripted(w: AWorld, options: PanelOptions = OPTIONS): AScripted
     [`${REPO}/.git/HEAD`]: `ref: refs/heads/${w.branch}\n`,
     [`${REPO}/.claude/tools/aidlc.ts`]: '// engine\n',
     [STATE]: w.local,
-    [`${REPO}/aidlc/.aidlc-sessions/${SESSION}.binding.json`]: JSON.stringify({ space: 'default', intent: INTENT, boundAt: '2026-10-06T08:00:00Z' }),
+    ...(w.isBound === false
+      ? {}
+      : { [`${REPO}/aidlc/.aidlc-sessions/${SESSION}.binding.json`]: JSON.stringify({ space: 'default', intent: INTENT, boundAt: '2026-10-06T08:00:00Z' }) }),
     ...artifacts(w),
     ...w.extra,
   }

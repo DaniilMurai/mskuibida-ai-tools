@@ -2,7 +2,8 @@
 // gate card that can sit between items.
 import { t } from '../strings/en'
 import type { Chip, Gate, Item, ItemStatus, ReviewState } from '../../types'
-import { clip, gateColor, gateGlyph, toneColor } from './kit'
+import { clip, gateColor, gateGlyph, isRich, tint, toneColor } from './kit'
+import { pill, statusIcon } from './look'
 import type { Ctx, El } from './kit'
 
 export type Look = { glyph: string; color: string | undefined; isDim: boolean; word: string; wordColor: string | undefined }
@@ -156,11 +157,12 @@ const LONG_CHIP_FLOOR = 6
 /** A chip is cut to a sensible length and shrinks before the title does. */
 function chipEl(ctx: Ctx, chip: Chip): El | false {
   const { Box, Text, Link } = ctx.kit
-  const label = `[${clip(chip.label, CHIP_MAX)}]`
+  // The desktop draws a chip as a grey pill (no brackets); the terminal brackets it.
+  const label = isRich(ctx) ? `\u00a0${clip(chip.label, CHIP_MAX)}\u00a0` : `[${clip(chip.label, CHIP_MAX)}]`
   const isShort = Array.from(chip.label).length <= SHORT_CHIP
   // A linked chip keeps its tone: the coloured Text sits inside the Link, as a linked title's does.
   const text = (
-    <Text dimColor color={toneColor(chip.tone)} wrap="truncate-end">
+    <Text dimColor color={toneColor(chip.tone)} backgroundColor={isRich(ctx) ? tint(undefined, '24') : undefined} wrap="truncate-end">
       {label}
     </Text>
   )
@@ -200,21 +202,29 @@ export function itemRow(ctx: Ctx, item: Item, fold: string): El {
   const keepsWord = item.landing === 'local' || item.review !== undefined || item.status === 'reopened' || item.status === 'stale'
   const hasWord = (ctx.bp !== 'S' || keepsWord) && look.word !== ''
   const isWordCut = item.review !== undefined && Array.from(look.word).length > WORD_FLOOR
+  const rich = isRich(ctx)
   return (
     <Box flexDirection="column">
-      <Box paddingLeft={2} gap={1}>
-        <Box width={1} flexShrink={0}>
-          {item.isCurrent && (
-            <Text bold color="claude">
-              ›
+      {/* The desktop marks the current row with a tint instead of the › and draws the status as an icon. */}
+      <Box paddingLeft={rich ? 1 : 2} paddingRight={rich ? 1 : 0} marginLeft={rich ? 1 : 0} gap={1} backgroundColor={rich && item.isCurrent ? tint('claude', '1a') : undefined}>
+        {!rich && (
+          <Box width={1} flexShrink={0}>
+            {item.isCurrent && (
+              <Text bold color="claude">
+                ›
+              </Text>
+            )}
+          </Box>
+        )}
+        {rich ? (
+          statusIcon(ctx, item, look.glyph, look.word)
+        ) : (
+          <Box flexShrink={0}>
+            <Text color={look.color} dimColor={look.isDim}>
+              {look.glyph}
             </Text>
-          )}
-        </Box>
-        <Box flexShrink={0}>
-          <Text color={look.color} dimColor={look.isDim}>
-            {look.glyph}
-          </Text>
-        </Box>
+          </Box>
+        )}
         {item.ordinal !== undefined && item.ordinal !== '' && (
           <Box flexShrink={0}>
             <Text dimColor>{item.ordinal}</Text>
@@ -235,9 +245,13 @@ export function itemRow(ctx: Ctx, item: Item, fold: string): El {
         <Box flexGrow={1} />
         {hasWord && (
           <Box flexShrink={isWordCut ? 2 : 0} minWidth={isWordCut ? WORD_FLOOR : undefined} overflow={isWordCut ? 'hidden' : undefined}>
-            <Text color={look.wordColor} dimColor={look.isDim || item.review === 'draft'} wrap={isWordCut ? 'truncate-end' : undefined}>
-              {look.word}
-            </Text>
+            {rich ? (
+              pill(ctx, look.word, look.wordColor, look.isDim || item.review === 'draft')
+            ) : (
+              <Text color={look.wordColor} dimColor={look.isDim || item.review === 'draft'} wrap={isWordCut ? 'truncate-end' : undefined}>
+                {look.word}
+              </Text>
+            )}
           </Box>
         )}
         <Box width={1} flexShrink={0}>
@@ -260,6 +274,31 @@ export function gateCard(ctx: Ctx, gate: Gate): El | false {
   const { Box, Text, Link } = ctx.kit
   if (gate.title === '') return false
   const color = gateColor(gate)
+  // The desktop draws it as one quiet line in its tone under the item: the card with its caption is under Needs attention.
+  if (isRich(ctx)) {
+    return (
+      <Box gap={1} marginLeft={5}>
+        <Box flexShrink={0}>
+          <Text bold color={color}>
+            {gateGlyph(gate)}
+          </Text>
+        </Box>
+        <Box flexShrink={1}>
+          {gate.href !== undefined && gate.href !== '' ? (
+            <Link href={gate.href} label={gate.title}>
+              <Text color={color} wrap="wrap">
+                {gate.title}
+              </Text>
+            </Link>
+          ) : (
+            <Text color={color} wrap="wrap">
+              {gate.title}
+            </Text>
+          )}
+        </Box>
+      </Box>
+    )
+  }
   const title = (
     <Text bold color={color} wrap="truncate-end">
       {gate.title}

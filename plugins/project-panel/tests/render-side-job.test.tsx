@@ -5,6 +5,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import type { Engine } from 'claude-code/testing'
 
+import { bare } from './rich'
 import { MOUNT, seedModel, sideJobModel } from './world'
 import type { PanelModel } from '../types'
 
@@ -48,7 +49,7 @@ async function draw($: Engine, on: On, model: PanelModel, surface: Surface, colu
 
 async function texts(ui: unknown): Promise<string[]> {
   const all = await (ui as Probe).findAll({})
-  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => el.text)
+  return all.filter(el => el.type === 'Text' || el.type === 'Button').map(el => bare(el.text))
 }
 
 describe('the side job\'s Now card', () => {
@@ -60,7 +61,12 @@ describe('the side job\'s Now card', () => {
         expect(shown).toContain('on claude/side-work')
         expect(shown).toContain('PR #25, awaiting dev-b')
         expect(shown).toContain('3 ahead, 2 behind main')
-        expect(shown.join('\n')).not.toContain('/aidlc')
+        if (surface === 'terminal') expect(shown.join('\n')).not.toContain('/aidlc')
+        else {
+          // The desktop's Needs attention card says why the workflow is parked (and names /aidlc there); Next's own command is not drawn.
+          expect(shown).not.toContain('/aidlc')
+          expect(shown.filter(line => line.includes('/aidlc'))).toEqual(['The workflow was parked 2026-09-04 01:19. Resume it with /aidlc.'])
+        }
         expect(shown).not.toContain('Put in prompt')
         await ui.unmount()
       })

@@ -1,7 +1,7 @@
 {
   "name": "project-panel",
   "displayName": "Project Panel",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "A side pane for any repo with a plan: sections, items and what blocks the next one. Providers: AI-DLC v2, and a task ledger (WORKPLAN.md) read against its pull or merge requests (GitHub through gh, GitLab through glab, self-hosted included), with each pull request's review state.",
   "author": { "name": "Maksym Skuibida" },
   "types": "./types/index.d.ts",
@@ -16,7 +16,7 @@
     "stageBranchPattern": {
       "type": "string",
       "title": "Stage branch pattern (AI-DLC)",
-      "description": "AI-DLC provider. Regex a stage session's branch matches; named groups `ticket` and `stages`. A bound session on another branch is shown as a side job. The default is a 3-segment <owner>/<ticket>/<stages> convention; set it to empty to treat every session as a side job.",
+      "description": "AI-DLC provider. Regex for the branch of a stage's pull request; named groups `ticket` and `stages`, used to map pull requests onto stages. Whether a session is a stage or a side job is decided by its AI-DLC binding, not its branch. Set it to empty to map no pull requests.",
       "default": "^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$"
     },
     "foldSeparator": {

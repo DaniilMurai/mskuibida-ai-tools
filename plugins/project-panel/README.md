@@ -114,6 +114,22 @@ button under the same key (`section:<id>`), so a press opens or closes that phas
 between widths; every open phase draws its items under the cards, under its title, with the same done-folding, cap and
 gates. A closed card carries the `‖`/`⊘` of a gate it holds. More than 7 phases, and the terminal, keep the list.
 
+**The desktop look (0.13.0).** The surfaces that draw `Svg` (desktop, vscode, mobile) get the card-and-pill look of
+the design canvas; the terminal keeps its glyphs. Tints are translucent 8-digit hex fills of a tone's mid-tone, so they
+read on a light and a dark theme alike.
+
+- **Header**: the title, the badge as a pill beside it, Refresh at the end; the stamp and the subtitle dim under it.
+- **Cards**: the stepper and the Now card sit on a faint neutral fill under a faint line (a side job keeps its warning
+  edge). Card labels are set in capitals (`NOW`, `NEXT`, `THIS SESSION`).
+- **Next**: the label, the command as a grey pill and the reason on one wrapping line, the button under them.
+- **Needs attention**: the heading with its count as a pill; each card tinted in its tone, the title in the text
+  colour, the where, and the gate's caption under it.
+- **Plan**: `Plan` bold over a dim summary. A section row is the chevron, its ring (a dashed one where nothing is
+  counted or it is skipped), the numbered title, the count on the right.
+- **Items**: the status as a 14 px icon (its alt the status word), chips as grey pills without brackets, the status
+  word as a pill in its tone, and the current row tinted in the accent instead of the `›`. A gate inside the plan is
+  one line in its tone; its card, with the caption, is under Needs attention.
+
 It is a **mod**: a TypeScript function-hooks module (`hooks/register.tsx`) the engine draws on the
 desktop app's and the terminal's pane surfaces.
 
@@ -416,9 +432,10 @@ Mirrors upstream's `core/hooks/aidlc-statusline.ts` (`readSessionBinding`, `reso
 - with no binding: `active-intent`, else the lone non-archived intent of the active space;
 - two or more live intents and no cursor: *Idle*, saying that none is selected; none live: *Idle*, nothing in flight.
 
-**Stage vs side job.** A session bound to an intent *and* on a branch matching `stageBranchPattern` is a
-stage session. Anything else in an AI-DLC workspace — unbound, bound to no intent, or on another branch —
-is a side job: a "Side job" badge and a "This session" card saying so.
+**Stage vs side job.** A session bound to an intent (its `aidlc/.aidlc-sessions/<session>.binding.json`) is a
+stage session, whatever its branch is called (0.13.0; before, the branch had to match `stageBranchPattern` too).
+Anything else in an AI-DLC workspace — unbound, or bound to no intent — is a side job: a "Side job" badge and a
+"This session" card saying so.
 
 A side job is not a stage of the plan, so the panel does not point it at the plan (0.9.1):
 
@@ -628,7 +645,7 @@ next load, not the next poll.
 | Option | Default | Meaning |
 |---|---|---|
 | `panel` | `auto` | `auto`: open by itself when a plan is detected (desktop app only — unasked panes need 144 columns); `command`: only `/panel` or a button; `off`: never (`/panel` says it is off). A pane the person closed is not reopened by `auto` that session; a slim bar above the prompt (*Project panel is closed. Open panel*) or `/panel` reopens it |
-| `stageBranchPattern` | `^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$` | AI-DLC. A stage branch; groups `ticket`, `stages` |
+| `stageBranchPattern` | `^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$` | AI-DLC. How a pull request's branch names its ticket and stages (groups `ticket`, `stages`), to map PRs onto stages. Not used to tell a stage session from a side job: the binding decides that |
 | `foldSeparator` | `--` | AI-DLC. Separates stages in a branch carrying several (`dev/SHOP-7/a--b`) |
 | `forge` | `auto` | Where pull or merge requests are read from. `auto` detects it from the origin (see [Forges](#forges-github-and-gitlab)); `github` / `gitlab` take the origin's host as that forge without probing; `none` reads no requests (the ledger stands alone, no AI grouping, no complaint) |
 | `reviewCommands` | `auto` | Whether attention rows and Next name the `pr-review` commands. `auto`: when the repository's `.claude/settings.json` enables a `pr-review` plugin (`"pr-review@<marketplace>": true`); `on`; `off` (the review state still shows) |
@@ -637,8 +654,8 @@ next load, not the next poll.
 | `prPollSeconds` | `180` | How often the open pane asks the provider for its remote `fingerprint`. Minimum 30; `0` turns the poll off. A provider without remote state is never asked |
 | `summaryModel` | `claude-haiku-5-5` | enrichment model (milestone 4+); a full id, not the `haiku` alias |
 
-The default `stageBranchPattern` is a 3-segment `<owner>/<ticket>/<stages>` convention: a bound session on
-**any** 3-segment branch counts as a stage session. Set it to empty to treat every session as a side job.
+The default `stageBranchPattern` is a 3-segment `<owner>/<ticket>/<stages>` convention for stage PRs' branches. Set it
+to empty to map no pull requests onto stages.
 
 ## Staying fresh (M2)
 
@@ -696,7 +713,7 @@ src/forge/                        the forge layer: types, remote.ts (origin URL)
 src/refresh.ts                    the refresh engine: ports in, hash-gated publish, debounce, polls, tool-call classification
 src/render.tsx                    renderPane: any PanelModel -> pane tree (deterministic), per breakpoint and surface
 src/render/                       its blocks: header, now (card, Next, actions), attention, plan (list, phase cards), item, ring (rings + strip),
-                                  stepper (the phase stepper, isPhased), kit
+                                  stepper (the phase stepper, isPhased), look (the desktop's pills and status icons), kit
 src/freshness.ts                  the "checked 12s ago" stamp (pure; the caller hands in the clock)
 src/strings/en.ts                 every user-facing string (a mod imports code files only, so not .json)
 src/providers/ledger.ts           the ledger Provider (detect, load, pin/rebuild actions)
@@ -740,12 +757,24 @@ Type-checking needs the engine's declarations, which the engine lays into `.clau
 loads the mod from a dev folder (`claude --plugin-dir plugins/project-panel`); then
 `tsc -p plugins/project-panel`.
 
+**See a desktop change before calling it done.** `tools/pane-preview/` draws the real `renderPane` with React, the
+way the desktop app draws the pane (cells to px, theme keys to a dark and a light palette, calibrated against
+screenshots of the real pane), over the test worlds' models and a sample of the design canvas. Edit, reload:
+
+```bash
+cd tools/pane-preview && bun install && bun serve.ts
+```
+
+Then open http://localhost:5178, pick a scenario and a width. It is an approximation of the app's renderer, not the
+renderer: check the real pane too when spacing matters.
+
 ## Roadmap
 
 - **M1** — providers seam, AI-DLC provider, static pane on desktop and terminal, `/panel`, rings, tests.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.13.0** — the desktop look (pills, tinted cards, status icons, ring-first section rows); a session is a stage by its AI-DLC binding alone, whatever its branch.
 - **0.12.0** — desktop phase views: the phase stepper on a one-column pane, phase cards in the wide pane's plan column.
 - **0.11.1** — Construction's row says `not included yet` until Units exist.
 - **0.11.0** — phase and `<phase>.<stage>` numbers; stages finished but local only count as done; Construction is not counted until Units exist.

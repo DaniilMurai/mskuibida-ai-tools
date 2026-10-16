@@ -364,8 +364,9 @@ describe('modeFor', () => {
     expect(stageBranch?.stages).toEqual(['a', 'b', 'c'])
   })
 
-  test('bound but off a stage branch: side-job, no stageBranch', () => {
-    expect(modeFor(bound, 'main', DEFAULT_PATTERN, '--')).toEqual({ mode: 'side-job' })
+  test('bound: a stage session whatever the branch, with no stageBranch off the pattern', () => {
+    expect(modeFor(bound, 'main', DEFAULT_PATTERN, '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(bound, 'semka/user-stories', DEFAULT_PATTERN, '--')).toEqual({ mode: 'stage' })
   })
 
   test('unbound on a stage branch: side-job, but stageBranch is still parsed', () => {
@@ -375,15 +376,17 @@ describe('modeFor', () => {
     })
   })
 
-  test('an unknown branch is never a stage branch', () => {
-    expect(modeFor(bound, '', DEFAULT_PATTERN, '--').mode).toBe('side-job')
-    expect(modeFor(bound, '', '.*', '--').mode).toBe('side-job')
+  test('an unknown branch is never a stage branch, and a bound session is still a stage', () => {
+    expect(modeFor(bound, '', DEFAULT_PATTERN, '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(bound, '', '.*', '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(unbound, '', '.*', '--')).toEqual({ mode: 'side-job' })
   })
 
-  test('an invalid or empty regex does not throw and matches nothing', () => {
-    expect(modeFor(bound, 'dev/SHOP-7/x', '([unclosed', '--')).toEqual({ mode: 'side-job' })
-    expect(modeFor(bound, 'dev/SHOP-7/x', '(?<ticket>', '--').mode).toBe('side-job')
-    expect(modeFor(bound, 'dev/SHOP-7/x', '', '--').mode).toBe('side-job')
+  test('an invalid or empty regex does not throw and matches nothing; the binding still decides', () => {
+    expect(modeFor(bound, 'dev/SHOP-7/x', '([unclosed', '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(bound, 'dev/SHOP-7/x', '(?<ticket>', '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(bound, 'dev/SHOP-7/x', '', '--')).toEqual({ mode: 'stage' })
+    expect(modeFor(unbound, 'dev/SHOP-7/x', '([unclosed', '--')).toEqual({ mode: 'side-job' })
   })
 
   test('a pattern without the named groups still decides the mode', () => {

@@ -110,3 +110,35 @@ export function clockTime(epochMs: number): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+// ── the desktop look ─────────────────────────────────────────────────────────
+
+/**
+ * True on the surfaces that draw Svg (desktop, vscode, mobile): they get the card-and-pill look of the design
+ * (tinted cards, pill words, icon rows). The terminal keeps its glyphs.
+ */
+export const isRich = (ctx: Ctx): boolean => ctx.kit.Svg !== undefined
+
+/** Mid-tones of the theme keys the panel paints with, for tints: a translucent fill reads on light and dark alike. */
+const TONE_HEX: Record<string, string> = {
+  claude: '#d97757',
+  success: '#4eba65',
+  warning: '#e3a83a',
+  error: '#ef6f64',
+  suggestion: '#8f9cf5',
+  merged: '#a37cf0',
+}
+const NEUTRAL_HEX = '#8a8a8a'
+
+/**
+ * A translucent fill of a theme key's tone (`'1f'` is about 12%); a key it does not know is the neutral grey. Raw
+ * 8-digit hex, so it sits over whatever the theme's background is.
+ */
+export function tint(key: string | undefined, alpha = '1f'): string {
+  return `${(key !== undefined && TONE_HEX[key]) || NEUTRAL_HEX}${alpha}`
+}
+
+/** The surface a card sits on: a faint neutral lift over the pane, in both themes. */
+export const CARD_FILL = `${NEUTRAL_HEX}12`
+/** A card's border on the desktop: a faint neutral line. */
+export const CARD_LINE = `${NEUTRAL_HEX}55`

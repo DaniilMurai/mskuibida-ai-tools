@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pane-preview",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["tools/pane-preview/serve.ts"],
+      "port": 5178
+    }
+  ]
+}

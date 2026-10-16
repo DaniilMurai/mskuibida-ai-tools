@@ -7,6 +7,7 @@ import type { Engine, Plugin } from 'claude-code/testing'
 import { LIVE_INTENT, ROOT, liveState, sessions, tree } from '../fixtures/real-sample'
 import { noGit } from '../fixtures/scenarios'
 import { en } from '../src/strings/en'
+import { padded } from './rich'
 import { MOUNT, NOW, mutableCopy, serveSession, setFile } from './world'
 import type { PaneRow } from './world'
 import type { PanelModel } from '../types'
@@ -183,13 +184,20 @@ describe('hash-gated redraw', () => {
 })
 
 describe('branch switch', () => {
-  test('HEAD changing between polls re-reads and the mode flips stage <-> side job', async ($, on) => {
+  test('HEAD changing between polls re-reads; the binding, not the branch, decides the mode', async ($, on) => {
     const { calls, files, clock } = await boot($, on)
     expect(modelOf(calls).header.mode).toBe('stage')
+    const loads = stateReads(calls)
 
     files.files[HEAD] = MAIN_HEAD
     calls.control.sha = 'bbbbbbb'
     calls.control.branch = 'main'
+    await clock.advance(10_600)
+    expect(stateReads(calls)).toBeGreaterThan(loads)
+    expect(modelOf(calls).header.mode).toBe('stage')
+
+    // The session's binding empties (bound to nothing): a side job, on the same branch.
+    setFile(files, BINDING, '')
     await clock.advance(10_600)
     expect(modelOf(calls).header.mode).toBe('side-job')
 
@@ -197,8 +205,7 @@ describe('branch switch', () => {
     calls.control.sha = 'ccccccc'
     calls.control.branch = 'dev/SHOP-7/refined-mockups'
     await clock.advance(10_600)
-    expect(modelOf(calls).header.mode).toBe('stage')
-    expect(calls.modelWrites).toHaveLength(3)
+    expect(modelOf(calls).header.mode).toBe('side-job')
   })
 
   test('a repo without git is normal: no re-read, no error', async ($, on) => {
@@ -425,6 +432,14 @@ describe('desktop attaching after session start', () => {
   })
 })
 
+/** The terminal's heading carries the count in its text; the desktop's is the words with the count as a pill after them. */
+async function attentionCount(ui: { find: (query: { type: string; text: string }) => Promise<unknown> }, surface: 'terminal' | 'desktop', count: number): Promise<boolean> {
+  if (surface === 'terminal') return (await ui.find({ type: 'Text', text: `Needs attention (${count})` })) !== undefined
+  const heading = await ui.find({ type: 'Text', text: 'Needs attention' })
+  const pill = await ui.find({ type: 'Text', text: padded(String(count)) })
+  return heading !== undefined && pill !== undefined
+}
+
 describe('the pane follows', () => {
   for (const surface of ['terminal', 'desktop'] as const) {
     test(`header shows "checked ..." on ${surface}`, async ($, on) => {
@@ -463,7 +478,7 @@ describe('the pane follows', () => {
       expect(await ui.find({ type: 'Text', text: 'Execute Domain Design' })).toBeDefined()
       expect(await ui.findAll({ type: 'Text', text: en['refresh.failed'] })).toHaveLength(2)
       // The heading counts it: the parked gate and the failure.
-      expect(await ui.find({ type: 'Text', text: 'Needs attention (2)' })).toBeDefined()
+      expect(await attentionCount(ui, surface, 2)).toBe(true)
 
       await ui.press({ key: 'refresh' })
       expect(await ui.findAll({ type: 'Text', text: en['refresh.failed'] })).toHaveLength(2)
@@ -472,7 +487,7 @@ describe('the pane follows', () => {
       calls.control.isDiskFailing = false
       await ui.press({ key: 'refresh' })
       expect(await ui.findAll({ type: 'Text', text: en['refresh.failed'] })).toHaveLength(0)
-      expect(await ui.find({ type: 'Text', text: 'Needs attention (1)' })).toBeDefined()
+      expect(await attentionCount(ui, surface, 1)).toBe(true)
       await ui.unmount()
     })
 

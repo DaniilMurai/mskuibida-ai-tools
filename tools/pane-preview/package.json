@@ -1,0 +1,8 @@
+{
+  "name": "pane-preview",
+  "private": true,
+  "description": "Renders project-panel's renderPane with React, as the desktop app draws the pane: to check a design change before calling it done.",
+  "scripts": { "dev": "bun serve.ts" },
+  "dependencies": { "react": "18.3.1", "react-dom": "18.3.1" },
+  "devDependencies": { "@types/react": "18.3.12", "@types/react-dom": "18.3.1" }
+}

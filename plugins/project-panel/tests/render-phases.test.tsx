@@ -2,12 +2,20 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import type { Engine } from 'claude-code/testing'
 
+import { CARD_FILL, CARD_LINE } from '../src/render/kit'
 import { isPhased, stepperAlt, stepperSource } from '../src/render/stepper'
+import { bare, ringsOf } from './rich'
 import { MOUNT, item, section, seedModel, stageModel } from './world'
 import type { PanelModel } from '../types'
 
 type Surface = 'terminal' | 'desktop' | 'vscode' | 'mobile'
 type Found = { type?: string; text: string; props: Record<string, unknown> }
+type PNode = { type: string; props: Record<string, unknown>; children?: (PNode | string)[] }
+/** Every node of the drawn tree `pred` accepts, in document order. */
+const descend = (node: PNode, pred: (node: PNode) => boolean): PNode[] => [
+  ...(pred(node) ? [node] : []),
+  ...(node.children ?? []).flatMap(child => (typeof child === 'string' ? [] : descend(child, pred))),
+]
 type Probe = { findAll: (query: { type?: string; key?: string; text?: string | RegExp }) => Promise<Found[]> }
 
 const NARROW = 36
@@ -22,7 +30,7 @@ async function draw($: Engine, on: On, model: PanelModel, surface: Surface, colu
 const svgs = async (ui: unknown) => (await (ui as Probe).findAll({ type: 'Svg' })) as Found[]
 /** The stepper is the one Svg with no size of its own. */
 const stepperOf = async (ui: unknown) => (await svgs(ui)).filter(svg => svg.props.width === undefined)
-const shown = async (ui: unknown) => (await (ui as Probe).findAll({})).filter(el => el.type === 'Text' || el.type === 'Button').map(el => el.text)
+const shown = async (ui: unknown) => (await (ui as Probe).findAll({})).filter(el => el.type === 'Text' || el.type === 'Button').map(el => bare(el.text))
 
 /** A plan of `count` phases, the first built, the second active with the current item. */
 function phasesModel(count: number): PanelModel {
@@ -147,7 +155,7 @@ describe('not included yet', () => {
     expect(word[0]?.props.color).toBe('warning')
     const all = await svgs(ui)
     // Initialization, Ideation and Inception keep theirs; Construction and Operation have none.
-    expect(all.filter(svg => svg.props.width === 20)).toHaveLength(3)
+    expect(ringsOf(all, 20)).toHaveLength(3)
     expect(all.filter(svg => svg.props.height === 6)).toHaveLength(3)
     await ui.unmount()
   })
@@ -200,7 +208,7 @@ describe('the wide pane: phase cards', () => {
     const ui = await draw($, on, stageModel(), 'desktop', WIDE)
     const all = await svgs(ui)
     // Initialization, Ideation, Inception, Construction; Operation is skipped.
-    expect(all.filter(svg => svg.props.width === 20)).toHaveLength(4)
+    expect(ringsOf(all, 20)).toHaveLength(4)
     expect(all.filter(svg => svg.props.height === 6)).toHaveLength(4)
     expect(await shown(ui)).toContain('skipped')
     await ui.unmount()
@@ -214,7 +222,44 @@ describe('the wide pane: phase cards', () => {
 
   test('more than 7 phases keeps the list of headings on the desktop too', async ($, on) => {
     const ui = await draw($, on, phasesModel(8), 'desktop', WIDE)
-    expect((await shown(ui)).some(text => /^[▾▸] Phase 1$/.test(text))).toBe(true)
+    const lines = await shown(ui)
+    // The desktop's heading is the chevron in a Text of its own, then the ring, then the title's Button.
+    expect(lines[lines.indexOf('Phase 1') - 1]).toMatch(/^[▾▸]$/)
+    expect(lines.some(text => /^[▾▸] Phase 1$/.test(text))).toBe(false)
+    // No phase cards: no card-sized rings.
+    expect(ringsOf(await svgs(ui), 20)).toEqual([])
     await ui.unmount()
   })
+
+  test('the cards: 10 cells at least, the open one filled, the strip at 72 px', async ($, on) => {
+    const ui = await draw($, on, stageModel(), 'desktop', WIDE)
+    const root = (await (ui as unknown as { drawn: () => Promise<unknown> }).drawn()) as PNode
+    const cards = descend(root, node => node.type === 'Box' && node.props.borderStyle === 'round' && String(node.props.key ?? '').startsWith('phase:'))
+    expect(cards.map(card => card.props.key)).toEqual(['phase:INITIALIZATION', 'phase:IDEATION', 'phase:INCEPTION', 'phase:CONSTRUCTION', 'phase:OPERATION'])
+    for (const card of cards) expect(card.props.minWidth).toBe(10)
+    // Inception is the open card (the active phase): the accent edge and the card fill; the others have neither.
+    const open = cards.filter(card => card.props.backgroundColor !== undefined)
+    expect(open.map(card => card.props.key)).toEqual(['phase:INCEPTION'])
+    expect(open[0]!.props.backgroundColor).toBe(CARD_FILL)
+    expect(open[0]!.props.borderColor).toBe('claude')
+    expect(cards.filter(card => card.props.borderColor === 'subtle')).toHaveLength(4)
+    const strips = (await svgs(ui)).filter(svg => svg.props.height === 6)
+    expect(strips.map(svg => svg.props.width)).toEqual([72, 72, 72, 72])
+    await ui.unmount()
+  })
+})
+
+describe('the stepper card', () => {
+  for (const surface of ['desktop', 'vscode', 'mobile'] as const) {
+    test(`${surface}: the stepper sits on a rounded card of its own, in the card line and fill`, async ($, on) => {
+      const ui = await draw($, on, stageModel(), surface, MEDIUM)
+      const root = (await (ui as unknown as { drawn: () => Promise<unknown> }).drawn()) as PNode
+      const cards = descend(root, node => node.type === 'Box' && node.props.borderStyle === 'round' && node.props.borderColor === CARD_LINE && node.children?.some(child => typeof child !== 'string' && child.type === 'Svg') === true)
+      expect(cards).toHaveLength(1)
+      expect(cards[0]!.props.backgroundColor).toBe(CARD_FILL)
+      // Its Svg still has no width of its own.
+      expect((cards[0]!.children![0] as PNode).props.width).toBeUndefined()
+      await ui.unmount()
+    })
+  }
 })

@@ -5,7 +5,8 @@ import type { Clock } from '../freshness'
 import { t } from '../strings/en'
 import type { PanelModel } from '../../types'
 import { showsCurrentItem } from './now'
-import { clockTime, safely } from './kit'
+import { clockTime, isRich, safely } from './kit'
+import { pill } from './look'
 import type { Ctx, El } from './kit'
 
 function badgeColor(mode: PanelModel['header']['mode']): string {
@@ -53,6 +54,7 @@ export function header(ctx: Ctx, model: PanelModel | null, clock: Clock | undefi
       false
     )
   const refresh = bp === 'S' ? '↻' : `↻ ${t('header.refresh')}`.trimEnd()
+  if (isRich(ctx)) return richHeader(ctx, title, badge, model, stamp, subtitle, error, refresh)
 
   return (
     <Box flexDirection="column">
@@ -96,6 +98,65 @@ export function header(ctx: Ctx, model: PanelModel | null, clock: Clock | undefi
           {subtitle}
         </Text>
       )}
+      {error !== '' && (
+        <Box gap={1}>
+          <Box flexShrink={0}>
+            <Text bold color="error">
+              !
+            </Text>
+          </Box>
+          <Box flexShrink={1}>
+            <Text color="error" wrap="wrap">
+              {error}
+            </Text>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/**
+ * The desktop's header: the title with the badge as a pill beside it and Refresh at the end; the stamp, the
+ * subtitle and the error line under it, dim. The title is what gives way.
+ */
+function richHeader(
+  ctx: Ctx,
+  title: string,
+  badge: string,
+  model: PanelModel | null,
+  stamp: string,
+  subtitle: string,
+  error: string,
+  refresh: string,
+): El {
+  const { Box, Text, Button } = ctx.kit
+  const below = [stamp, subtitle].filter(part => part !== '')
+  return (
+    <Box flexDirection="column">
+      <Box gap={1} alignItems="center">
+        {title !== '' && (
+          <Box flexShrink={1} minWidth={Math.min(Array.from(title).length, 8)}>
+            <Text bold wrap="truncate-end">
+              {title}
+            </Text>
+          </Box>
+        )}
+        {badge !== '' && model !== null && (
+          <Box flexShrink={0}>{pill(ctx, badge, badgeColor(model.header.mode), model.header.mode === 'idle')}</Box>
+        )}
+        <Box flexGrow={1} />
+        <Box flexShrink={0}>
+          <Button key="refresh" hotkey="r" onPress={safely(ctx.handlers.onRefresh)}>
+            {refresh}
+          </Button>
+        </Box>
+      </Box>
+      {below.map(line => (
+        <Text dimColor wrap="wrap">
+          {line}
+        </Text>
+      ))}
       {error !== '' && (
         <Box gap={1}>
           <Box flexShrink={0}>
