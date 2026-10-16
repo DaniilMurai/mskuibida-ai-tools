@@ -59,6 +59,12 @@ export const en = {
 
   'ring.alt': '{percent}% done',
   'strip.alt': '{done} of {total} done',
+  'stepper.alt': 'Phases: {phases}',
+  'stepper.alt.done': '{title} done',
+  'stepper.alt.skipped': '{title} skipped',
+  'stepper.alt.empty': '{title} not included yet',
+  'stepper.alt.current': '{title} {percent}% done, current',
+  'stepper.alt.open': '{title} {percent}% done',
 
   'section.count': '{done}/{total}',
   'section.skipped': 'skipped',

@@ -101,6 +101,19 @@ On the desktop, vscode and mobile surfaces the rings are real donuts (an `Svg`):
 inside for the plan, 16 px per section, and each Attention row a bordered card in its tone. The terminal has no
 `Svg`, so it draws the glyph rings and plain Attention lines above.
 
+**Phase views (0.12.0).** On those same surfaces a plan of a handful of phases (2 to 7 sections, proposed ones not
+counted) gets two more views. A one-column pane (under 80 columns) draws the **phase stepper** between the header and
+the Now card: one `Svg` row of numbered nodes joined by a line, each over its title (cut with `…` to the room between
+nodes). A built phase is a green check, the current one (holding the current item, else the first active) an accent
+ring with its percent as the arc and its title bold in the accent, skipped and uncounted phases (no items, or `not
+included yet`) dashed; the line after a built phase is green. The Svg has no size of its own and fits its slot; its
+`alt` names every phase and where it stands. The wide pane's plan column draws **phase cards** instead of the section
+headings: one bordered card per phase (the open ones in the accent, any under the pointer too) with a 20 px ring, the
+count (`skipped`, or `not included yet` in amber), the numbered title and a strip (86 px). The title is the heading's
+button under the same key (`section:<id>`), so a press opens or closes that phase as before and the fold carries over
+between widths; every open phase draws its items under the cards, under its title, with the same done-folding, cap and
+gates. A closed card carries the `‖`/`⊘` of a gate it holds. More than 7 phases, and the terminal, keep the list.
+
 It is a **mod**: a TypeScript function-hooks module (`hooks/register.tsx`) the engine draws on the
 desktop app's and the terminal's pane surfaces.
 
@@ -682,7 +695,8 @@ src/forge/                        the forge layer: types, remote.ts (origin URL)
                                   problem.ts (ForgeError, cause text), index.ts (forgeFor)
 src/refresh.ts                    the refresh engine: ports in, hash-gated publish, debounce, polls, tool-call classification
 src/render.tsx                    renderPane: any PanelModel -> pane tree (deterministic), per breakpoint and surface
-src/render/                       its blocks: header, now (card, Next, actions), attention, plan, item, ring (rings + strip), kit
+src/render/                       its blocks: header, now (card, Next, actions), attention, plan (list, phase cards), item, ring (rings + strip),
+                                  stepper (the phase stepper, isPhased), kit
 src/freshness.ts                  the "checked 12s ago" stamp (pure; the caller hands in the clock)
 src/strings/en.ts                 every user-facing string (a mod imports code files only, so not .json)
 src/providers/ledger.ts           the ledger Provider (detect, load, pin/rebuild actions)
@@ -732,6 +746,7 @@ loads the mod from a dev folder (`claude --plugin-dir plugins/project-panel`); t
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.12.0** — desktop phase views: the phase stepper on a one-column pane, phase cards in the wide pane's plan column.
 - **0.11.1** — Construction's row says `not included yet` until Units exist.
 - **0.11.0** — phase and `<phase>.<stage>` numbers; stages finished but local only count as done; Construction is not counted until Units exist.
 - **0.7.1** — "in review" instead of "in PR #N", "up next" for a stage nothing is written for yet, pushed work never "local only", and PR lists that survive a flaky network.
