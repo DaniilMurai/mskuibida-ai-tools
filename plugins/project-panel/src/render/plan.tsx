@@ -193,9 +193,11 @@ function phasePlan(ctx: Ctx, model: PanelModel, ids: string[], expanded: Record<
 function phaseCard(ctx: Ctx, section: Section, id: string, isOpen: boolean, gates: Gate[], press: () => void | Promise<void>): El {
   const { Box, Text, Button } = ctx.kit
   const isSkipped = section.status === 'skipped'
+  const isUncounted = section.isUncounted === true
   const isBuilt = section.status === 'built'
-  const hasRing = !isSkipped && section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
-  const count = isSkipped ? t('section.skipped') : countText(section)
+  const hasRing = !isSkipped && !isUncounted && section.percent !== undefined && Number.isFinite(section.percent) && !isEmptySection(section)
+  // As the list's row says it: skipped dim, work with no size yet in the colour of "local only".
+  const count = isSkipped ? t('section.skipped') : isUncounted ? t('section.notIncluded') : countText(section)
   // The open phase draws its gates in its items; a closed one only marks that it holds some.
   const hidden = isOpen ? [] : gates
   const hasError = hidden.some(gate => gate.tone === 'error')
@@ -219,17 +221,17 @@ function phaseCard(ctx: Ctx, section: Section, id: string, isOpen: boolean, gate
           </Text>
         )}
         {count !== '' && (
-          <Text dimColor={!isBuilt} color={isBuilt ? 'success' : undefined}>
+          <Text dimColor={!isBuilt && !isUncounted} color={isBuilt ? 'success' : isUncounted ? 'warning' : undefined}>
             {count}
           </Text>
         )}
       </Box>
-      <Button plain key={'section:' + id} dimColor={isSkipped || isEmptySection(section)} onPress={safely(press)}>
+      <Button plain key={'section:' + id} dimColor={isSkipped || isUncounted || isEmptySection(section)} onPress={safely(press)}>
         <Text bold={isOpen} wrap="truncate-end">
           {numbered(section)}
         </Text>
       </Button>
-      {!isSkipped && strip(ctx, mixOf(section.items), CARD_STRIP)}
+      {!isSkipped && !isUncounted && strip(ctx, mixOf(section.items), CARD_STRIP)}
     </Box>
   )
 }

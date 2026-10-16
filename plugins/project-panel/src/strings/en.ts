@@ -62,7 +62,7 @@ export const en = {
   'stepper.alt': 'Phases: {phases}',
   'stepper.alt.done': '{title} done',
   'stepper.alt.skipped': '{title} skipped',
-  'stepper.alt.empty': '{title} not counted yet',
+  'stepper.alt.empty': '{title} not included yet',
   'stepper.alt.current': '{title} {percent}% done, current',
   'stepper.alt.open': '{title} {percent}% done',
 

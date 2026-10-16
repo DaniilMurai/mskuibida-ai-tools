@@ -21,7 +21,7 @@ const NODE_Y = 14
 const LABEL_Y = 42
 const HEIGHT = 50
 /** Average advance of the 10.5 px label font, for cutting a title to the room between nodes. */
-const LABEL_PX_PER_CHAR = 6
+const LABEL_PX_PER_CHAR = 5.6
 const FONT = '-apple-system, system-ui, sans-serif'
 
 /** A section with no items and nothing counted: no ring, a dim title. */
@@ -44,7 +44,8 @@ type NodeState = 'done' | 'skipped' | 'empty' | 'current' | 'open'
 function stateOf(section: Section, isCurrent: boolean): NodeState {
   if (section.status === 'skipped') return 'skipped'
   if (section.status === 'built' || (section.percent ?? 0) >= 100) return 'done'
-  if (isEmptySection(section)) return 'empty'
+  // Nothing counted yet: no items, or items that stand for work not defined yet (Construction before its Units).
+  if (isEmptySection(section) || section.isUncounted === true) return 'empty'
   return isCurrent ? 'current' : 'open'
 }
 
@@ -93,7 +94,7 @@ function nodeSource(state: NodeState, x: number, percent: number, label: string)
 /**
  * The stepper's markup, `width` px wide: one node per phase, evenly spaced, each over its cut title.
  * Done is a green check, the current phase an accent ring with its percent as the arc, skipped and
- * uncounted phases dashed. The line after a done phase is green, the rest the track tone.
+ * uncounted (empty, or not included yet) phases dashed. The line after a done phase is green, the rest the track tone.
  */
 export function stepperSource(sections: Section[], current: number, width: number): string {
   const count = sections.length

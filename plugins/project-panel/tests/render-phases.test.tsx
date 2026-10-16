@@ -114,10 +114,42 @@ describe('the phase stepper', () => {
     expect(stepperSource(tight, -1, 200)).toContain('>Con…</text>')
   })
 
-  test('an uncounted phase reads as not counted yet, and the alt names every phase', () => {
+  test('an empty phase reads as not included yet, and the alt names every phase', () => {
     const sections = [section('A', 'Inception', 'active', [item('a', 'done'), item('b', 'open', { isCurrent: true })]), section('B', 'Construction', 'planned', [])]
-    expect(stepperAlt(sections, 0)).toBe('Phases: Inception 50% done, current, Construction not counted yet')
+    expect(stepperAlt(sections, 0)).toBe('Phases: Inception 50% done, current, Construction not included yet')
     expect(stepperSource(sections, 0, 300)).toMatch(/stroke-dasharray="3 3"\/><text [^>]*>2<\/text>/)
+  })
+})
+
+/** Construction before its Units exist: items that stand for work not defined yet, no count, no ring. */
+function uncountedModel(): PanelModel {
+  const model = stageModel()
+  const construction = model.sections.find(one => one.id === 'CONSTRUCTION')!
+  construction.isUncounted = true
+  delete construction.counts
+  delete construction.percent
+  return model
+}
+
+describe('not included yet', () => {
+  test('the stepper draws an uncounted phase dashed, as an empty one', async ($, on) => {
+    const ui = await draw($, on, uncountedModel(), 'desktop', MEDIUM)
+    const [found] = await stepperOf(ui)
+    expect(found?.props.alt).toContain('Construction not included yet')
+    expect(String(found?.props.source)).toMatch(/stroke-dasharray="3 3"\/><text [^>]*>4<\/text>/)
+    await ui.unmount()
+  })
+
+  test('its card says not included yet in the warning colour, with no ring and no strip', async ($, on) => {
+    const ui = await draw($, on, uncountedModel(), 'desktop', WIDE)
+    const word = (await (ui as Probe).findAll({ type: 'Text' })).filter(el => el.text === 'not included yet')
+    expect(word).toHaveLength(1)
+    expect(word[0]?.props.color).toBe('warning')
+    const all = await svgs(ui)
+    // Initialization, Ideation and Inception keep theirs; Construction and Operation have none.
+    expect(all.filter(svg => svg.props.width === 20)).toHaveLength(3)
+    expect(all.filter(svg => svg.props.height === 6)).toHaveLength(3)
+    await ui.unmount()
   })
 })
 
