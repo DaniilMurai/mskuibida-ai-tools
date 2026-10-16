@@ -416,9 +416,10 @@ Mirrors upstream's `core/hooks/aidlc-statusline.ts` (`readSessionBinding`, `reso
 - with no binding: `active-intent`, else the lone non-archived intent of the active space;
 - two or more live intents and no cursor: *Idle*, saying that none is selected; none live: *Idle*, nothing in flight.
 
-**Stage vs side job.** A session bound to an intent *and* on a branch matching `stageBranchPattern` is a
-stage session. Anything else in an AI-DLC workspace — unbound, bound to no intent, or on another branch —
-is a side job: a "Side job" badge and a "This session" card saying so.
+**Stage vs side job.** A session bound to an intent (its `aidlc/.aidlc-sessions/<session>.binding.json`) is a
+stage session, whatever its branch is called (0.13.0; before, the branch had to match `stageBranchPattern` too).
+Anything else in an AI-DLC workspace — unbound, or bound to no intent — is a side job: a "Side job" badge and a
+"This session" card saying so.
 
 A side job is not a stage of the plan, so the panel does not point it at the plan (0.9.1):
 
@@ -628,7 +629,7 @@ next load, not the next poll.
 | Option | Default | Meaning |
 |---|---|---|
 | `panel` | `auto` | `auto`: open by itself when a plan is detected (desktop app only — unasked panes need 144 columns); `command`: only `/panel` or a button; `off`: never (`/panel` says it is off). A pane the person closed is not reopened by `auto` that session; a slim bar above the prompt (*Project panel is closed. Open panel*) or `/panel` reopens it |
-| `stageBranchPattern` | `^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$` | AI-DLC. A stage branch; groups `ticket`, `stages` |
+| `stageBranchPattern` | `^[^/]+/(?<ticket>[^/]+)/(?<stages>.+)$` | AI-DLC. How a pull request's branch names its ticket and stages (groups `ticket`, `stages`), to map PRs onto stages. Not used to tell a stage session from a side job: the binding decides that |
 | `foldSeparator` | `--` | AI-DLC. Separates stages in a branch carrying several (`dev/SHOP-7/a--b`) |
 | `forge` | `auto` | Where pull or merge requests are read from. `auto` detects it from the origin (see [Forges](#forges-github-and-gitlab)); `github` / `gitlab` take the origin's host as that forge without probing; `none` reads no requests (the ledger stands alone, no AI grouping, no complaint) |
 | `reviewCommands` | `auto` | Whether attention rows and Next name the `pr-review` commands. `auto`: when the repository's `.claude/settings.json` enables a `pr-review` plugin (`"pr-review@<marketplace>": true`); `on`; `off` (the review state still shows) |
@@ -637,8 +638,8 @@ next load, not the next poll.
 | `prPollSeconds` | `180` | How often the open pane asks the provider for its remote `fingerprint`. Minimum 30; `0` turns the poll off. A provider without remote state is never asked |
 | `summaryModel` | `claude-haiku-5-5` | enrichment model (milestone 4+); a full id, not the `haiku` alias |
 
-The default `stageBranchPattern` is a 3-segment `<owner>/<ticket>/<stages>` convention: a bound session on
-**any** 3-segment branch counts as a stage session. Set it to empty to treat every session as a side job.
+The default `stageBranchPattern` is a 3-segment `<owner>/<ticket>/<stages>` convention for stage PRs' branches. Set it
+to empty to map no pull requests onto stages.
 
 ## Staying fresh (M2)
 

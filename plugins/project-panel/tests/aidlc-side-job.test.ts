@@ -6,7 +6,7 @@ import { ME, SCENARIOS } from '../fixtures/review'
 import { REPO, aload, aworld, branchOf, gitlabAworld, mr, pr, state } from './aidlc-world'
 import type { AWorld } from './aidlc-world'
 
-/** Two segments, so the stage-branch pattern does not match: the bound session is a side job. */
+/** An unbound session is a side job, whatever its branch. */
 const SIDE = 'claude/side-work'
 const SETTINGS = { [`${REPO}/.claude/settings.json`]: JSON.stringify({ enabledPlugins: { 'pr-review@acme': true } }) }
 const PARKED = { current: 'domain-design', parked: { at: 'domain-design', since: '2026-10-06T09:30:00Z' } }
@@ -15,6 +15,7 @@ const base = (over: Partial<AWorld>): Partial<AWorld> => ({
   local: state({ 'requirements-analysis': 'x', 'user-stories': 'x', 'domain-design': '-' }, PARKED),
   main: state({ 'requirements-analysis': 'x', 'user-stories': 'x' }, { current: 'domain-design' }),
   branch: SIDE,
+  isBound: false,
   viewer: ME,
   extra: SETTINGS,
   ...over,
@@ -114,7 +115,7 @@ describe('a side job with nothing to show beyond its branch', () => {
 
 describe('a stage session is untouched', () => {
   test('no context, the plan open, /aidlc still the Next, the parked caption still says how to resume', async () => {
-    const { model } = await aload(world({ branch: branchOf('domain-design') }))
+    const { model } = await aload(world({ branch: branchOf('domain-design'), isBound: true }))
     expect(model.header.mode).toBe('stage')
     expect(model.header).not.toHaveProperty('context')
     expect(model).not.toHaveProperty('isPlanCollapsed')

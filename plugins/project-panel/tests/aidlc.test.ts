@@ -206,18 +206,16 @@ describe('modes over the real sample', () => {
     expect(model.sections.length).toBe(5)
   })
 
-  test('bound but off the stage branch pattern: side job', async () => {
-    const model = await load(real.tree, real.ROOT, real.sessions.live, { ...OPTIONS, stageBranchPattern: '^never/' })
-    expect(model.header.mode).toBe('side-job')
+  test('bound: a stage session whatever the branch pattern says', async () => {
+    for (const stageBranchPattern of ['^never/', '', '(']) {
+      const model = await load(real.tree, real.ROOT, real.sessions.live, { ...OPTIONS, stageBranchPattern })
+      expect(model.header.mode).toBe('stage')
+    }
   })
 
-  test('an empty pattern treats every session as a side job', async () => {
-    expect((await load(real.tree, real.ROOT, real.sessions.live, { ...OPTIONS, stageBranchPattern: '' })).header.mode).toBe('side-job')
-  })
-
-  test('an invalid pattern does not throw', async () => {
-    const model = await load(real.tree, real.ROOT, real.sessions.live, { ...OPTIONS, stageBranchPattern: '(' })
-    expect(model.header.mode).toBe('side-job')
+  test('bound and on main: still a stage session', async () => {
+    const onMain: VirtualTree = { files: { ...real.tree.files, [`${real.ROOT}/.git/HEAD`]: 'ref: refs/heads/main\n' } }
+    expect((await load(onMain, real.ROOT, real.sessions.live)).header.mode).toBe('stage')
   })
 })
 

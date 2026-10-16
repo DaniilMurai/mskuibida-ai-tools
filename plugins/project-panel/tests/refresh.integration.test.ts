@@ -183,13 +183,20 @@ describe('hash-gated redraw', () => {
 })
 
 describe('branch switch', () => {
-  test('HEAD changing between polls re-reads and the mode flips stage <-> side job', async ($, on) => {
+  test('HEAD changing between polls re-reads; the binding, not the branch, decides the mode', async ($, on) => {
     const { calls, files, clock } = await boot($, on)
     expect(modelOf(calls).header.mode).toBe('stage')
+    const loads = stateReads(calls)
 
     files.files[HEAD] = MAIN_HEAD
     calls.control.sha = 'bbbbbbb'
     calls.control.branch = 'main'
+    await clock.advance(10_600)
+    expect(stateReads(calls)).toBeGreaterThan(loads)
+    expect(modelOf(calls).header.mode).toBe('stage')
+
+    // The session's binding empties (bound to nothing): a side job, on the same branch.
+    setFile(files, BINDING, '')
     await clock.advance(10_600)
     expect(modelOf(calls).header.mode).toBe('side-job')
 
@@ -197,8 +204,7 @@ describe('branch switch', () => {
     calls.control.sha = 'ccccccc'
     calls.control.branch = 'dev/SHOP-7/refined-mockups'
     await clock.advance(10_600)
-    expect(modelOf(calls).header.mode).toBe('stage')
-    expect(calls.modelWrites).toHaveLength(3)
+    expect(modelOf(calls).header.mode).toBe('side-job')
   })
 
   test('a repo without git is normal: no re-read, no error', async ($, on) => {

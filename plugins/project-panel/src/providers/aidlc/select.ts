@@ -239,9 +239,9 @@ export function matchStageBranch(
 }
 
 /**
- * stage = bound to an intent and on a stage branch; side-job = anything else
- * with an intent selected; none = no intent. The parsed branch is returned
- * whenever it matches, side-job included.
+ * stage = bound to an intent (a usable binding), whatever the branch;
+ * side-job = anything else with an intent selected; none = no intent. The
+ * branch parsed by the pattern is returned whenever it matches.
  */
 export function modeFor(
   sel: { intent: string | null; isBound: boolean },
@@ -250,6 +250,7 @@ export function modeFor(
   foldSeparator: string,
 ): { mode: PanelMode; stageBranch?: { ticket: string; stages: string[] } } {
   const stageBranch = matchStageBranch(branch, stageBranchPattern, foldSeparator)
-  const mode: PanelMode = sel.intent === null ? 'none' : sel.isBound && stageBranch ? 'stage' : 'side-job'
+  // The binding alone decides: the branch's name says nothing about which stage a session works on.
+  const mode: PanelMode = sel.intent === null ? 'none' : sel.isBound ? 'stage' : 'side-job'
   return stageBranch ? { mode, stageBranch } : { mode }
 }
