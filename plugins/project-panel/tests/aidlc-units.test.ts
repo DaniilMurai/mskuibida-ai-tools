@@ -4,6 +4,7 @@ import { aidlc } from '../src/providers/aidlc'
 import { parseUnitDag, parseUnitEvents, parseUnitIndex, progressOf, unitStageStatuses } from '../src/providers/aidlc/units'
 import type { Unit, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
 import { cloudIdsOf, jiraServerOf, parsePointsCsv, storyPointsOf, withRows } from '../src/providers/aidlc/points'
+import { isResumedAfter } from '../src/providers/aidlc/park'
 import { parseState } from '../src/providers/aidlc/parse-state'
 import * as s from '../fixtures/scenarios'
 import type { VirtualTree } from '../fixtures/virtual'
@@ -490,9 +491,9 @@ describe('a Unit claimed at this checkout', () => {
     expect(section.percent).toBe(20)
     expect(section.ordinal).toBe('3')
     expect(section.isDetail).toBe(true)
-    expect(section.countLabel).toBe('1/5 pt')
-    // Each of its stages says what it weighs.
-    expect(section.items.map(item => item.points)).toEqual(['1 pt', '1 pt', '1 pt', '1 pt', '1 pt'])
+    // Its stages are counted one each (1/5), with no points: the Unit's points are counted under Units.
+    expect(section.countLabel).toBeUndefined()
+    expect(section.items.map(item => item.points)).toEqual([undefined, undefined, undefined, undefined, undefined])
   })
 
   test('every Unit, with the stages that run once, moves to a folded Units section that is no phase', async () => {
@@ -523,6 +524,26 @@ describe('a Unit claimed at this checkout', () => {
     const model = await load(t, jiraHost(t, () => issue(13)))
     const first = model.sections.flatMap(one => one.items).find(item => item.isCurrent)
     expect(first?.id).toBe('nfr-requirements')
+  })
+
+  test('a fresh claim, with no receipt yet: the workflow\'s Current Stage is the claimed Unit\'s, and the Now card is on it', async () => {
+    const fresh = tree(stateText({}, ['- **Active Unit**: web-billing', '- **Unit State**: in-progress']).replace('- **Current Stage**: code-generation', '- **Current Stage**: functional-design'), {
+      [`${INTENT_DIR}/audit/host-a.md`]: shard,
+      [POINTS_PATH]: POINTS,
+      [`${s.ROOT}/.mcp.json`]: MCP_JSON,
+    })
+    const model = await load(fresh, jiraHost(fresh, () => issue(13)))
+    const section = construction(model)
+    expect(section.titleTag).toBe('U4 web-billing')
+    expect(section.items.map(item => [item.id, item.status, item.isCurrent])).toEqual([
+      ['functional-design', 'open', true],
+      ['nfr-requirements', 'planned', false],
+      ['nfr-design', 'planned', false],
+      ['infrastructure-design', 'planned', false],
+      ['code-generation', 'planned', false],
+    ])
+    expect(section.counts).toEqual({ done: 0, total: 5 })
+    expect(model.sections.flatMap(one => one.items).find(item => item.isCurrent)?.id).toBe('functional-design')
   })
 
   test('a paused Unit says so on its stage', async () => {
@@ -561,5 +582,36 @@ describe('unitStageStatuses', () => {
     expect(at('done', '')).toEqual(['done', 'done', 'done', 'done', 'done'])
     expect(at('planned', '')).toEqual(['planned', 'planned', 'planned', 'planned', 'planned'])
     expect(at('active', 'unknown-stage')).toEqual(['planned', 'planned', 'planned', 'planned', 'planned'])
+  })
+})
+
+describe('a park the engine left behind, and a running stage', () => {
+  const parkedLines = ['- **Parked**: 2026-10-02T11:30:00Z', '- **Parked At Stage**: nfr-requirements', '- **Parked By**: person']
+  const claimed = ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']
+  // A stage session (bound): a side job names no Next whatever the state says.
+  const world = (rows: [string, string, string, string][], extra: string[] = []) =>
+    asStage(tree(stateText({}, [...parkedLines, ...claimed, ...extra]), { [`${INTENT_DIR}/audit/host-a.md`]: audit(...rows), [POINTS_PATH]: POINTS }))
+
+  test('parked, and nothing started since: the gate stands and Next resumes', async () => {
+    const model = await load(world([['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing']]))
+    expect(model.gates.some(gate => gate.kind === 'parked')).toBe(true)
+    expect(model.next?.command).toBe('/aidlc')
+  })
+
+  test('a Unit stage started after the park: the park is over, and a running stage names no Next', async () => {
+    const model = await load(world([['2026-10-02T12:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing']]))
+    expect(model.gates.some(gate => gate.kind === 'parked')).toBe(false)
+    expect(model.sections.flatMap(one => one.items).find(item => item.isCurrent)?.id).toBe('nfr-requirements')
+    expect(model.next).toBeUndefined()
+  })
+
+  test('isResumedAfter: unparked, a stage or a Unit started later ends it; an earlier one, or another event, does not', () => {
+    const shard = (event: string, at: string) => ['## X', `**Timestamp**: ${at}`, `**Event**: ${event}`, ''].join('\n')
+    const since = '2026-10-02T11:30:00Z'
+    expect(isResumedAfter(shard('WORKFLOW_UNPARKED', '2026-10-02T11:31:00Z'), since)).toBe(true)
+    expect(isResumedAfter(shard('STAGE_STARTED', '2026-10-02T12:00:00Z'), since)).toBe(true)
+    expect(isResumedAfter(shard('UNIT_STARTED', '2026-10-02T11:00:00Z'), since)).toBe(false)
+    expect(isResumedAfter(shard('ARTIFACT_CREATED', '2026-10-02T12:00:00Z'), since)).toBe(false)
+    expect(isResumedAfter(shard('STAGE_STARTED', '2026-10-02T12:00:00Z'), 'not a time')).toBe(false)
   })
 })

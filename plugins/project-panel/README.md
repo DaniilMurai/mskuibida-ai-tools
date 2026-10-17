@@ -422,7 +422,8 @@ Construction narrows to that Unit:
 
 - **Construction** is the Unit's own walk through the five per-unit stages, each where that Unit stands on it (before the
   stage it is on done, that one in progress or `paused`, the rest planned; all done once it is built), counted one row
-  each. The Unit is a tag beside the title (an accent pill on the desktop). The phase stepper's Construction node shows
+  each (`1/5`; no points: the Unit's points are counted once, under Units, and its rows carry no `pt`). A fresh claim, with
+  no receipt or artifact yet, is on the workflow's own `Current Stage` (0.19.1). The Unit is a tag beside the title (an accent pill on the desktop). The phase stepper's Construction node shows
   the same progress, and the Now card is on that stage. A stage's own gate (`[?]`) shows on its row, and hangs after it.
 - **Units** follows, folded: every Unit with its points, and the stages that run once (build-and-test, ci-pipeline), as
   the unclaimed Construction draws them, with the same counts. It is no phase: the stepper and the wide pane's phase
@@ -493,6 +494,11 @@ Mirrors upstream's `core/hooks/aidlc-statusline.ts` (`readSessionBinding`, `reso
   `active-intent`, else its lone intent), not the global active space;
 - with no binding: `active-intent`, else the lone non-archived intent of the active space;
 - two or more live intents and no cursor: *Idle*, saying that none is selected; none live: *Idle*, nothing in flight.
+
+**Parked, and running (0.19.1).** A `Parked:` line in the state holds only while no audit shard has a `WORKFLOW_UNPARKED`,
+`STAGE_STARTED`, `UNIT_STARTED` or `UNIT_RESUMED` row later than it: the engine can resume without clearing the line, and
+the panel then shows no park. While the current stage is running (in progress, not parked, not waiting at a gate) the Now
+card has no Next: the workflow is doing it. A PR that asks something of you (a review, a merge) still names its command.
 
 **Stage vs side job.** A session bound to an intent (its `aidlc/.aidlc-sessions/<session>.binding.json`) is a
 stage session, whatever its branch is called (0.13.0; before, the branch had to match `stageBranchPattern` too).
@@ -800,6 +806,7 @@ src/providers/aidlc/load.ts       -> PanelModel
 src/providers/aidlc/units.ts      Construction by Unit: the units block, the index's IDs and Jira keys, the audit receipts, progress
 src/providers/aidlc/points.ts     each Unit's story points: unit-points.csv, then Jira through the session's MCP, then 5
 src/providers/aidlc/stage-points.ts  each stage's story points: 1, or stage-story-points.txt (pure)
+src/providers/aidlc/park.ts       whether a park still holds, from the audit shards (pure)
 src/providers/aidlc/two.ts        the second truth: main's state file, the PRs, changed files, rev-list (I/O)
 src/providers/aidlc/truths.ts     merged / in-pr / local per stage, chips, folds, reopens, gates, base line (pure)
 src/providers/aidlc/prs.ts        every forge call of the AI-DLC provider (through src/forge: `gh` or `glab`), its caches, the fingerprint
@@ -844,6 +851,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.19.1** — a claimed Unit's stages count `0/5`, with no points; a fresh claim is on the workflow's Current Stage, so the Now card names it; a park the engine left in the state after work resumed (a later `STAGE_STARTED`/`UNIT_STARTED`/`WORKFLOW_UNPARKED` in the audit) is not shown; a running stage names no Next.
 - **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.
 - **0.18.0** — phase branches (`docs/inception`) carry their whole phase; a press on the pane is taken by a `ui.press` hook, so the first press after the pane is shown again lands.
 - **0.17.0** — points shown: every phase counts its points (`7/8 pt`), every stage row says what it weighs (`1 pt`).
