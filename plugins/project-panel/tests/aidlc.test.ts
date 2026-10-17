@@ -164,6 +164,7 @@ describe('real sample, bound session on its stage branch', () => {
       `${real.ROOT}/aidlc/active-space`,
       intent,
       `${intent}/stage-story-points.txt`,
+      `${real.ROOT}/aidlc/.aidlc-unit-scope.json`,
       `${real.ROOT}/aidlc`,
     ])
   })

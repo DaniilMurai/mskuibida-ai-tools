@@ -131,6 +131,22 @@ function displaySlugFromDirName(dirName: string): string {
   return dated?.[1] ?? dirName.replace(/-[0-9a-f]+$/, '')
 }
 
+/** The intent's UUID from its space's intents.json, '' when the registry has no row for the dir (or no uuid). */
+export async function intentUuidOf(fsx: Fsx, ws: Workspace, space: string, intent: string): Promise<string> {
+  try {
+    const parsed: unknown = JSON.parse((await fsx.read(join(intentsDir(ws, space), 'intents.json'))) ?? '')
+    if (!Array.isArray(parsed)) return ''
+    for (const row of parsed) {
+      if (row === null || typeof row !== 'object') continue
+      const record = row as Record<string, unknown>
+      if (recordDirMatches(record, intent) && typeof record.uuid === 'string') return record.uuid
+    }
+  } catch {
+    // No registry: no UUID to match a claim against.
+  }
+  return ''
+}
+
 /** The registry slug (rename-stable) when intents.json has a row for the dir. */
 async function slugOf(fsx: Fsx, ws: Workspace, space: string, intent: string): Promise<string> {
   try {

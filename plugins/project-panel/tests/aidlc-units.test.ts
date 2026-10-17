@@ -1,7 +1,7 @@
 // Construction by Unit of work: the Units, their story points and their receipts in, one row per Unit out.
 import { test, expect, describe } from 'claude-code/testing'
 import { aidlc } from '../src/providers/aidlc'
-import { parseUnitDag, parseUnitEvents, parseUnitIndex, progressOf, unitStageStatuses } from '../src/providers/aidlc/units'
+import { parseUnitDag, parseUnitEvents, parseUnitIndex, parseUnitProgress, parseUnitScope, progressOf, unitStageStatuses } from '../src/providers/aidlc/units'
 import type { Unit, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
 import { cloudIdsOf, jiraServerOf, parsePointsCsv, storyPointsOf, withRows } from '../src/providers/aidlc/points'
 import { isResumedAfter } from '../src/providers/aidlc/park'
@@ -144,6 +144,12 @@ const construction = (model: PanelModel) => {
   if (!found) throw new Error('no Construction')
   return found
 }
+
+/** The engine's scope file for this checkout: `aidlc --claim <unit>` wrote it, `aidlc unit finish` deletes it. */
+const SCOPE_PATH = `${s.ROOT}/aidlc/.aidlc-unit-scope.json`
+const claimOf = (unit: string, space = 'default'): Record<string, string> => ({
+  [SCOPE_PATH]: JSON.stringify({ version: 1, space, intent_uuid: '01a1-test', intent_id8: 'test', unit, owner: 'A', generation: 1 }),
+})
 
 /** Where the Unit rows are: the Units section once a Unit is claimed at this checkout, else Construction. */
 const unitList = (model: PanelModel) => model.sections.find(one => one.id === 'UNITS') ?? construction(model)
@@ -397,7 +403,10 @@ describe('Construction drawn as Units', () => {
   })
 
   test('an open gate on a per-unit stage hangs after the stage of the Unit this checkout claimed', async () => {
-    const t = tree(stateText({ 'nfr-requirements': '?' }, ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']), { [`${INTENT_DIR}/audit/host-a.md`]: shard })
+    const t = tree(stateText({ 'nfr-requirements': '?' }, ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']), {
+      [`${INTENT_DIR}/audit/host-a.md`]: shard,
+      ...claimOf('api-billing'),
+    })
     const model = await load(t)
     const gate = model.gates.find(one => one.id === 'awaiting:nfr-requirements')
     expect(gate?.sectionId).toBe('CONSTRUCTION')
@@ -471,8 +480,14 @@ describe('a Unit claimed at this checkout', () => {
     ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'functional-design', 'api-billing'],
     ['2026-10-02T12:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing'],
   )
-  const world = (extra: string[] = ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']) =>
-    tree(stateText({}, extra), { [`${INTENT_DIR}/audit/host-a.md`]: shard, [POINTS_PATH]: POINTS, [`${s.ROOT}/.mcp.json`]: MCP_JSON })
+  // A claim is the checkout's scope file; the state's Active Unit is only where the engine last was.
+  const world = (extra: string[] = ['- **Active Unit**: api-billing', '- **Unit State**: in-progress'], claimed: string | null = 'api-billing') =>
+    tree(stateText({}, extra), {
+      [`${INTENT_DIR}/audit/host-a.md`]: shard,
+      [POINTS_PATH]: POINTS,
+      [`${s.ROOT}/.mcp.json`]: MCP_JSON,
+      ...(claimed === null ? {} : claimOf(claimed)),
+    })
 
   test("Construction is the claimed Unit's own walk through the per-unit stages", async () => {
     const t = world()
@@ -531,6 +546,7 @@ describe('a Unit claimed at this checkout', () => {
       [`${INTENT_DIR}/audit/host-a.md`]: shard,
       [POINTS_PATH]: POINTS,
       [`${s.ROOT}/.mcp.json`]: MCP_JSON,
+      ...claimOf('web-billing'),
     })
     const model = await load(fresh, jiraHost(fresh, () => issue(13)))
     const section = construction(model)
@@ -553,8 +569,9 @@ describe('a Unit claimed at this checkout', () => {
     expect(item?.statusWord).toBe('paused')
   })
 
-  test('no Active Unit: Construction keeps the Units, counted by story points, and there is no Units section', async () => {
-    const t = world([])
+  test('no claim: Construction keeps the Units, counted by story points, and there is no Units section', async () => {
+    // The state's Active Unit alone claims nothing: it is where the engine last was, not this checkout's claim.
+    const t = world(undefined, null)
     const model = await load(t, jiraHost(t, () => issue(13)))
     expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
     const section = construction(model)
@@ -564,10 +581,56 @@ describe('a Unit claimed at this checkout', () => {
     expect(section.titleTag).toBeUndefined()
   })
 
-  test('an Active Unit that is none of the Units claims nothing', async () => {
-    const t = world(['- **Active Unit**: not-a-unit'])
+  test('a claim of a Unit that is none of these claims nothing', async () => {
+    const t = world(undefined, 'not-a-unit')
     const model = await load(t, jiraHost(t, () => issue(13)))
     expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
+  })
+})
+
+describe('the claim is the checkout\'s scope file', () => {
+  const shard = audit(
+    ['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'functional-design', 'api-billing'],
+    ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'functional-design', 'api-billing'],
+  )
+  const world = (extra: string[], files: Record<string, string>) =>
+    tree(stateText({}, extra), { [`${INTENT_DIR}/audit/host-a.md`]: shard, [POINTS_PATH]: POINTS, ...files })
+
+  test('between stages the state forgets the Unit; the claim holds, and its next stage is up next', async () => {
+    // The engine reset Active Unit after functional-design finished: only the scope file still says api-billing.
+    const model = await load(world([], claimOf('api-billing')))
+    const section = construction(model)
+    expect(section.titleTag).toBe('U3 api-billing')
+    expect(section.items.map(item => [item.id, item.status, item.isCurrent, item.statusWord ?? null])).toEqual([
+      ['functional-design', 'done', false, null],
+      ['nfr-requirements', 'planned', true, 'up next'],
+      ['nfr-design', 'planned', false, null],
+      ['infrastructure-design', 'planned', false, null],
+      ['code-generation', 'planned', false, null],
+    ])
+    // The claimed Unit is the current row of the Units list too.
+    expect(unitList(model).items.find(item => item.isCurrent)?.id).toBe('unit:api-billing')
+  })
+
+  test('a claim in another space, or of another intent, is not this one\'s', async () => {
+    expect((await load(world([], claimOf('api-billing', 'other')))).sections.some(one => one.id === 'UNITS')).toBe(false)
+    const registry = { [`${s.ROOT}/aidlc/spaces/default/intents/intents.json`]: JSON.stringify([{ uuid: 'another-uuid', dirName: s.INTENT, slug: 'x' }]) }
+    expect((await load(world([], { ...claimOf('api-billing'), ...registry }))).sections.some(one => one.id === 'UNITS')).toBe(false)
+    const same = { [`${s.ROOT}/aidlc/spaces/default/intents/intents.json`]: JSON.stringify([{ uuid: '01a1-test', dirName: s.INTENT, slug: 'x' }]) }
+    expect((await load(world([], { ...claimOf('api-billing'), ...same }))).sections.some(one => one.id === 'UNITS')).toBe(true)
+  })
+
+  test('finished (the scope file gone): no claim, whatever the state still says', async () => {
+    const model = await load(world(['- **Active Unit**: api-billing', '- **Unit State**: in-progress'], {}))
+    expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
+  })
+
+  test('parseUnitScope reads the fields the engine checks, and nothing else', () => {
+    expect(parseUnitScope(JSON.stringify({ version: 1, space: 's', intent_uuid: 'u', unit: 'x', owner: 'A' }))).toEqual({ space: 's', intentUuid: 'u', unit: 'x', owner: 'A' })
+    expect(parseUnitScope(null)).toBeNull()
+    expect(parseUnitScope('not json')).toBeNull()
+    expect(parseUnitScope(JSON.stringify({ version: 2, space: 's', intent_uuid: 'u', unit: 'x' }))).toBeNull()
+    expect(parseUnitScope(JSON.stringify({ version: 1, space: 's', intent_uuid: 'u', unit: '' }))).toBeNull()
   })
 })
 
@@ -590,7 +653,7 @@ describe('a park the engine left behind, and a running stage', () => {
   const claimed = ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']
   // A stage session (bound): a side job names no Next whatever the state says.
   const world = (rows: [string, string, string, string][], extra: string[] = []) =>
-    asStage(tree(stateText({}, [...parkedLines, ...claimed, ...extra]), { [`${INTENT_DIR}/audit/host-a.md`]: audit(...rows), [POINTS_PATH]: POINTS }))
+    asStage(tree(stateText({}, [...parkedLines, ...claimed, ...extra]), { [`${INTENT_DIR}/audit/host-a.md`]: audit(...rows), [POINTS_PATH]: POINTS, ...claimOf('api-billing') }))
 
   test('parked, and nothing started since: the gate stands and Next resumes', async () => {
     const model = await load(world([['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing']]))
@@ -613,5 +676,67 @@ describe('a park the engine left behind, and a running stage', () => {
     expect(isResumedAfter(shard('UNIT_STARTED', '2026-10-02T11:00:00Z'), since)).toBe(false)
     expect(isResumedAfter(shard('ARTIFACT_CREATED', '2026-10-02T12:00:00Z'), since)).toBe(false)
     expect(isResumedAfter(shard('STAGE_STARTED', '2026-10-02T12:00:00Z'), 'not a time')).toBe(false)
+  })
+})
+
+describe("the engine's Unit Progress table", () => {
+  /** A state with the engine's table: `cells` per Unit, five per-unit stages, then the gate. */
+  const withTable = (state: string, rows: Record<string, string[]>) =>
+    state.replace(
+      '## Current Status',
+      [
+        '## Unit Progress',
+        '',
+        '| unit | owner | functional-design | nfr-requirements | nfr-design | infrastructure-design | code-generation | gate |',
+        '| --- | --- | --- | --- | --- | --- | --- | --- |',
+        ...Object.entries(rows).map(([unit, cells]) => `| ${unit} | A | ${cells.map(cell => `[${cell}]`).join(' | ')} |`),
+        '',
+        '## Current Status',
+      ].join('\n'),
+    )
+  // The receipt says functional-design is complete for api-billing; the engine's table says it waits on approval.
+  const shard = audit(
+    ['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'functional-design', 'api-billing'],
+    ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'functional-design', 'api-billing'],
+  )
+  const world = (rows: Record<string, string[]>, claimed: string | null) =>
+    tree(withTable(stateText(), rows), { [`${INTENT_DIR}/audit/host-a.md`]: shard, [POINTS_PATH]: POINTS, ...(claimed ? claimOf(claimed) : {}) })
+
+  test('parseUnitProgress reads each Unit\'s per-unit stages; no table, nothing', () => {
+    const table = parseUnitProgress(withTable(stateText(), { 'api-billing': ['?', ' ', ' ', ' ', ' ', '?'] }))
+    expect([...(table.get('api-billing') ?? new Map())]).toEqual([
+      ['functional-design', '?'],
+      ['nfr-requirements', ' '],
+      ['nfr-design', ' '],
+      ['infrastructure-design', ' '],
+      ['code-generation', ' '],
+    ])
+    expect(parseUnitProgress(stateText()).size).toBe(0)
+  })
+
+  test('a stage awaiting approval in the table is not done, though its receipt says complete: claimed', async () => {
+    const model = await load(world({ 'api-billing': ['?', ' ', ' ', ' ', ' ', '?'] }, 'api-billing'))
+    const stage = construction(model).items.find(item => item.id === 'functional-design')
+    expect(stage).toMatchObject({ status: 'awaiting', isCurrent: true })
+    expect(construction(model).counts).toEqual({ done: 0, total: 5 })
+    // One approval row, after the stage; the Units list does not repeat it.
+    const awaiting = model.gates.filter(gate => gate.kind === 'awaiting-approval')
+    expect(awaiting.map(gate => [gate.title, gate.afterItemId])).toEqual([['functional-design awaits your approval', 'functional-design']])
+    expect(unitList(model).items.find(item => item.id === 'unit:api-billing')).toMatchObject({ status: 'awaiting', statusWord: 'functional-design awaits approval' })
+  })
+
+  test('unclaimed, the Unit row waits on approval, named as drawn', async () => {
+    const model = await load(world({ 'api-billing': ['?', ' ', ' ', ' ', ' ', '?'] }, null))
+    expect(unitList(model).items.find(item => item.id === 'unit:api-billing')?.status).toBe('awaiting')
+    expect(model.gates.find(gate => gate.id === 'awaiting:unit:api-billing')?.title).toBe('U3 api-billing awaits your approval')
+  })
+
+  test('the table decides built, between and planned too', async () => {
+    const model = await load(world({ 'api-core': ['x', 'x', 'x', 'x', 'x', 'x'], 'web-shell': ['x', ' ', ' ', ' ', ' ', '-'], 'api-billing': [' ', ' ', ' ', ' ', ' ', ' '] }, null))
+    const list = unitList(model)
+    expect(list.items.find(item => item.id === 'unit:api-core')?.status).toBe('done')
+    expect(list.items.find(item => item.id === 'unit:web-shell')).toMatchObject({ status: 'partial', statusWord: 'functional-design done' })
+    // Its receipt says functional-design is complete, but the engine's table has it not started.
+    expect(list.items.find(item => item.id === 'unit:api-billing')?.status).toBe('planned')
   })
 })
