@@ -27,8 +27,9 @@ const FONT = '-apple-system, system-ui, sans-serif'
 /** A section with no items and nothing counted: no ring, a dim title. */
 export const isEmptySection = (section: Section): boolean => section.items.length === 0 && !(section.counts && section.counts.total > 0)
 
-/** The sections the phase views draw: every one but a ledger's proposed ones. */
-export const phasesOf = (model: PanelModel): Section[] => model.sections.filter(section => section.isProposed !== true)
+/** The sections the phase views draw: every one but a ledger's proposed ones and those that are no phase (Units). */
+export const phasesOf = (model: PanelModel): Section[] =>
+  model.sections.filter(section => section.isProposed !== true && section.isSupplement !== true)
 
 /** True when the plan is a handful of phases (2 to 7), the shape the stepper and the phase cards are for. */
 export function isPhased(model: PanelModel): boolean {

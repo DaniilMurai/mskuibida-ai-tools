@@ -387,8 +387,8 @@ engine ticks their checkbox only after every Unit; build-and-test and ci-pipelin
 **one row per Unit**, in the dependency block's order, with its story points, followed by the run-once stages:
 
 ```
-▾ Construction                                  ◔ 18%  1/6
-  8 of 29 story points done, 4 units
+▾ Construction                       ◔  1/4 units  8/29 pt
+  1 of 4 units done, 8 of 29 story points
     ✓ U1 api-core  8 pt
     ◐ U2 web-shell  3 pt               functional-design done
   › ◐ U3 api-billing  13 pt                  nfr-requirements
@@ -396,6 +396,33 @@ engine ticks their checkbox only after every Unit; build-and-test and ci-pipelin
     ○ build-and-test
     ○ ci-pipeline
 ```
+
+**Counted by story points (0.15.0).** The row's count is the story points done of all (`8/29 pt`, not the rows'
+`1/6`), with the Units done beside it (`1/4 units`, a grey pill on the desktop), and the caption says both.
+
+**A Unit claimed at this checkout (0.15.0).** When this checkout's own state file names one of the Units as its
+`Active Unit` (else the engine directive's unit) — a worktree or the main checkout, each has its own copy —
+Construction narrows to that Unit:
+
+```
+▾ Construction  U3 api-billing                      ◔ 1/5
+  U3 api-billing, 13 pt: claimed at this checkout
+    ✓ functional-design
+  › ◐ nfr-requirements
+    ○ nfr-design
+    ○ infrastructure-design
+    ○ code-generation
+▸ Units                              ◔  1/4 units  8/29 pt
+```
+
+- **Construction** is the Unit's own walk through the five per-unit stages, each where that Unit stands on it (before the
+  stage it is on done, that one in progress or `paused`, the rest planned; all done once it is built), counted one row
+  each. The Unit is a tag beside the title (an accent pill on the desktop). The phase stepper's Construction node shows
+  the same progress, and the Now card is on that stage. A stage's own gate (`[?]`) shows on its row, and hangs after it.
+- **Units** follows, folded: every Unit with its points, and the stages that run once (build-and-test, ci-pipeline), as
+  the unclaimed Construction draws them, with the same counts. It is no phase: the stepper and the wide pane's phase
+  cards leave it out, and the plan list keeps it as a row of its own.
+- **The plan's percent** counts the Units, never the claimed Unit's stages, so it is the same claimed or not.
 
 - **A Unit is done** when code-generation, its last per-unit stage, is settled for it: a `UNIT_COMPLETED` receipt in the
   audit shards when one is owed (Construction Checkpoints enabled, or any `UNIT_*` row exists), else its four
@@ -784,6 +811,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.15.0** — Construction by Unit counted by story points (`8/29 pt`) with the Units done beside them (`1/4 units`); a Unit claimed at this checkout (`Active Unit`) narrows Construction to its own stages, with every Unit under a folded Units section.
 - **0.14.1** — buttons work on the first click: the pane's render no longer reads the clock, which redrew it continually and retired its buttons' press handles under the pointer.
 - **0.14.0** — a dim `project-panel <version>` mark at the foot of the pane, read from the manifest the mod was loaded from, so you can tell which build is drawing it.
 - **0.13.0** — the desktop look (pills, tinted cards, status icons, ring-first section rows); a session is a stage by its AI-DLC binding alone, whatever its branch.

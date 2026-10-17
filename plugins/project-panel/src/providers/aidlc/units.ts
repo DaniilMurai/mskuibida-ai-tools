@@ -231,6 +231,28 @@ export function progressOf(units: readonly Unit[], parsed: ParsedState, facts: U
   return out
 }
 
+/** Where one Unit stands on each per-unit stage, for the Unit this checkout has claimed. */
+export type UnitStageStatus = 'done' | 'active' | 'paused' | 'planned'
+
+/**
+ * Each per-unit stage's status for one Unit, from how far it has got: the stages before the one it is on are done,
+ * that one is active (or paused), the rest planned; a stage it finished last ("between") is done; a built Unit has
+ * every stage done. A stage the progress does not name leaves only built-or-not to go on.
+ */
+export function unitStageStatuses(progress: UnitProgress): Map<string, UnitStageStatus> {
+  const at = PER_UNIT_STAGES.indexOf(progress.stage)
+  return new Map(
+    PER_UNIT_STAGES.map((stage, index): [string, UnitStageStatus] => {
+      if (progress.phase === 'done') return [stage, 'done']
+      if (at < 0) return [stage, 'planned']
+      if (index < at) return [stage, 'done']
+      if (index > at) return [stage, 'planned']
+      if (progress.phase === 'between') return [stage, 'done']
+      return [stage, progress.phase === 'paused' ? 'paused' : 'active']
+    }),
+  )
+}
+
 // ── reads ────────────────────────────────────────────────────────────────────
 
 /** A file's text, '' when it is not there; asked first, since a missing file is the usual case here. */
