@@ -306,8 +306,8 @@ describe('Construction drawn as Units', () => {
     ])
     expect(section.items.find(item => item.isCurrent)?.id).toBe('unit:api-billing')
     expect(section.caption).toBe('1 of 4 units done, 8 of 29 story points')
-    // Counted by story points, with the Units done beside them.
-    expect(section.countLabel).toBe('8/29 pt')
+    // Counted by story points (the Units' 29 and the run-once stages' 2), with the Units done beside them.
+    expect(section.countLabel).toBe('8/31 pt')
     expect(section.sideCount).toBe('1/4 units')
   })
 
@@ -490,7 +490,9 @@ describe('a Unit claimed at this checkout', () => {
     expect(section.percent).toBe(20)
     expect(section.ordinal).toBe('3')
     expect(section.isDetail).toBe(true)
-    expect(section.countLabel).toBeUndefined()
+    expect(section.countLabel).toBe('1/5 pt')
+    // Each of its stages says what it weighs.
+    expect(section.items.map(item => item.points)).toEqual(['1 pt', '1 pt', '1 pt', '1 pt', '1 pt'])
   })
 
   test('every Unit, with the stages that run once, moves to a folded Units section that is no phase', async () => {
@@ -503,7 +505,7 @@ describe('a Unit claimed at this checkout', () => {
     expect(units.isSupplement).toBe(true)
     expect(units.isCollapsed).toBe(true)
     expect(units.items.map(item => item.id)).toEqual(['unit:api-core', 'unit:web-shell', 'unit:api-billing', 'unit:web-billing', 'build-and-test', 'ci-pipeline'])
-    expect(units.countLabel).toBe('8/29 pt')
+    expect(units.countLabel).toBe('8/31 pt')
     expect(units.sideCount).toBe('1/4 units')
   })
 
@@ -536,7 +538,7 @@ describe('a Unit claimed at this checkout', () => {
     expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
     const section = construction(model)
     expect(section.items[0]?.id).toBe('unit:api-core')
-    expect(section.countLabel).toBe('8/29 pt')
+    expect(section.countLabel).toBe('8/31 pt')
     expect(section.sideCount).toBe('1/4 units')
     expect(section.titleTag).toBeUndefined()
   })

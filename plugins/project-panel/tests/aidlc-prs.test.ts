@@ -105,8 +105,8 @@ describe('the regression: refined-mockups in PR #33, domain-design only in this 
   test('the model is plain data: it round-trips, and absent fields are absent, not undefined', async () => {
     const { model } = await aload(regression())
     expect(JSON.parse(JSON.stringify(model))).toEqual(model)
-    expect(Object.keys(itemOf(model, 'requirements-analysis')).sort()).toEqual(['chips', 'id', 'isCurrent', 'landing', 'ordinal', 'status', 'title'])
-    expect(Object.keys(itemOf(model, 'units-generation')).sort()).toEqual(['chips', 'id', 'isCurrent', 'ordinal', 'status', 'title'])
+    expect(Object.keys(itemOf(model, 'requirements-analysis')).sort()).toEqual(['chips', 'id', 'isCurrent', 'landing', 'ordinal', 'points', 'status', 'title'])
+    expect(Object.keys(itemOf(model, 'units-generation')).sort()).toEqual(['chips', 'id', 'isCurrent', 'ordinal', 'points', 'status', 'title'])
   })
 
   test('the commands: argv only, the PR list once, no model', async () => {
@@ -439,7 +439,7 @@ describe('one truth', () => {
     const w = aworld({ isRepo: false, local: state({ 'user-stories': 'x', 'refined-mockups': 'x', 'domain-design': '-' }) })
     const { model, s } = await aload(w)
     expect(s.lines()).toEqual([`git -C ${REPO} rev-parse --show-toplevel`])
-    expect(itemOf(model, 'refined-mockups')).toEqual({ id: 'refined-mockups', title: 'refined-mockups', ordinal: '2.3', status: 'done', isCurrent: false, chips: [] })
+    expect(itemOf(model, 'refined-mockups')).toEqual({ id: 'refined-mockups', title: 'refined-mockups', ordinal: '2.3', status: 'done', isCurrent: false, chips: [], points: '1 pt' })
     expect(model.overall.counts.done).toBe(2)
     expect(model.header).not.toHaveProperty('base')
     expect(model.gates).toEqual([])
