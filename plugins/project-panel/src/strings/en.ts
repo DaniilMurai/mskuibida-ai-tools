@@ -110,7 +110,11 @@ export const en = {
   // Construction drawn as Units of work (providers/aidlc/units.ts, points.ts): the section's caption, a Unit's points
   // chip, its status word ({stage} a per-unit stage slug, {units} the Unit IDs it waits on), the plan heading when
   // Construction counts by points, and the rows about the points file ({file}; {units} the Unit IDs it repeats).
-  'aidlc.units.caption': '{done} of {total} story points done, {count} units',
+  'aidlc.units.caption': '{units} of {count} units done, {done} of {total} story points',
+  'aidlc.units.count': '{done}/{total} pt',
+  'aidlc.units.done': '{done}/{total} units',
+  'aidlc.section.units': 'Units',
+  'aidlc.unit.claimed': '{unit}, {points} pt: claimed at this checkout',
   'aidlc.chip.points': '{points} pt',
   'aidlc.chip.pointsDefault': '{points} pt, default',
   'aidlc.unit.atStage': '{stage}',

@@ -30,7 +30,7 @@ import { wording } from './truths'
 import type { Derived, Two } from './truths'
 import { hasMoreThanBranch, sessionContext } from './session'
 import { readTwo } from './two'
-import { PER_UNIT_STAGES, LAST_UNIT_STAGE, progressOf, readUnitFacts, readUnitList } from './units'
+import { PER_UNIT_STAGES, LAST_UNIT_STAGE, progressOf, readUnitFacts, readUnitList, unitStageStatuses } from './units'
 import { POINTS_FILE, isUncommitted, resolvePoints } from './points'
 import type { UnitPoints } from './points'
 import type { Unit, UnitProgress } from './units'
@@ -67,7 +67,9 @@ export async function loadAidlc(ctx: ProviderContext, detection: Detection): Pro
   for (const section of sections) {
     const holdsCurrent = section.items.some(item => item.isCurrent)
     const hasGate = gates.some(gate => gate.sectionId === section.id && gate.isAttentionOnly !== true)
-    section.isCollapsed = !(section.status === 'active' || holdsCurrent || hasGate)
+    // The Units beside a claimed Unit's Construction start folded: the claimed Unit's own stages are what this
+    // checkout works on.
+    section.isCollapsed = section.isSupplement === true || !(section.status === 'active' || holdsCurrent || hasGate)
   }
 
   const phaseKey = firstToken(parsed.fields['Lifecycle Phase']).toUpperCase()
@@ -267,15 +269,27 @@ function sectionsOf(
   units: UnitView | null,
 ): Section[] {
   const isWaitingOnUnits = unitsPending(parsed, units)
-  return parsed.phases.map((phase, index) => {
+  return parsed.phases.flatMap(phase => {
+    const index = parsed.phases.indexOf(phase)
     const local = parsed.phaseProgress[phase.key] ?? 'pending'
     const progress = phaseProgressOf(local, phase.key, two)
     const known = PHASE_ORDER.indexOf(phase.key)
     const phaseNo = known >= 0 ? known : PHASE_ORDER.length + index
-    const section =
-      units && phase.key === 'CONSTRUCTION' && hasUnitRows(phase)
-        ? unitSectionOf(phase, progress, currentStage, view, units, phaseNo)
-        : sectionOf(phase, progress, currentStage, view, phaseNo)
+    if (units && phase.key === 'CONSTRUCTION' && hasUnitRows(phase)) {
+      const list = unitSectionOf(phase, progress, currentStage, view, units, phaseNo)
+      list.ordinal = String(phaseNo)
+      if (units.claimed === '') return [list]
+      // A Unit claimed at this checkout: Construction is that Unit's own walk through the per-unit stages, and every
+      // Unit (with the stages that run once) moves to a Units section of its own, folded, which the plan counts.
+      const mine = claimedSectionOf(phase, progress, units, phaseNo)
+      mine.ordinal = String(phaseNo)
+      list.id = UNITS_SECTION
+      list.title = t('aidlc.section.units')
+      delete list.ordinal
+      list.isSupplement = true
+      return [mine, list]
+    }
+    const section = sectionOf(phase, progress, currentStage, view, phaseNo)
     section.ordinal = String(phaseNo)
     if (isWaitingOnUnits && phase.key === 'CONSTRUCTION') {
       // Construction is seven stages only on paper until Units Generation has cut the intent into Units: nothing of
@@ -392,7 +406,7 @@ function weightedPercent(items: Item[], weightOf: (item: Item) => number): numbe
 function overallOf(sections: Section[], units: UnitView | null): PanelModel['overall'] {
   const counts: PanelModel['overall']['counts'] = { total: 0 }
   const executed = sections
-    .filter(section => section.isUncounted !== true)
+    .filter(section => section.isUncounted !== true && section.isDetail !== true)
     .flatMap(section => section.items)
     .filter(item => item.status !== 'skipped')
   for (const item of executed) {
@@ -420,6 +434,11 @@ type UnitView = {
   progress: Map<string, UnitProgress>
   /** The Unit the session is on, by name; '' when none. */
   current: string
+  /**
+   * The Unit this checkout has claimed, by name: its own state file's `Active Unit`, else the engine directive's unit
+   * (a worktree or not, each checkout has its own copy). '' when it names none of the Units.
+   */
+  claimed: string
   /** Each Unit's story points, by name, and where they came from. */
   points: Map<string, UnitPoints>
   /**
@@ -434,6 +453,9 @@ type UnitView = {
 }
 
 const unitItemId = (name: string) => `unit:${name}`
+
+/** The id of the Units section a claimed Unit's Construction moves the Units to. */
+const UNITS_SECTION = 'UNITS'
 
 /** The stage that cuts an intent into Units. */
 const UNITS_STAGE = 'units-generation'
@@ -472,6 +494,7 @@ async function unitsOf(
     units,
     progress,
     current: named ?? working ?? '',
+    claimed: named ?? '',
     points: points.byUnit,
     weights: new Map(
       units.map(unit => {
@@ -542,7 +565,7 @@ function unitSectionOf(
               : undefined
     const item: Item = {
       id: unitItemId(unit.name),
-      title: unit.id === '' ? unit.name : `${unit.id} ${unit.name}`,
+      title: unitTitle(unit),
       status: STATUS_OF_UNIT[facts.phase],
       isCurrent: unit.name === units.current,
       chips: pointsChips(units.points.get(unit.name)),
@@ -555,15 +578,59 @@ function unitSectionOf(
     .filter(({ stage }) => !PER_UNIT_STAGES.includes(stage.slug))
     .map(({ stage, ordinal }) => stageItem(stage, currentStage, view, ordinal))
   const pointsOf = (unit: Unit) => units.points.get(unit.name)?.points ?? 0
-  const donePoints = units.units.filter(unit => units.progress.get(unit.name)?.phase === 'done').reduce((sum, unit) => sum + pointsOf(unit), 0)
+  const doneUnits = units.units.filter(unit => units.progress.get(unit.name)?.phase === 'done')
+  const donePoints = doneUnits.reduce((sum, unit) => sum + pointsOf(unit), 0)
   const allPoints = units.units.reduce((sum, unit) => sum + pointsOf(unit), 0)
-  return withCounts(
+  const count = String(units.units.length)
+  const section = withCounts(
     phase,
     progress,
     [...unitItems, ...onceItems],
-    t('aidlc.units.caption', { done: formatPoints(donePoints), total: formatPoints(allPoints), count: String(units.units.length) }),
+    t('aidlc.units.caption', { units: String(doneUnits.length), count, done: formatPoints(donePoints), total: formatPoints(allPoints) }),
     item => units.weights.get(item.id) ?? 1,
   )
+  // Counted by story points, with the Units done beside them: the rows are not what the work weighs.
+  const countLabel = t('aidlc.units.count', { done: formatPoints(donePoints), total: formatPoints(allPoints) })
+  const sideCount = t('aidlc.units.done', { done: String(doneUnits.length), total: count })
+  if (countLabel !== '') section.countLabel = countLabel
+  if (sideCount !== '') section.sideCount = sideCount
+  return section
+}
+
+/** A Unit as its row names it: `U3 u3-day-page`, or the name alone when the index has no ID for it. */
+const unitTitle = (unit: Unit): string => (unit.id === '' ? unit.name : `${unit.id} ${unit.name}`)
+
+/**
+ * Construction narrowed to the Unit this checkout claimed: the per-unit stages, each where that Unit stands on it,
+ * counted one row each. The plan counts the Units section instead, so this one is a detail it leaves out.
+ */
+function claimedSectionOf(phase: ParsedPhase, progress: PhaseStatus, units: UnitView, phaseNo: number): Section {
+  const unit = units.units.find(one => one.name === units.claimed)!
+  const statuses = unitStageStatuses(units.progress.get(unit.name) ?? { phase: 'planned', stage: '' })
+  const items: Item[] = phase.stages
+    .map((stage, at) => ({ stage, ordinal: ordinalOf(phaseNo, at + 1) }))
+    .filter(({ stage }) => PER_UNIT_STAGES.includes(stage.slug))
+    .map(({ stage, ordinal }) => {
+      const status = !stage.isExecuted || stage.marker === 'skipped' ? 'skipped' : (statuses.get(stage.slug) ?? 'planned')
+      const isOn = status === 'active' || status === 'paused'
+      // The stage's own gate ([?]) is the one the Unit on it waits at: its row says so, and the gate hangs after it.
+      const isAwaiting = isOn && itemStatus(stage) === 'awaiting'
+      const item: Item = {
+        id: stage.slug,
+        title: stage.slug,
+        ordinal,
+        status: isAwaiting ? 'awaiting' : isOn ? 'open' : status,
+        isCurrent: isOn,
+        chips: [],
+      }
+      if (status === 'paused') item.statusWord = t('aidlc.unit.paused')
+      return item
+    })
+  const points = units.points.get(unit.name)?.points ?? 0
+  const section = withCounts(phase, progress, items, t('aidlc.unit.claimed', { unit: unitTitle(unit), points: formatPoints(points) }), () => 1)
+  section.titleTag = unitTitle(unit)
+  section.isDetail = true
+  return section
 }
 
 /** `8` stays `8`; a fraction keeps one decimal. */

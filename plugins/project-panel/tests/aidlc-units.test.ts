@@ -1,8 +1,8 @@
 // Construction by Unit of work: the Units, their story points and their receipts in, one row per Unit out.
 import { test, expect, describe } from 'claude-code/testing'
 import { aidlc } from '../src/providers/aidlc'
-import { parseUnitDag, parseUnitEvents, parseUnitIndex, progressOf } from '../src/providers/aidlc/units'
-import type { Unit, UnitFacts } from '../src/providers/aidlc/units'
+import { parseUnitDag, parseUnitEvents, parseUnitIndex, progressOf, unitStageStatuses } from '../src/providers/aidlc/units'
+import type { Unit, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
 import { cloudIdsOf, jiraServerOf, parsePointsCsv, storyPointsOf, withRows } from '../src/providers/aidlc/points'
 import { parseState } from '../src/providers/aidlc/parse-state'
 import * as s from '../fixtures/scenarios'
@@ -143,6 +143,9 @@ const construction = (model: PanelModel) => {
   if (!found) throw new Error('no Construction')
   return found
 }
+
+/** Where the Unit rows are: the Units section once a Unit is claimed at this checkout, else Construction. */
+const unitList = (model: PanelModel) => model.sections.find(one => one.id === 'UNITS') ?? construction(model)
 
 describe('parseUnitDag', () => {
   test('the units block, flow and block lists, quotes and comments', () => {
@@ -292,7 +295,7 @@ describe('Construction drawn as Units', () => {
 
   test('one row per Unit in the block order, with its points, then the once-run stages', async () => {
     const t = world()
-    const section = construction(await load(t, jiraHost(t, () => issue(13))))
+    const section = unitList(await load(t, jiraHost(t, () => issue(13))))
     expect(section.items.map(item => [item.id, item.title, item.status, item.statusWord ?? null, item.chips.map(chip => chip.label)])).toEqual([
       ['unit:api-core', 'U1 api-core', 'done', null, ['8 pt']],
       ['unit:web-shell', 'U2 web-shell', 'partial', 'functional-design done', ['3 pt']],
@@ -302,12 +305,15 @@ describe('Construction drawn as Units', () => {
       ['ci-pipeline', 'ci-pipeline', 'planned', null, []],
     ])
     expect(section.items.find(item => item.isCurrent)?.id).toBe('unit:api-billing')
-    expect(section.caption).toBe('8 of 29 story points done, 4 units')
+    expect(section.caption).toBe('1 of 4 units done, 8 of 29 story points')
+    // Counted by story points, with the Units done beside them.
+    expect(section.countLabel).toBe('8/29 pt')
+    expect(section.sideCount).toBe('1/4 units')
   })
 
   test('the ring: the Units weigh 4 rows shared by points, each once-run stage 1', async () => {
     const t = world()
-    const section = construction(await load(t, jiraHost(t, () => issue(13))))
+    const section = unitList(await load(t, jiraHost(t, () => issue(13))))
     // Points 8 + 3 + 13 + 5 = 29. Done: U1, 4 x 8/29 rows. All: 4 + 2 = 6 rows.
     expect(section.percent).toBe(Math.round(((4 * 8) / 29 / 6) * 100))
     expect(section.counts).toEqual({ done: 1, total: 6 })
@@ -339,7 +345,7 @@ describe('Construction drawn as Units', () => {
     await load(t, host)
     expect(host.writes[POINTS_PATH]).toBe('unit,points,source\nU1,8,human\nweb-shell,3,ai\nU3,13,human\n')
     const again = jiraHost(t, () => issue(13))
-    const section = construction(await load(t, again))
+    const section = unitList(await load(t, again))
     expect(again.calls).toEqual([])
     expect(section.items.find(item => item.id === 'unit:api-billing')?.chips[0]?.label).toBe('13 pt')
   })
@@ -347,7 +353,7 @@ describe('Construction drawn as Units', () => {
   test('no points on the issue: 5, nothing written, and Jira is not asked again within the hour', async () => {
     const t = asStage(world())
     const host = jiraHost(t, () => issue(null))
-    const section = construction(await load(t, host))
+    const section = unitList(await load(t, host))
     expect(section.items.find(item => item.id === 'unit:api-billing')?.chips[0]?.label).toBe('5 pt, default')
     expect(host.writes).toEqual({})
     const ctx = ctxOf(t, s.ROOT, s.SESSION, OPTIONS, host)
@@ -359,7 +365,7 @@ describe('Construction drawn as Units', () => {
   test('no Atlassian server in .mcp.json: every Unit without a row is 5, and nothing is asked', async () => {
     const t = world({ [`${s.ROOT}/.mcp.json`]: JSON.stringify({ mcpServers: {} }) })
     const host = jiraHost(t, () => issue(13))
-    const section = construction(await load(t, host))
+    const section = unitList(await load(t, host))
     expect(host.calls).toEqual([])
     expect(section.items.find(item => item.id === 'unit:api-billing')?.chips[0]?.label).toBe('5 pt, default')
   })
@@ -368,7 +374,7 @@ describe('Construction drawn as Units', () => {
     const t = world()
     const host: ProviderHost = { ...jiraHost(t, () => null), mcp: async () => { throw new Error('not connected') } }
     const model = await load(t, host)
-    expect(construction(model).items.find(item => item.id === 'unit:api-billing')?.chips[0]?.label).toBe('5 pt, default')
+    expect(unitList(model).items.find(item => item.id === 'unit:api-billing')?.chips[0]?.label).toBe('5 pt, default')
   })
 
   test('an uncommitted points file asks to be committed, under Needs attention', async () => {
@@ -382,15 +388,24 @@ describe('Construction drawn as Units', () => {
   test('a Unit listed more than once: the last row counts, and Needs attention names it', async () => {
     const t = world({ [POINTS_PATH]: `${POINTS}U1,13,human\n` })
     const model = await load(t, jiraHost(t, () => issue(13)))
-    expect(construction(model).items.find(item => item.id === 'unit:api-core')?.chips[0]?.label).toBe('13 pt')
+    expect(unitList(model).items.find(item => item.id === 'unit:api-core')?.chips[0]?.label).toBe('13 pt')
     const gate = model.gates.find(one => one.id === 'points-repeated')
     expect(gate?.title).toBe('unit-points.csv lists a unit more than once')
     expect(gate?.caption).toBe('U1: the last row counts. Remove the rows that are out of date.')
     expect(gate?.isAttentionOnly).toBe(true)
   })
 
-  test('an open gate on a per-unit stage hangs after the current Unit', async () => {
+  test('an open gate on a per-unit stage hangs after the stage of the Unit this checkout claimed', async () => {
     const t = tree(stateText({ 'nfr-requirements': '?' }, ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']), { [`${INTENT_DIR}/audit/host-a.md`]: shard })
+    const model = await load(t)
+    const gate = model.gates.find(one => one.id === 'awaiting:nfr-requirements')
+    expect(gate?.sectionId).toBe('CONSTRUCTION')
+    expect(gate?.afterItemId).toBe('nfr-requirements')
+    expect(construction(model).items.find(item => item.id === 'nfr-requirements')?.status).toBe('awaiting')
+  })
+
+  test('with no Unit claimed, an open gate on a per-unit stage hangs after the Unit being worked', async () => {
+    const t = tree(stateText({ 'nfr-requirements': '?' }), { [`${INTENT_DIR}/audit/host-a.md`]: shard })
     const gate = (await load(t)).gates.find(one => one.id === 'awaiting:nfr-requirements')
     expect(gate?.sectionId).toBe('CONSTRUCTION')
     expect(gate?.afterItemId).toBe('unit:api-billing')
@@ -445,5 +460,104 @@ describe('Construction drawn as Units', () => {
     const skipped = stateText().replace('- [ ] code-generation — EXECUTE', '- [S] code-generation — SKIP: no code')
     const section = construction(await load(tree(skipped)))
     expect(section.items.some(item => item.id.startsWith('unit:'))).toBe(false)
+  })
+})
+
+describe('a Unit claimed at this checkout', () => {
+  const shard = audit(
+    ['2026-10-02T09:00:00Z', 'UNIT_COMPLETED', 'code-generation', 'api-core'],
+    ['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'functional-design', 'api-billing'],
+    ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'functional-design', 'api-billing'],
+    ['2026-10-02T12:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing'],
+  )
+  const world = (extra: string[] = ['- **Active Unit**: api-billing', '- **Unit State**: in-progress']) =>
+    tree(stateText({}, extra), { [`${INTENT_DIR}/audit/host-a.md`]: shard, [POINTS_PATH]: POINTS, [`${s.ROOT}/.mcp.json`]: MCP_JSON })
+
+  test("Construction is the claimed Unit's own walk through the per-unit stages", async () => {
+    const t = world()
+    const model = await load(t, jiraHost(t, () => issue(13)))
+    const section = construction(model)
+    expect(section.items.map(item => [item.id, item.ordinal, item.status, item.isCurrent])).toEqual([
+      ['functional-design', '3.1', 'done', false],
+      ['nfr-requirements', '3.2', 'open', true],
+      ['nfr-design', '3.3', 'planned', false],
+      ['infrastructure-design', '3.4', 'planned', false],
+      ['code-generation', '3.5', 'planned', false],
+    ])
+    expect(section.titleTag).toBe('U3 api-billing')
+    expect(section.caption).toBe('U3 api-billing, 13 pt: claimed at this checkout')
+    expect(section.counts).toEqual({ done: 1, total: 5 })
+    expect(section.percent).toBe(20)
+    expect(section.ordinal).toBe('3')
+    expect(section.isDetail).toBe(true)
+    expect(section.countLabel).toBeUndefined()
+  })
+
+  test('every Unit, with the stages that run once, moves to a folded Units section that is no phase', async () => {
+    const t = world()
+    const model = await load(t, jiraHost(t, () => issue(13)))
+    expect(model.sections.map(one => one.id).slice(-2)).toEqual(['CONSTRUCTION', 'UNITS'])
+    const units = unitList(model)
+    expect(units.title).toBe('Units')
+    expect(units.ordinal).toBeUndefined()
+    expect(units.isSupplement).toBe(true)
+    expect(units.isCollapsed).toBe(true)
+    expect(units.items.map(item => item.id)).toEqual(['unit:api-core', 'unit:web-shell', 'unit:api-billing', 'unit:web-billing', 'build-and-test', 'ci-pipeline'])
+    expect(units.countLabel).toBe('8/29 pt')
+    expect(units.sideCount).toBe('1/4 units')
+  })
+
+  test("the plan's percent is the same whether a Unit is claimed or not: it counts the Units, never the claimed one's stages", async () => {
+    const claimed = world()
+    const unclaimed = world([])
+    const a = await load(claimed, jiraHost(claimed, () => issue(13)))
+    const b = await load(unclaimed, jiraHost(unclaimed, () => issue(13)))
+    expect(a.overall.percent).toBe(b.overall.percent)
+    expect(a.overall.label).toBe(b.overall.label)
+  })
+
+  test('the Now card is on the claimed Unit\'s stage', async () => {
+    const t = world()
+    const model = await load(t, jiraHost(t, () => issue(13)))
+    const first = model.sections.flatMap(one => one.items).find(item => item.isCurrent)
+    expect(first?.id).toBe('nfr-requirements')
+  })
+
+  test('a paused Unit says so on its stage', async () => {
+    const t = world(['- **Active Unit**: api-billing', '- **Unit State**: paused'])
+    const item = construction(await load(t, jiraHost(t, () => issue(13)))).items.find(one => one.id === 'nfr-requirements')
+    expect(item?.status).toBe('open')
+    expect(item?.statusWord).toBe('paused')
+  })
+
+  test('no Active Unit: Construction keeps the Units, counted by story points, and there is no Units section', async () => {
+    const t = world([])
+    const model = await load(t, jiraHost(t, () => issue(13)))
+    expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
+    const section = construction(model)
+    expect(section.items[0]?.id).toBe('unit:api-core')
+    expect(section.countLabel).toBe('8/29 pt')
+    expect(section.sideCount).toBe('1/4 units')
+    expect(section.titleTag).toBeUndefined()
+  })
+
+  test('an Active Unit that is none of the Units claims nothing', async () => {
+    const t = world(['- **Active Unit**: not-a-unit'])
+    const model = await load(t, jiraHost(t, () => issue(13)))
+    expect(model.sections.some(one => one.id === 'UNITS')).toBe(false)
+  })
+})
+
+describe('unitStageStatuses', () => {
+  const at = (phase: UnitProgress['phase'], stage: string) => [...unitStageStatuses({ phase, stage }).values()]
+  test('before the stage done, the stage itself active or paused, after it planned', () => {
+    expect(at('active', 'nfr-design')).toEqual(['done', 'done', 'active', 'planned', 'planned'])
+    expect(at('paused', 'nfr-design')).toEqual(['done', 'done', 'paused', 'planned', 'planned'])
+    expect(at('between', 'nfr-design')).toEqual(['done', 'done', 'done', 'planned', 'planned'])
+  })
+  test('built is all done; not started, or a stage it does not name, all planned', () => {
+    expect(at('done', '')).toEqual(['done', 'done', 'done', 'done', 'done'])
+    expect(at('planned', '')).toEqual(['planned', 'planned', 'planned', 'planned', 'planned'])
+    expect(at('active', 'unknown-stage')).toEqual(['planned', 'planned', 'planned', 'planned', 'planned'])
   })
 })

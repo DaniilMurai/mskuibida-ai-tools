@@ -8,6 +8,7 @@ import { item, ledgerModel, section, sideJobModel, stageModel, idleModel } from 
 import type { Gate, PanelModel } from '../../plugins/project-panel/types'
 import manifest from '../../plugins/project-panel/.claude-plugin/plugin.json'
 import { ADVANCE, desktopKit } from './kit'
+import { unitsModel } from './units-world'
 
 // The panel's modules are compiled with `h` as their JSX factory (the engine's); here it is React's.
 Object.assign(globalThis, { h: createElement, Fragment })
@@ -89,7 +90,12 @@ function designModel(): PanelModel {
   })
 }
 
+// Built by the real AI-DLC provider (async), before the page draws.
+const [unitsFree, unitsClaimed] = await Promise.all([unitsModel(false), unitsModel(true)])
+
 const SCENARIOS: Record<string, () => PanelModel | null> = {
+  'Construction: no Unit claimed (provider)': () => unitsFree,
+  'Construction: U3 claimed here (provider)': () => unitsClaimed,
   'Design sample (stage, PR in review)': designModel,
   'Screenshot: side job, local only': screenshotModel,
   'Test world: stage': () => stageModel(),

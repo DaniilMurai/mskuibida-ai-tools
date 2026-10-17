@@ -2,7 +2,7 @@
 import { t } from '../strings/en'
 import type { Gate, PanelModel, Section } from '../../types'
 import { CARD_FILL, isRich, safely, uniqueIds } from './kit'
-import { emptyRing } from './look'
+import { emptyRing, pill } from './look'
 import type { Ctx, El } from './kit'
 import { foldGutters, foldRow, gateCard, itemRow, openCap } from './item'
 import { clampPercent, mixOf, ring, strip } from './ring'
@@ -164,7 +164,7 @@ function phasePlan(ctx: Ctx, model: PanelModel, ids: string[], expanded: Record<
   // A card is its phase's heading: the same fold key, so a phase open in one column stays open in two.
   const phases = model.sections
     .map((section, index) => ({ section, id: ids[index]!, index, isOpen: isSectionOpen(section, ids[index]!, expanded) }))
-    .filter(phase => phase.section.isProposed !== true)
+    .filter(phase => phase.section.isProposed !== true && phase.section.isSupplement !== true)
   const firstProposed = model.sections.findIndex(section => section.isProposed === true)
   return (
     <Box flexDirection="column">
@@ -185,6 +185,10 @@ function phasePlan(ctx: Ctx, model: PanelModel, ids: string[], expanded: Record<
             {sectionBody(ctx, phase.section, phase.id, gatesOf(phase.index), expanded)}
           </Box>
         ))}
+      {/* A section that is no phase (the Units beside a claimed Unit) keeps its list row under the cards. */}
+      {model.sections.map(
+        (section, index) => section.isSupplement === true && section.isProposed !== true && sectionEl(ctx, section, ids[index]!, gatesOf(index), expanded, 0, false),
+      )}
       {model.sections.map((section, index) => section.isProposed === true && sectionEl(ctx, section, ids[index]!, [], expanded, 0, index === firstProposed))}
     </Box>
   )
@@ -242,6 +246,8 @@ function phaseCard(ctx: Ctx, section: Section, id: string, isOpen: boolean, gate
 function countText(section: Section): string {
   if (section.isProposed === true || section.status === 'skipped') return ''
   const isBuilt = section.status === 'built'
+  // A provider's own count (story points) stands in for done/total.
+  if (section.countLabel !== undefined && section.countLabel !== '') return isBuilt ? `${section.countLabel} ✓` : section.countLabel
   const count = section.counts && section.counts.total > 0 ? t('section.count', { done: String(section.counts.done), total: String(section.counts.total) }) : ''
   if (count === '') return isBuilt ? '✓' : ''
   return isBuilt ? `${count} ✓` : count
@@ -385,6 +391,7 @@ function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean,
           </Text>
         </Button>
       </Box>
+      {tagOf(ctx, section.titleTag, 'claude')}
       <Box flexGrow={1} />
       <Box flexShrink={0} gap={1}>
         {hiddenGates.length > 0 && (
@@ -393,8 +400,26 @@ function sectionHeading(ctx: Ctx, section: Section, id: string, isOpen: boolean,
           </Text>
         )}
         {!isOpen && ctx.bp !== 'S' && section.items.length >= STRIP_FROM_ITEMS && !isFinished(section) && strip(ctx, mixOf(section.items), ctx.bp === 'L' ? 96 : 64)}
+        {tagOf(ctx, section.sideCount, undefined)}
         {sectionTail(ctx, section, countWidth, !isRich(ctx))}
       </Box>
+    </Box>
+  )
+}
+
+/** A section's extra label (its title tag, its side count): a pill on the desktop, dim text on the terminal. */
+function tagOf(ctx: Ctx, text: string | undefined, color: string | undefined): El | false {
+  const { Box, Text } = ctx.kit
+  if (text === undefined || text === '') return false
+  return (
+    <Box flexShrink={1} minWidth={0} overflow="hidden">
+      {isRich(ctx) ? (
+        pill(ctx, text, color)
+      ) : (
+        <Text dimColor wrap="truncate-end">
+          {text}
+        </Text>
+      )}
     </Box>
   )
 }

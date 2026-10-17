@@ -90,6 +90,11 @@ export type RefreshEngine = {
   isRunning(): boolean
   /** Epoch ms of the latest successful check, changed or not; 0 before any. */
   checkedAt(): number
+  /**
+   * Epoch ms of the latest time the engine read the clock (every poll tick, check and read); 0 before any. The
+   * pane's "now" for its stamp: a render that read the clock itself would be redrawn by it, endlessly.
+   */
+  now(): number
 }
 
 export const DEBOUNCE_MS = 500
@@ -352,6 +357,8 @@ export function createRefreshEngine(ports: RefreshPorts, config: RefreshConfig):
   let lastHash: string | null = null
   let publishedError: string | undefined
   let lastCheckedAt = 0
+  /** The latest clock reading, for the pane's stamp (see `now()`). */
+  let lastNowAt = 0
   let isPlanFailing = false
   let isRemoteFailing = false
   /** The failed remote check's own line (a forge error carries one); '' = the generic one. */
@@ -465,12 +472,21 @@ export function createRefreshEngine(ports: RefreshPorts, config: RefreshConfig):
     }
   }
 
-  /** A check that found nothing to do still counts: the stamp moves, and the pane redraws only if its text would. */
+  /** Reads the clock (`fallback` when it fails) and remembers the reading for the pane's stamp. */
+  async function clockNow(fallback: number): Promise<number> {
+    const now = await safe(() => ports.now(), fallback)
+    lastNowAt = Math.max(lastNowAt, now)
+    return now
+  }
+
+  /**
+   * A check that found nothing to do still counts: the stamp moves, and the pane redraws only if its text would.
+   * While the plan fails to read nothing is checked, but the time still moves: the stamp ages ("checked 30s ago").
+   */
   async function markChecked(): Promise<void> {
-    if (isPlanFailing) return
-    const now = await safe(() => ports.now(), lastCheckedAt)
-    lastCheckedAt = now
-    const text = agoText(now, now)
+    const now = await clockNow(lastCheckedAt)
+    if (!isPlanFailing) lastCheckedAt = now
+    const text = agoText(now, lastCheckedAt)
     if (text === drawnText) return
     drawnText = text
     await safe(() => ports.invalidate(), undefined)
@@ -502,7 +518,7 @@ export function createRefreshEngine(ports: RefreshPorts, config: RefreshConfig):
     // A read just took fresh baselines: a resume right after it has nothing to catch up on.
     isStale = false
     if (model !== null && model.watch.length > 0) knownWatch = model.watch
-    const now = await safe(() => ports.now(), model?.readAt ?? lastCheckedAt)
+    const now = await clockNow(model?.readAt ?? lastCheckedAt)
     lastCheckedAt = now
     if (pendingFingerprint !== null && seq > pendingFingerprint.afterSeq) {
       fingerprintBase = pendingFingerprint.value
@@ -688,7 +704,7 @@ export function createRefreshEngine(ports: RefreshPorts, config: RefreshConfig):
     async seed(model, before) {
       if (!config.isEnabled) return model
       generation++
-      const now = await safe(() => ports.now(), model?.readAt ?? 0)
+      const now = await clockNow(model?.readAt ?? 0)
       lastCheckedAt = now
       last = model === null ? null : withFreshness(model, now, undefined)
       lastHash = model === null ? '' : modelHash(model)
@@ -792,6 +808,7 @@ export function createRefreshEngine(ports: RefreshPorts, config: RefreshConfig):
 
     isRunning: () => isRunning,
     checkedAt: () => lastCheckedAt,
+    now: () => lastNowAt,
   }
   return engine
 }

@@ -247,6 +247,25 @@ export type Section = {
   isUncounted?: boolean
   /** Suggested by the provider, not declared in the plan: the row is dimmed and tagged. */
   isProposed?: boolean
+  /**
+   * Display text that replaces the "4/8" count (a provider-resolved `0/45 pt`); '' or absent = the count. Built
+   * sections still get their ✓.
+   */
+  countLabel?: string
+  /** A second count shown before the main one (`0/6 units`), drawn as a grey pill on the desktop; display text. */
+  sideCount?: string
+  /** What the section is narrowed to, beside its title (`U3 u3-day-page`), an accent pill on the desktop; display text. */
+  titleTag?: string
+  /**
+   * Not a phase of its own (the Units of a Construction narrowed to one Unit): drawn in the list, but left out of the
+   * phase stepper and the wide pane's phase cards.
+   */
+  isSupplement?: boolean
+  /**
+   * A closer view of work another section already counts (one claimed Unit's own stages): drawn with its own ring
+   * and count, left out of the plan's totals.
+   */
+  isDetail?: boolean
   items: Item[]
 }
 
