@@ -55,10 +55,23 @@ export const RANK: Record<StageMarker, number> = {
 
 // ── pull requests onto stages ────────────────────────────────────────────────
 
-export type BranchOptions = { stageBranchPattern: string; foldSeparator: string }
+export type BranchOptions = {
+  stageBranchPattern: string
+  foldSeparator: string
+  /**
+   * The plan's phases by name in lower case (`inception`), each with its executed stages in plan order: a branch whose
+   * last segment names one (`docs/inception`, `semka/construction`) carries all of them, one PR for the whole phase.
+   */
+  phases?: Readonly<Record<string, readonly string[]>>
+}
 
 /** A pull request and the stages its branch carries, in plan order (only slugs that are rows of the state). */
-export type Mapped = { pr: StagePr; stages: string[] }
+export type Mapped = {
+  pr: StagePr
+  stages: string[]
+  /** The branch names a phase (`docs/inception`), not stages: it carries the phase, not a redo of what already landed. */
+  isPhase?: boolean
+}
 
 /** The ticket of a stage branch, or null when the branch is not one. */
 export function ticketOf(branch: string, o: BranchOptions): string | null {
@@ -70,11 +83,27 @@ export function ticketOf(branch: string, o: BranchOptions): string | null {
  * in order), so the ones between the named ones are carried too.
  */
 export function stagesOf(branch: string, order: readonly string[], o: BranchOptions): string[] {
+  return carriedBy(branch, order, o).stages
+}
+
+/** The stages a branch carries, and whether it carries them as a phase branch (by the phase's name, not the stages'). */
+export function carriedBy(branch: string, order: readonly string[], o: BranchOptions): { stages: string[]; isPhase: boolean } {
   const found = matchStageBranch(branch, o.stageBranchPattern, o.foldSeparator)
-  if (!found) return []
-  const at = found.stages.map(slug => order.indexOf(slug)).filter(index => index >= 0)
-  if (at.length === 0) return []
-  return order.slice(Math.min(...at), Math.max(...at) + 1)
+  const at = (found?.stages ?? []).map(slug => order.indexOf(slug)).filter(index => index >= 0)
+  if (at.length > 0) return { stages: order.slice(Math.min(...at), Math.max(...at) + 1), isPhase: false }
+  const phase = phaseStagesOf(branch, order, o)
+  return { stages: phase, isPhase: phase.length > 0 }
+}
+
+/**
+ * A phase branch's stages: a branch whose last `/` segment is a phase's name (`docs/inception`, `semka/Construction`)
+ * carries every executed stage of it, in plan order; [] otherwise. Only the last segment: a branch that starts with a
+ * phase (`inception/mvp-to-refined-mockups`) may be a part of it. Asked only when the branch names no stage.
+ */
+function phaseStagesOf(branch: string, order: readonly string[], o: BranchOptions): string[] {
+  const last = branch.split('/').pop()?.toLowerCase() ?? ''
+  const named = new Set(o.phases?.[last] ?? [])
+  return order.filter(slug => named.has(slug))
 }
 
 /**
@@ -94,10 +123,12 @@ export function mapPrs(
       const at = pr.mergedAt === null ? Number.NaN : Date.parse(pr.mergedAt)
       if (!(at >= o.startMs)) continue
     }
+    // A branch the stage pattern reads names its ticket, and on a stage branch only the session's ticket counts; a
+    // phase branch (docs/inception) names none, so no ticket rules it out.
     const found = matchStageBranch(pr.headRefName, o.stageBranchPattern, o.foldSeparator)
-    if (!found || (o.ticket !== null && found.ticket !== o.ticket)) continue
-    const stages = stagesOf(pr.headRefName, order, o)
-    if (stages.length > 0) out.push({ pr, stages })
+    if (found && o.ticket !== null && found.ticket !== o.ticket) continue
+    const { stages, isPhase } = carriedBy(pr.headRefName, order, o)
+    if (stages.length > 0) out.push(isPhase ? { pr, stages, isPhase } : { pr, stages })
   }
   return out
 }
@@ -246,15 +277,21 @@ export function derive(local: ParsedState, two: Two): Derived {
   const merged = two.mapped
     .filter(m => m.pr.state === 'MERGED')
     .sort((a, b) => Date.parse(b.pr.mergedAt ?? '') - Date.parse(a.pr.mergedAt ?? '') || b.pr.number - a.pr.number)
-  const ownerOf = new Map<string, Mapped>()
-  for (const m of open) for (const slug of m.stages) if (!ownerOf.has(slug)) ownerOf.set(slug, m)
-
   // A merged PR that carries a stage landed it, even when the local `origin/<base>` is behind and still shows the
   // old box. A stage main is revising is the one exception: that is later work than the merge.
   const hasMerged = new Set(merged.flatMap(m => m.stages))
   const effective = (slug: string): StageMarker => {
     const m = mainMarker(slug)
     return m !== 'completed' && m !== 'revising' && hasMerged.has(slug) ? 'completed' : m
+  }
+  // An open PR owns the stages its branch carries. A phase PR (docs/inception) carries its phase, not a redo of the
+  // stages of it already on main: those stay merged (its changed files can still reopen one, below).
+  const ownerOf = new Map<string, Mapped>()
+  for (const m of open) {
+    for (const slug of m.stages) {
+      if (m.isPhase === true && effective(slug) === 'completed') continue
+      if (!ownerOf.has(slug)) ownerOf.set(slug, m)
+    }
   }
   // A PR's own chips sit on the first stage of its group that is not merged on main.
   const chipAt = new Map<number, string>()
@@ -267,7 +304,7 @@ export function derive(local: ParsedState, two: Two): Derived {
   const reopened = new Map<string, StagePr>()
   for (const m of open.slice(0, REOPEN_CAP)) {
     const changed = two.files.get(m.pr.number) ?? []
-    const first = m.stages[0]
+    const first = m.isPhase === true ? m.stages.find(slug => ownerOf.get(slug) === m) : m.stages[0]
     if (changed.length === 0 || first === undefined) continue
     for (const slug of order.slice(0, order.indexOf(first))) {
       const dir = `${two.prefix}${(phaseOf.get(slug) ?? '').toLowerCase()}/${slug}/`

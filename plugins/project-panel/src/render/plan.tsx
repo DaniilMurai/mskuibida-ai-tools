@@ -20,7 +20,7 @@ const OPEN_CAP = { S: 8, M: 12, L: 20 } as const
 const STRIP_FROM_ITEMS = 10
 
 /** The Plan fold's state key: `#` keeps it clear of every section id. */
-const PLAN_KEY = '#plan'
+export const PLAN_KEY = '#plan'
 
 /** The overall percent and the line that says it: the provider's own label, else "50% done, 11 of 22". */
 function overallText(model: PanelModel): { value: number | undefined; summary: string } {
