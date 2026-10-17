@@ -422,7 +422,8 @@ Construction narrows to that Unit:
 
 - **Construction** is the Unit's own walk through the five per-unit stages, each where that Unit stands on it (before the
   stage it is on done, that one in progress or `paused`, the rest planned; all done once it is built), counted one row
-  each. The Unit is a tag beside the title (an accent pill on the desktop). The phase stepper's Construction node shows
+  each (`1/5`; no points: the Unit's points are counted once, under Units, and its rows carry no `pt`). A fresh claim, with
+  no receipt or artifact yet, is on the workflow's own `Current Stage` (0.19.1). The Unit is a tag beside the title (an accent pill on the desktop). The phase stepper's Construction node shows
   the same progress, and the Now card is on that stage. A stage's own gate (`[?]`) shows on its row, and hangs after it.
 - **Units** follows, folded: every Unit with its points, and the stages that run once (build-and-test, ci-pipeline), as
   the unclaimed Construction draws them, with the same counts. It is no phase: the stepper and the wide pane's phase
@@ -844,6 +845,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.19.1** — a claimed Unit's stages count `0/5`, with no points; a fresh claim is on the workflow's Current Stage, so the Now card names it.
 - **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.
 - **0.18.0** — phase branches (`docs/inception`) carry their whole phase; a press on the pane is taken by a `ui.press` hook, so the first press after the pane is shown again lands.
 - **0.17.0** — points shown: every phase counts its points (`7/8 pt`), every stage row says what it weighs (`1 pt`).

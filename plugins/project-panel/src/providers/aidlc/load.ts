@@ -295,7 +295,7 @@ function sectionsOf(
       if (units.claimed === '') return [list]
       // A Unit claimed at this checkout: Construction is that Unit's own walk through the per-unit stages, and every
       // Unit (with the stages that run once) moves to a Units section of its own, folded, which the plan counts.
-      const mine = claimedSectionOf(phase, progress, units, phaseNo, pointsOf)
+      const mine = claimedSectionOf(phase, progress, units, phaseNo, currentStage)
       mine.ordinal = String(phaseNo)
       list.id = UNITS_SECTION
       list.title = t('aidlc.section.units')
@@ -654,10 +654,15 @@ function claimedSectionOf(
   progress: PhaseStatus,
   units: UnitView,
   phaseNo: number,
-  pointsOf: (item: Item) => number,
+  currentStage: string,
 ): Section {
   const unit = units.units.find(one => one.name === units.claimed)!
-  const statuses = unitStageStatuses(units.progress.get(unit.name) ?? { phase: 'planned', stage: '' })
+  const known = units.progress.get(unit.name) ?? { phase: 'planned', stage: '' }
+  // Claimed and on its way, but no receipt or artifact says which stage yet (a fresh claim): the workflow's own
+  // Current Stage is the one this checkout is on.
+  const isOnItsWay = known.phase === 'active' || known.phase === 'paused' || known.phase === 'planned'
+  const fallback = known.stage === '' && isOnItsWay && PER_UNIT_STAGES.includes(currentStage)
+  const statuses = unitStageStatuses(fallback ? { phase: known.phase === 'paused' ? 'paused' : 'active', stage: currentStage } : known)
   const items: Item[] = phase.stages
     .map((stage, at) => ({ stage, ordinal: ordinalOf(phaseNo, at + 1) }))
     .filter(({ stage }) => PER_UNIT_STAGES.includes(stage.slug))
@@ -678,7 +683,11 @@ function claimedSectionOf(
       return item
     })
   const points = units.points.get(unit.name)?.points ?? 0
-  const section = withCounts(phase, progress, items, t('aidlc.unit.claimed', { unit: unitTitle(unit), points: formatPoints(points) }), pointsOf)
+  // Its stages are counted one each, done of all ("1/5"): the Unit's points are counted once, under Units, and a
+  // stage of a Unit has no points of its own, so no `pt` count and no `1 pt` on its rows.
+  const section = withCounts(phase, progress, items, t('aidlc.unit.claimed', { unit: unitTitle(unit), points: formatPoints(points) }), () => 1)
+  delete section.countLabel
+  for (const item of section.items) delete item.points
   section.titleTag = unitTitle(unit)
   section.isDetail = true
   return section

@@ -490,9 +490,9 @@ describe('a Unit claimed at this checkout', () => {
     expect(section.percent).toBe(20)
     expect(section.ordinal).toBe('3')
     expect(section.isDetail).toBe(true)
-    expect(section.countLabel).toBe('1/5 pt')
-    // Each of its stages says what it weighs.
-    expect(section.items.map(item => item.points)).toEqual(['1 pt', '1 pt', '1 pt', '1 pt', '1 pt'])
+    // Its stages are counted one each (1/5), with no points: the Unit's points are counted under Units.
+    expect(section.countLabel).toBeUndefined()
+    expect(section.items.map(item => item.points)).toEqual([undefined, undefined, undefined, undefined, undefined])
   })
 
   test('every Unit, with the stages that run once, moves to a folded Units section that is no phase', async () => {
@@ -523,6 +523,26 @@ describe('a Unit claimed at this checkout', () => {
     const model = await load(t, jiraHost(t, () => issue(13)))
     const first = model.sections.flatMap(one => one.items).find(item => item.isCurrent)
     expect(first?.id).toBe('nfr-requirements')
+  })
+
+  test('a fresh claim, with no receipt yet: the workflow\'s Current Stage is the claimed Unit\'s, and the Now card is on it', async () => {
+    const fresh = tree(stateText({}, ['- **Active Unit**: web-billing', '- **Unit State**: in-progress']).replace('- **Current Stage**: code-generation', '- **Current Stage**: functional-design'), {
+      [`${INTENT_DIR}/audit/host-a.md`]: shard,
+      [POINTS_PATH]: POINTS,
+      [`${s.ROOT}/.mcp.json`]: MCP_JSON,
+    })
+    const model = await load(fresh, jiraHost(fresh, () => issue(13)))
+    const section = construction(model)
+    expect(section.titleTag).toBe('U4 web-billing')
+    expect(section.items.map(item => [item.id, item.status, item.isCurrent])).toEqual([
+      ['functional-design', 'open', true],
+      ['nfr-requirements', 'planned', false],
+      ['nfr-design', 'planned', false],
+      ['infrastructure-design', 'planned', false],
+      ['code-generation', 'planned', false],
+    ])
+    expect(section.counts).toEqual({ done: 0, total: 5 })
+    expect(model.sections.flatMap(one => one.items).find(item => item.isCurrent)?.id).toBe('functional-design')
   })
 
   test('a paused Unit says so on its stage', async () => {
