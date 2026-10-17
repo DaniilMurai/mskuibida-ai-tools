@@ -445,10 +445,26 @@ Construction narrows to that Unit:
      `unit,points` header; a side job only keeps it in the store. An issue with no points, or a call that fails (server not
      connected, signed out), is asked again after an hour.
   3. `5`, shown as `5 pt, default` in the warning tone.
-- **Progress.** A Unit counts its points once done, nothing before. Construction's ring weighs the Units together as
-  many rows as there are Units, shared out by points (U1's 8 of 29 points is 4 × 8/29 rows), and each run-once stage
-  1 row. The plan does the same with every other stage at 1 row, so each phase counts by its rows and Construction's
-  share by points; the heading says so: `39% done, Construction by story points, 3 of 8`.
+- **Progress, by story points (0.16.0).** Every stage is 1 story point, a Unit its own points, so the plan weighs
+  building at what it was estimated against the stages around it. A Unit counts its points once done, nothing before.
+  Construction's ring is its Units' points plus 1 point per run-once stage; the plan's percent is every stage's points
+  plus every Unit's, and the heading says so: `23% done by story points, 14 of 62 pt` (15 stages outside Construction,
+  45 Unit points, build-and-test and ci-pipeline). Before 0.16.0 the Units shared as many rows as there were Units,
+  so 45 points of building weighed what 8 planning stages did.
+- **`stage-story-points.txt`.** `<intent>/stage-story-points.txt` overrides a stage's points, or the rate for every
+  stage it does not name. One `<stage>: <points>` per line (`=`, `,` or spaces work as the separator too), `default:
+  <points>` for the rest; blank lines and `#` comments are skipped, names match in any case, and the last line for a
+  stage wins. Every ring and the plan follow it, and with the file the heading counts in points even before there are
+  Units. A name that is no stage of the plan, or a line that is not `<stage>: <points>`, counts nothing, and Needs
+  attention says `stage-story-points.txt has lines that count nothing` and names them. The file is watched: an edit
+  re-reads.
+
+  ```
+  # design is heavier here
+  default: 1
+  domain-design: 3
+  build-and-test: 2
+  ```
 - **Commit the file.** While `git status --porcelain` shows `unit-points.csv` changed or new, Needs attention carries
   `unit-points.csv not committed`: the panel may have added Jira's points, and a pre-review check that refuses
   uncommitted files would otherwise be a surprise.
@@ -767,6 +783,7 @@ src/providers/aidlc/parse-state.ts  aidlc-state.md -> ParsedState (pure, only ty
 src/providers/aidlc/load.ts       -> PanelModel
 src/providers/aidlc/units.ts      Construction by Unit: the units block, the index's IDs and Jira keys, the audit receipts, progress
 src/providers/aidlc/points.ts     each Unit's story points: unit-points.csv, then Jira through the session's MCP, then 5
+src/providers/aidlc/stage-points.ts  each stage's story points: 1, or stage-story-points.txt (pure)
 src/providers/aidlc/two.ts        the second truth: main's state file, the PRs, changed files, rev-list (I/O)
 src/providers/aidlc/truths.ts     merged / in-pr / local per stage, chips, folds, reopens, gates, base line (pure)
 src/providers/aidlc/prs.ts        every forge call of the AI-DLC provider (through src/forge: `gh` or `glab`), its caches, the fingerprint
@@ -811,6 +828,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.16.0** — the plan by story points: every stage 1 point, a Unit its own, overridable per stage in `stage-story-points.txt`.
 - **0.15.0** — Construction by Unit counted by story points (`8/29 pt`) with the Units done beside them (`1/4 units`); a Unit claimed at this checkout (`Active Unit`) narrows Construction to its own stages, with every Unit under a folded Units section.
 - **0.14.1** — buttons work on the first click: the pane's render no longer reads the clock, which redrew it continually and retired its buttons' press handles under the pointer.
 - **0.14.0** — a dim `project-panel <version>` mark at the foot of the pane, read from the manifest the mod was loaded from, so you can tell which build is drawing it.
