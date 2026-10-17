@@ -92,3 +92,28 @@ describe('Construction by story points and a claimed Unit, drawn', () => {
     await ui.unmount()
   })
 })
+
+describe('stage points, drawn', () => {
+  const model = (): PanelModel => {
+    const base = stageModel()
+    const inception = base.sections.find(one => one.id === 'INCEPTION')!
+    inception.items = inception.items.map(one => ({ ...one, points: one.id === 'domain-design' ? '3 pt' : '1 pt' }))
+    inception.countLabel = '4/10 pt'
+    inception.isCollapsed = false
+    return base
+  }
+  for (const surface of ['terminal', 'desktop'] as const) {
+    test(`each stage row shows its points after its chips, and the phase its points count, on ${surface}`, async ($, on) => {
+      const ui = await draw($, on, model(), surface)
+      const texts = await shown(ui)
+      expect(texts).toContain('3 pt')
+      expect(texts.filter(text => text === '1 pt').length).toBeGreaterThan(3)
+      expect(texts).toContain('4/10 pt')
+      const all = (await (ui as Probe).findAll({ type: 'Text' })) as Found[]
+      const pill = all.find(el => bare(el.text) === '3 pt')
+      if (surface === 'desktop') expect(typeof pill?.props.backgroundColor).toBe('string')
+      else expect(pill?.props.dimColor).toBe(true)
+      await ui.unmount()
+    })
+  }
+})

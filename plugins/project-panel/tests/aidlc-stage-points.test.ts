@@ -102,3 +102,24 @@ describe('the plan by stage points', () => {
     expect((await load(world('domain-design: 4\n'))).gates.some(one => one.id === 'stage-points')).toBe(false)
   })
 })
+
+describe('points shown', () => {
+  test('every phase counts its points and every stage says what it weighs; a skipped stage says nothing', async () => {
+    const model = await load(world('domain-design: 4\n'))
+    const inception = model.sections.find(one => one.id === 'INCEPTION')!
+    expect(inception.countLabel).toBe('2/6 pt')
+    expect(inception.items.map(item => [item.id, item.points ?? null])).toEqual([
+      ['requirements-analysis', '1 pt'],
+      ['user-stories', '1 pt'],
+      ['domain-design', '4 pt'],
+      ['units-generation', null],
+    ])
+  })
+
+  test('the phases add up to the plan', async () => {
+    const model = await load(world('default: 2\ndomain-design: 6\n'))
+    const totals = model.sections.map(one => Number((one.countLabel ?? '0/0').split('/')[1]?.replace(' pt', '') ?? 0))
+    expect(totals.reduce((sum, n) => sum + n, 0)).toBe(10)
+    expect(model.overall.label).toBe('40% done by story points, 4 of 10 pt')
+  })
+})

@@ -451,6 +451,11 @@ Construction narrows to that Unit:
   plus every Unit's, and the heading says so: `23% done by story points, 14 of 62 pt` (15 stages outside Construction,
   45 Unit points, build-and-test and ci-pipeline). Before 0.16.0 the Units shared as many rows as there were Units,
   so 45 points of building weighed what 8 planning stages did.
+- **Points shown (0.17.0).** Every phase's count is its points done of all (`7/8 pt`, Construction `0/47 pt`: its 45
+  Unit points and its two run-once stages), so the phases add up to the plan's total. Every stage row says what it
+  weighs, after its chips (`1 pt`, a grey pill on the desktop, dim on the terminal); a Unit says it in its own chip, and a
+  skipped stage, or one of a Construction not counted yet, says nothing. Construction keeps `0/6 units` beside its
+  count.
 - **`stage-story-points.txt`.** `<intent>/stage-story-points.txt` overrides a stage's points, or the rate for every
   stage it does not name. One `<stage>: <points>` per line (`=`, `,` or spaces work as the separator too), `default:
   <points>` for the rest; blank lines and `#` comments are skipped, names match in any case, and the last line for a
@@ -828,6 +833,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.17.0** — points shown: every phase counts its points (`7/8 pt`), every stage row says what it weighs (`1 pt`).
 - **0.16.0** — the plan by story points: every stage 1 point, a Unit its own, overridable per stage in `stage-story-points.txt`.
 - **0.15.0** — Construction by Unit counted by story points (`8/29 pt`) with the Units done beside them (`1/4 units`); a Unit claimed at this checkout (`Active Unit`) narrows Construction to its own stages, with every Unit under a folded Units section.
 - **0.14.1** — buttons work on the first click: the pane's render no longer reads the clock, which redrew it continually and retired its buttons' press handles under the pointer.

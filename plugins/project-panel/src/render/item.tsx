@@ -242,6 +242,15 @@ export function itemRow(ctx: Ctx, item: Item, fold: string): El {
           )}
         </Box>
         {chipsOf(ctx, item.chips)}
+        {item.points !== undefined && item.points !== '' && (
+          <Box flexShrink={0}>
+            {rich ? (
+              pill(ctx, item.points, undefined)
+            ) : (
+              <Text dimColor>{item.points}</Text>
+            )}
+          </Box>
+        )}
         <Box flexGrow={1} />
         {hasWord && (
           <Box flexShrink={isWordCut ? 2 : 0} minWidth={isWordCut ? WORD_FLOOR : undefined} overflow={isWordCut ? 'hidden' : undefined}>

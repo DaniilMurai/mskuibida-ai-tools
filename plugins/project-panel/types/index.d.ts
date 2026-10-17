@@ -225,6 +225,8 @@ export type Item = {
    * (one PR spanning several stages). Not display text; a lone item draws none.
    */
   group?: string
+  /** What the item weighs in the plan (`1 pt`), drawn after its chips (a grey pill on the desktop); display text. */
+  points?: string
 }
 
 export type Section = {

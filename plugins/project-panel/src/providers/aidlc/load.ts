@@ -310,6 +310,8 @@ function sectionsOf(
       // it is counted yet, in its own row or the plan's.
       delete section.counts
       delete section.percent
+      delete section.countLabel
+      for (const item of section.items) delete item.points
       section.isUncounted = true
     }
     return section
@@ -404,6 +406,17 @@ function withCounts(
   if (caption !== '') section.caption = caption
   const percent = weightedPercent(executed, weightOf)
   if (percent !== null) section.percent = percent
+  // Counted in story points, what the plan adds up: `7/8 pt` (a stage 1 unless the file says, a Unit its own).
+  const donePoints = executed.filter(isCountedDone).reduce((sum, item) => sum + weightOf(item), 0)
+  const allPoints = executed.reduce((sum, item) => sum + weightOf(item), 0)
+  const label = t('aidlc.units.count', { done: formatPoints(donePoints), total: formatPoints(allPoints) })
+  if (allPoints > 0 && label !== '') section.countLabel = label
+  // Each stage says what it weighs; a Unit says it in its own chip, and a skipped stage weighs nothing.
+  for (const item of items) {
+    if (item.status === 'skipped' || item.chips.some(chip => chip.kind === 'unit')) continue
+    const points = t('aidlc.stage.points', { points: formatPoints(weightOf(item)) })
+    if (points !== '') item.points = points
+  }
   return section
 }
 
@@ -623,10 +636,8 @@ function unitSectionOf(
     t('aidlc.units.caption', { units: String(doneUnits.length), count, done: formatPoints(donePoints), total: formatPoints(allPoints) }),
     weightOf,
   )
-  // Counted by story points, with the Units done beside them: the rows are not what the work weighs.
-  const countLabel = t('aidlc.units.count', { done: formatPoints(donePoints), total: formatPoints(allPoints) })
+  // The phase's points (its Units' and its run-once stages') are the count; the Units done stand beside them.
   const sideCount = t('aidlc.units.done', { done: String(doneUnits.length), total: count })
-  if (countLabel !== '') section.countLabel = countLabel
   if (sideCount !== '') section.sideCount = sideCount
   return section
 }

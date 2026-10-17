@@ -112,6 +112,7 @@ export const en = {
   // Construction counts by points, and the rows about the points file ({file}; {units} the Unit IDs it repeats).
   'aidlc.units.caption': '{units} of {count} units done, {done} of {total} story points',
   'aidlc.units.count': '{done}/{total} pt',
+  'aidlc.stage.points': '{points} pt',
   'aidlc.units.done': '{done}/{total} units',
   'aidlc.section.units': 'Units',
   'aidlc.unit.claimed': '{unit}, {points} pt: claimed at this checkout',
