@@ -106,7 +106,15 @@ read keeps failing (the stamp then ages: `checked 30s ago`).
 **Presses (0.18.0).** A press on the pane is taken by a `ui.press` hook, from the button's key and the state now
 (`src/render/press.ts`), not left to the drawing's `onPress` closure: a pane hidden and shown again repaints its last
 drawing, whose closures the surface had let go, and the first press on it was lost. A key the pane does not draw now goes
-on to the closure. The clock and the error line below come from
+on to the closure.
+
+**Steady press handles (0.21.0).** The hook alone did not stop the lost first press: `<Button>` mints a fresh press
+handle on every call, the host retires a drawing's handles when the next drawing arrives, and the host checks the handle
+before any `ui.press` hook runs. A press from a drawing the surface had not replaced yet (a poll's redraw, a pane shown
+again) named a retired handle and was dropped (`ui_press not handled` in the desktop app's log); the second press, on the
+new drawing, worked. Every button now keeps the handle its key was first drawn with (`src/render/steady.ts`, applied in
+both render hooks), and the host keeps a handle the plugin draws again, so a press lands on whichever drawing is on
+screen. The clock and the error line below come from
 the refresh engine (`src/refresh.ts`), which fills `freshness` on the model; `hooks/register.tsx` passes the clock. When the latest re-read or remote
 check failed, a red line under the header says so, the same text is the first Attention row, and the panel keeps the
 last good model.
@@ -436,8 +444,15 @@ its UUID where `intents.json` has one) — a worktree or the main checkout — C
   unit-major iteration), its row decides, stage by stage: `[x]` done, `[-]` in progress, `[?]` waiting on the person's
   approval, `[R]` revising, `[ ]` not started. A stage whose work is finished but not approved is `[?]` there even though
   its `UNIT_COMPLETED` receipt is written, so it is drawn waiting on approval, never done: `functional-design awaits
-  approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. Without the
-  table, the receipts and artifacts below decide.
+  approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. The engine
+  rewrites the table only when `/aidlc` routes, so a stage that started since can still read `[ ]` there: a cell at
+  `[ ]` whose latest receipt is `UNIT_STARTED`, `UNIT_RESUMED` or `UNIT_PAUSED` is in progress (0.20.1). A cell past `[ ]`
+  stays the table's. A stage a Unit's kind does not owe is `[x]` there too, unrun (0.21.0): units-generation tags each
+  Unit `kind: service|spec|ui|packaging|library`, and a per-unit stage none of whose `produces` its `produces_kinds` map
+  gives that kind does not apply (the engine's own rule). The panel reads those maps from the workspace's engine install
+  (`.claude/aidlc-common/stages/construction/<stage>.md`, or the other agents' install folders) and draws such a stage
+  skipped, not done: a packaging Unit nobody has started is not started, and a claimed one counts `0/4`. Without the
+  stage files every stage counts as the table says. Without the table, the receipts and artifacts below decide.
 - **A Unit is done** when code-generation, its last per-unit stage, is settled for it: a `UNIT_COMPLETED` receipt in the
   audit shards when one is owed (Construction Checkpoints enabled, or any `UNIT_*` row exists), else its four
   code-generation artifacts under `construction/<unit>/code-generation/`. code-generation's own `[x]` means every Unit
@@ -859,6 +874,8 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.21.0** — buttons keep one press handle per key across redraws, so the first press lands on a drawing the surface has not replaced yet (Put in prompt and folds no longer take a second click); a Unit stage its kind does not owe is skipped, not done, so an unstarted packaging Unit reads not started.
+- **0.20.1** — a stage that started after the engine last wrote its Unit Progress table is in progress, not up next, so the stale Next goes too.
 - **0.20.0** — the claim is the checkout's `aidlc/.aidlc-unit-scope.json`, not the state's Active Unit; Unit progress follows the engine's `## Unit Progress` table, so a stage waiting on approval is not shown done.
 - **0.19.1** — a claimed Unit's stages count `0/5`, with no points; a fresh claim is on the workflow's Current Stage, so the Now card names it; a park the engine left in the state after work resumed (a later `STAGE_STARTED`/`UNIT_STARTED`/`WORKFLOW_UNPARKED` in the audit) is not shown; a running stage names no Next.
 - **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.
