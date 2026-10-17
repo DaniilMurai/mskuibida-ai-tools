@@ -43,7 +43,8 @@ describe('up next', () => {
     const item = itemOf(model, 'domain-design')
     expect(item).toMatchObject({ status: 'planned', statusWord: 'up next', isCurrent: true, chips: [] })
     expect(item).not.toHaveProperty('landing')
-    expect(model.overall.counts).toEqual({ done: 2, open: 1, planned: 3, total: 6 })
+    // refined-mockups is checked off here (in PR #33): it counts as done by the local state.
+    expect(model.overall.counts).toEqual({ done: 3, planned: 3, total: 6 })
     expect(model.gates.map(gate => [gate.kind, gate.afterItemId])).toEqual([
       ['pr-not-merged', 'refined-mockups'],
       ['parked', 'refined-mockups'],
@@ -91,8 +92,9 @@ describe('pushed work is not "local only"', () => {
     const { model, s } = await aload(noDesign({ pushed: [branchOf('refined-mockups')] }))
     expect(s.lines()).toContain(`git -C ${REPO} rev-parse --verify --quiet refs/remotes/origin/${branchOf('refined-mockups')}`)
     const item = itemOf(model, 'refined-mockups')
-    expect(item).toMatchObject({ landing: 'in-pr', status: 'open', statusWord: 'not merged', chips: [] })
-    expect(model.overall.counts.done).toBe(2)
+    expect(item).toMatchObject({ landing: 'in-pr', status: 'open', statusWord: 'not merged', chips: [], isFinishedLocal: true })
+    // Checked off here: it counts as done, merged or not.
+    expect(model.overall.counts.done).toBe(3)
     expect(model.header.base).toBe('main: refined-mockups not merged yet')
     expect(itemOf(model, 'domain-design')).toMatchObject({ status: 'planned', statusWord: 'up next' })
   })

@@ -91,13 +91,16 @@ describe('the regression: refined-mockups in PR #33, domain-design only in this 
     expect(model.header.mode).toBe('stage')
   })
 
-  test('only merged counts as done: overall, the section ring and the section status', async () => {
+  test('progress follows the local state: a stage checked off here counts as done, in its open PR or not', async () => {
     const { model } = await aload(regression())
-    expect(model.overall.counts).toEqual({ done: 2, open: 2, planned: 2, total: 6 })
-    expect(model.overall.percent).toBe(33)
+    // requirements-analysis and user-stories merged; refined-mockups [x] here, in PR #33; domain-design in progress.
+    expect(model.overall.counts).toEqual({ done: 3, open: 1, planned: 2, total: 6 })
+    expect(model.overall.percent).toBe(50)
+    expect(itemOf(model, 'refined-mockups')).toMatchObject({ status: 'open', landing: 'in-pr', isFinishedLocal: true })
     const inception = sectionOf(model, 'INCEPTION')
-    expect(inception.counts).toEqual({ done: 2, total: 6 })
-    expect(inception.percent).toBe(33)
+    expect(inception.counts).toEqual({ done: 3, total: 6 })
+    expect(inception.percent).toBe(50)
+    // The phase's own status is still main's: work done here does not make it partial.
     expect(inception.status).toBe('active')
     expect(inception.isCollapsed).toBe(false)
   })

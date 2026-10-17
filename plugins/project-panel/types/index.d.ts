@@ -204,8 +204,9 @@ export type Item = {
   /** Where the item's progress lives (M3); drives the glyph: ✓ merged, ◐ in-pr, ◌ local. */
   landing?: Landing
   /**
-   * Finished (checked off) in this working tree but not landed anywhere (landing `local`): the status is still
-   * open and the row is drawn ◌ "local only", yet counts, rings and the plan's percent take it as done.
+   * Finished (checked off) in this working tree's state but not landed on main: local only, pushed, or in an open PR.
+   * The status stays open and the row says where it is (◌ "local only", ◐ "in review"), yet counts, rings and the
+   * plan's percent take it as done: progress follows the local state, not main.
    */
   isFinishedLocal?: boolean
   /**

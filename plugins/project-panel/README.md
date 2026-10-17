@@ -529,7 +529,7 @@ tree's copy and `origin/<default>`'s — and maps the repository's PRs onto stag
 | up next | not done on main, current or marked in progress here, and nothing written in its `<phase>/<stage>/` folder yet | `○ up next` — a stage the engine moved to, not work in progress |
 | (none) | otherwise | main's own status (running, parked) as before |
 
-Merged stages count as done, in the rings and the plan's percent, and so do stages **finished here but not landed yet** (`[x]` in this worktree, drawn `◌ local only` or `◌ pushed, no PR`; 0.11.0): the plan shows what you have done, the glyph still says it is not on main. A stage in review or in progress does not count. Phases take main's Phase Progress, so finished-here work does not turn a phase `partial`.
+Merged stages count as done, in the rings and the plan's percent, and so does every stage **checked off in this checkout's state** but not on main yet (`[x]` here): drawn `◌ local only` or `◌ pushed, no PR` (0.11.0), or `◐ in review` in its open PR (0.19.0). Progress follows the local state; the glyph and the word still say where the work stands. A stage in progress (`[-]`) does not count. Phases take main's Phase Progress, so finished-here work does not turn a phase `partial`.
 
 - **Folds.** A branch carrying several stages (`dev/SHOP-7/domain-design--units-generation`) draws one bracket
   in the gutter across them, the PR chip on the first.
@@ -844,6 +844,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.
 - **0.18.0** — phase branches (`docs/inception`) carry their whole phase; a press on the pane is taken by a `ui.press` hook, so the first press after the pane is shown again lands.
 - **0.17.0** — points shown: every phase counts its points (`7/8 pt`), every stage row says what it weighs (`1 pt`).
 - **0.16.0** — the plan by story points: every stage 1 point, a Unit its own, overridable per stage in `stage-story-points.txt`.
