@@ -436,8 +436,10 @@ its UUID where `intents.json` has one) — a worktree or the main checkout — C
   unit-major iteration), its row decides, stage by stage: `[x]` done, `[-]` in progress, `[?]` waiting on the person's
   approval, `[R]` revising, `[ ]` not started. A stage whose work is finished but not approved is `[?]` there even though
   its `UNIT_COMPLETED` receipt is written, so it is drawn waiting on approval, never done: `functional-design awaits
-  approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. Without the
-  table, the receipts and artifacts below decide.
+  approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. The engine
+  rewrites the table only when `/aidlc` routes, so a stage that started since can still read `[ ]` there: a cell at
+  `[ ]` whose latest receipt is `UNIT_STARTED`, `UNIT_RESUMED` or `UNIT_PAUSED` is in progress (0.20.1). A cell past `[ ]`
+  stays the table's. Without the table, the receipts and artifacts below decide.
 - **A Unit is done** when code-generation, its last per-unit stage, is settled for it: a `UNIT_COMPLETED` receipt in the
   audit shards when one is owed (Construction Checkpoints enabled, or any `UNIT_*` row exists), else its four
   code-generation artifacts under `construction/<unit>/code-generation/`. code-generation's own `[x]` means every Unit
@@ -859,6 +861,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.20.1** — a stage that started after the engine last wrote its Unit Progress table is in progress, not up next, so the stale Next goes too.
 - **0.20.0** — the claim is the checkout's `aidlc/.aidlc-unit-scope.json`, not the state's Active Unit; Unit progress follows the engine's `## Unit Progress` table, so a stage waiting on approval is not shown done.
 - **0.19.1** — a claimed Unit's stages count `0/5`, with no points; a fresh claim is on the workflow's Current Stage, so the Now card names it; a park the engine left in the state after work resumed (a later `STAGE_STARTED`/`UNIT_STARTED`/`WORKFLOW_UNPARKED` in the audit) is not shown; a running stage names no Next.
 - **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.

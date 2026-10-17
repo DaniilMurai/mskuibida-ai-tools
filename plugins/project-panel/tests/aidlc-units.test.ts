@@ -1,8 +1,8 @@
 // Construction by Unit of work: the Units, their story points and their receipts in, one row per Unit out.
 import { test, expect, describe } from 'claude-code/testing'
 import { aidlc } from '../src/providers/aidlc'
-import { parseUnitDag, parseUnitEvents, parseUnitIndex, parseUnitProgress, parseUnitScope, progressOf, unitStageStatuses } from '../src/providers/aidlc/units'
-import type { Unit, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
+import { parseUnitDag, parseUnitEvents, parseUnitIndex, parseUnitProgress, parseUnitScope, progressOf, unitStageStatuses, withReceipts } from '../src/providers/aidlc/units'
+import type { Unit, UnitCell, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
 import { cloudIdsOf, jiraServerOf, parsePointsCsv, storyPointsOf, withRows } from '../src/providers/aidlc/points'
 import { isResumedAfter } from '../src/providers/aidlc/park'
 import { parseState } from '../src/providers/aidlc/parse-state'
@@ -729,6 +729,38 @@ describe("the engine's Unit Progress table", () => {
     const model = await load(world({ 'api-billing': ['?', ' ', ' ', ' ', ' ', '?'] }, null))
     expect(unitList(model).items.find(item => item.id === 'unit:api-billing')?.status).toBe('awaiting')
     expect(model.gates.find(gate => gate.id === 'awaiting:unit:api-billing')?.title).toBe('U3 api-billing awaits your approval')
+  })
+
+  test('a stage that started after the table was written is running, not up next, and names no Next', async () => {
+    // The table was written at functional-design's approval; nfr-requirements started since (its receipt says so).
+    const started = audit(
+      ['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'functional-design', 'api-billing'],
+      ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'functional-design', 'api-billing'],
+      ['2026-10-02T12:00:00Z', 'UNIT_STARTED', 'nfr-requirements', 'api-billing'],
+    )
+    const t = asStage(
+      tree(withTable(stateText(), { 'api-billing': ['x', ' ', ' ', ' ', ' ', '-'] }), {
+        [`${INTENT_DIR}/audit/host-a.md`]: started,
+        [POINTS_PATH]: POINTS,
+        ...claimOf('api-billing'),
+      }),
+    )
+    const model = await load(t)
+    const stages = construction(model).items.map(item => [item.id, item.status, item.isCurrent])
+    expect(stages.slice(0, 2)).toEqual([
+      ['functional-design', 'done', false],
+      ['nfr-requirements', 'open', true],
+    ])
+    expect(model.next).toBeUndefined()
+    expect(unitList(model).items.find(item => item.id === 'unit:api-billing')).toMatchObject({ status: 'open', statusWord: 'nfr-requirements' })
+  })
+
+  test('the table wins over a receipt for what it knows: a [?] stays waiting on approval', () => {
+    const table = withReceipts(new Map([['u', new Map<string, UnitCell>([['functional-design', '?'], ['nfr-requirements', ' ']])]]), [
+      { event: 'UNIT_COMPLETED', stage: 'functional-design', unit: 'u', at: '1' },
+      { event: 'UNIT_COMPLETED', stage: 'nfr-requirements', unit: 'u', at: '2' },
+    ])
+    expect([...(table.get('u') ?? new Map())]).toEqual([['functional-design', '?'], ['nfr-requirements', ' ']])
   })
 
   test('the table decides built, between and planned too', async () => {
