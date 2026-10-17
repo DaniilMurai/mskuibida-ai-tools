@@ -6,6 +6,8 @@ import { buildModel, fingerprintOf, runAction } from '../src/model'
 import { createRefreshEngine } from '../src/refresh'
 import type { RefreshEngine, RefreshPorts, Snapshot } from '../src/refresh'
 import { renderPane } from '../src/render'
+import type { Handlers } from '../src/render'
+import { pressAction } from '../src/render/press'
 import { manifestPath, versionOfManifest } from '../src/version'
 import { t } from '../src/strings/en'
 import type { PanelModel, PanelOptions } from '../types'
@@ -170,6 +172,31 @@ function bindEngine($: EngineInterface, settings: Settings, slot: EngineSlot, st
 
 async function engineOf($: EngineInterface, settings: Settings, slot: EngineSlot): Promise<RefreshEngine> {
   return slot.engine ?? bindEngine($, settings, slot, await $.session.root().catch(() => ''))
+}
+
+// What the pane's buttons do: the drawing's closures and the press hook both run these.
+function handlersOf($: EngineInterface, settings: Settings, slot: EngineSlot): Handlers {
+  return {
+    onRefresh: async () => {
+      await (await engineOf($, settings, slot)).readNow({ manual: true })
+    },
+    onToggle: async (sectionId, isOpen) => {
+      await update($, expandedAtom, folds => ({ ...folds, [sectionId]: isOpen }))
+    },
+    onAction: async actionId => {
+      // The provider that owns the plan answers; its model replaces the drawn one.
+      const running = await engineOf($, settings, slot)
+      const before = await running.snapshot().catch(() => undefined)
+      const acted = await runAction(await contextOf($, settings), actionId)
+      if (acted === null) return
+      // The engine adopts the provider's answer (a read still in flight drops its result), so the next poll does not re-publish it.
+      const adopted = await running.seed(acted, before)
+      await update($, modelAtom, () => adopted)
+    },
+    onFillNext: async command => {
+      await $.prompt.fill({ text: command, mode: 'replace' })
+    },
+  }
 }
 
 /** Opens the pane once for a desktop that attached after session start (`panel: auto`, a plan, not closed, not open). */
@@ -373,29 +400,29 @@ export const register: Register = (on, options) => {
     slot.engine?.noteRendered(now)
     void slot.engine?.wake().catch(() => undefined)
 
-    return renderPane($.ui.resolve(e), e.surface, e.props.bodyColumns, model, expanded, {
-      onRefresh: async () => {
-        await (await engineOf($, settings, slot)).readNow({ manual: true })
-      },
-      onToggle: async (sectionId, isOpen) => {
-        await update($, expandedAtom, folds => ({ ...folds, [sectionId]: isOpen }))
-      },
-      onAction: async actionId => {
-        // The provider that owns the plan answers; its model replaces the drawn one.
-        const running = await engineOf($, settings, slot)
-        const before = await running.snapshot().catch(() => undefined)
-        const acted = await runAction(await contextOf($, settings), actionId)
-        if (acted === null) return
-        // The engine adopts the provider's answer (a read still in flight drops its result), so the next poll does not re-publish it.
-        const adopted = await running.seed(acted, before)
-        await update($, modelAtom, () => adopted)
-      },
-      onFillNext: async command => {
-        await $.prompt.fill({ text: command, mode: 'replace' })
-      },
-    },
+    return renderPane($.ui.resolve(e), e.surface, e.props.bodyColumns, model, expanded, handlersOf($, settings, slot),
     // M2 hook point data: the clock the header's "checked {ago}" reads.
     { now, checkedAt: slot.engine?.checkedAt() ?? 0 },
     version)
+  })
+
+  // A press on the pane is taken here, from its key and the state now, not left to the drawing's closure: a pane
+  // hidden and shown again repaints its last drawing, whose closures the surface had let go, so the first press
+  // found none and was lost. A key the pane does not draw now goes on to the closure, as before.
+  on('ui.press', async ($, e, next) => {
+    if (e.plugin !== $.plugin.name || e.component !== 'Pane' || e.requestId !== PANE) return next(e)
+    const [model, expanded] = await Promise.all([read($, modelAtom), read($, expandedAtom)])
+    const action = pressAction(model, expanded, e.element)
+    if (action === null) return next(e)
+    const handlers = handlersOf($, settings, slot)
+    try {
+      if (action.kind === 'refresh') await handlers.onRefresh()
+      else if (action.kind === 'toggle') await handlers.onToggle(action.key, action.isOpen)
+      else if (action.kind === 'fill') await handlers.onFillNext(action.command)
+      else await handlers.onAction(action.id)
+    } catch {
+      // A failed press changes nothing on screen, as a closure's would.
+    }
+    return { element: e.element }
   })
 }

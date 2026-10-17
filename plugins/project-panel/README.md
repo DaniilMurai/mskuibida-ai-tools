@@ -101,7 +101,12 @@ no mark, and the next draw asks again.
 (0.14.1): a render that reads the clock is redrawn by it, and each redraw retires the drawn buttons' press handles, so a
 click landing across one was lost and a fold took a second click. Its `now` is the refresh engine's latest clock reading
 (`now()`), which every poll tick moves; the engine redraws the pane only when the stamp's text would change, also while a
-read keeps failing (the stamp then ages: `checked 30s ago`). The clock and the error line below come from
+read keeps failing (the stamp then ages: `checked 30s ago`).
+
+**Presses (0.18.0).** A press on the pane is taken by a `ui.press` hook, from the button's key and the state now
+(`src/render/press.ts`), not left to the drawing's `onPress` closure: a pane hidden and shown again repaints its last
+drawing, whose closures the surface had let go, and the first press on it was lost. A key the pane does not draw now goes
+on to the closure. The clock and the error line below come from
 the refresh engine (`src/refresh.ts`), which fills `freshness` on the model; `hooks/register.tsx` passes the clock. When the latest re-read or remote
 check failed, a red line under the header says so, the same text is the first Attention row, and the panel keeps the
 last good model.
