@@ -184,7 +184,7 @@ export type ItemFacts = {
   status: ItemStatus
   chips: Chip[]
   landing?: Landing
-  /** Finished here, not landed (landing `local`): counts as done. */
+  /** Checked off in this checkout's state, not landed on main (local only, pushed, or in an open PR): counts as done. */
   isFinishedLocal?: boolean
   statusWord?: string
   group?: string
@@ -373,6 +373,8 @@ export function derive(local: ParsedState, two: Two): Derived {
       items.set(row.slug, {
         status: row.marker === 'awaiting-approval' ? 'awaiting' : row.marker === 'revising' ? 'revising' : 'open',
         landing: 'in-pr',
+        // Checked off in this checkout: done by the local state, though its PR has not landed yet.
+        ...(row.marker === 'completed' ? { isFinishedLocal: true } : {}),
         statusWord: said !== '' ? said : t(pr.isDraft ? 'aidlc.word.inDraftPr' : 'aidlc.word.inPr'),
         ...(said !== '' ? { review } : {}),
         chips: [...(m === 'completed' ? mergedChip : []), ...own],
@@ -389,7 +391,8 @@ export function derive(local: ParsedState, two: Two): Derived {
       items.set(row.slug, {
         status: status === 'done' ? 'open' : status,
         landing,
-        ...(status === 'done' && landing === 'local' ? { isFinishedLocal: true } : {}),
+        // Checked off in this checkout: done by the local state, landed or not (local only, or pushed with no PR).
+        ...(status === 'done' ? { isFinishedLocal: true } : {}),
         statusWord: t(word),
         chips: m === 'completed' ? mergedChip : [],
       })
