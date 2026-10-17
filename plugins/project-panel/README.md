@@ -405,9 +405,11 @@ engine ticks their checkbox only after every Unit; build-and-test and ci-pipelin
 **Counted by story points (0.15.0).** The row's count is the story points done of all (`8/29 pt`, not the rows'
 `1/6`), with the Units done beside it (`1/4 units`, a grey pill on the desktop), and the caption says both.
 
-**A Unit claimed at this checkout (0.15.0).** When this checkout's own state file names one of the Units as its
-`Active Unit` (else the engine directive's unit) — a worktree or the main checkout, each has its own copy —
-Construction narrows to that Unit:
+**A Unit claimed at this checkout (0.15.0; the claim's source changed in 0.20.0).** When the checkout's
+`aidlc/.aidlc-unit-scope.json` names one of the Units (the engine writes it on `aidlc --claim <unit>`, keeps it while
+the checkout builds the Unit, and `aidlc unit finish <unit>` deletes it; git ignores it) for this intent (its space, and
+its UUID where `intents.json` has one) — a worktree or the main checkout — Construction narrows to that Unit. The state's
+`Active Unit` is not the claim: the state is the intent's, and the engine resets it between stages. Construction then:
 
 ```
 ▾ Construction  U3 api-billing                      ◔ 1/5
@@ -430,6 +432,12 @@ Construction narrows to that Unit:
   cards leave it out, and the plan list keeps it as a row of its own.
 - **The plan's percent** counts the Units, never the claimed Unit's stages, so it is the same claimed or not.
 
+- **Where a Unit stands (0.20.0).** Where the state has the engine's `## Unit Progress` table (team ownership,
+  unit-major iteration), its row decides, stage by stage: `[x]` done, `[-]` in progress, `[?]` waiting on the person's
+  approval, `[R]` revising, `[ ]` not started. A stage whose work is finished but not approved is `[?]` there even though
+  its `UNIT_COMPLETED` receipt is written, so it is drawn waiting on approval, never done: `functional-design awaits
+  approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. Without the
+  table, the receipts and artifacts below decide.
 - **A Unit is done** when code-generation, its last per-unit stage, is settled for it: a `UNIT_COMPLETED` receipt in the
   audit shards when one is owed (Construction Checkpoints enabled, or any `UNIT_*` row exists), else its four
   code-generation artifacts under `construction/<unit>/code-generation/`. code-generation's own `[x]` means every Unit
@@ -851,6 +859,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.20.0** — the claim is the checkout's `aidlc/.aidlc-unit-scope.json`, not the state's Active Unit; Unit progress follows the engine's `## Unit Progress` table, so a stage waiting on approval is not shown done.
 - **0.19.1** — a claimed Unit's stages count `0/5`, with no points; a fresh claim is on the workflow's Current Stage, so the Now card names it; a park the engine left in the state after work resumed (a later `STAGE_STARTED`/`UNIT_STARTED`/`WORKFLOW_UNPARKED` in the audit) is not shown; a running stage names no Next.
 - **0.19.0** — progress follows the local state: a stage checked off in this checkout counts as done in its open PR too, not only when local only.
 - **0.18.0** — phase branches (`docs/inception`) carry their whole phase; a press on the pane is taken by a `ui.press` hook, so the first press after the pane is shown again lands.

@@ -24,19 +24,19 @@ import type {
 import { detectWorkspace } from './detect'
 import { readBranch } from './git'
 import { parseState } from './parse-state'
-import { intentsDir, modeFor, selectIntent, validSessionId } from './select'
+import { intentUuidOf, intentsDir, modeFor, selectIntent, validSessionId } from './select'
 import { baseLine, derive, statusOfMarker } from './truths'
 import { wording } from './truths'
 import type { Derived, Two } from './truths'
 import { hasMoreThanBranch, sessionContext } from './session'
 import { readTwo } from './two'
-import { PER_UNIT_STAGES, LAST_UNIT_STAGE, progressOf, readUnitFacts, readUnitList, unitStageStatuses } from './units'
+import { PER_UNIT_STAGES, LAST_UNIT_STAGE, UNIT_SCOPE_FILE, parseUnitProgress, parseUnitScope, progressOf, readUnitFacts, readUnitList, stageStatusesFromRow, unitStageStatuses } from './units'
 import { NO_STAGE_POINTS, STAGE_POINTS_FILE, parseStagePoints, stagePointsOf } from './stage-points'
 import { isResumedAfter } from './park'
 import type { StagePoints } from './stage-points'
 import { POINTS_FILE, isUncommitted, resolvePoints } from './points'
 import type { UnitPoints } from './points'
-import type { Unit, UnitProgress } from './units'
+import type { Unit, UnitCell, UnitProgress } from './units'
 import { reviewNext } from '../review/view'
 import type { ParsedPhase, ParsedStage, ParsedState, PhaseStatus, Selection, Workspace } from './types'
 
@@ -62,7 +62,12 @@ export async function loadAidlc(ctx: ProviderContext, detection: Detection): Pro
   const two = text === null ? null : await readTwo(ctx, selection.statePath, parsed, branch, step.stage)
   const view = two ? derive(parsed, two) : null
 
-  const units = text === null ? null : await unitsOf(ctx, workspace.root, selection.statePath, parsed, step, mode === 'stage')
+  // The Unit this checkout claimed: the engine's scope file in this checkout's aidlc/, for this intent.
+  const scope = parseUnitScope((await fsx.exists(join(workspace.aidlcDir, UNIT_SCOPE_FILE))) ? await fsx.read(join(workspace.aidlcDir, UNIT_SCOPE_FILE)) : null)
+  const uuid = scope !== null && selection.intent !== null ? await intentUuidOf(fsx, workspace, selection.space, selection.intent) : ''
+  // The same space, and the same intent where both say which (a space without intents.json matches on the space).
+  const scopeMatches = scope !== null && selection.intent !== null && scope.space === selection.space && (uuid === '' || scope.intentUuid === '' || uuid === scope.intentUuid)
+  const units = text === null ? null : await unitsOf(ctx, workspace.root, selection.statePath, parsed, step, mode === 'stage', scopeMatches ? scope.unit : '', text)
   // Every stage is 1 story point unless the intent's stage-story-points.txt says otherwise (asked first: it is
   // usually not there).
   const stagePointsPath = join(parent(selection.statePath) ?? '', STAGE_POINTS_FILE)
@@ -211,6 +216,7 @@ function watched(workspace: Workspace, selection: Selection, sessionId: string):
   // intent's directory or to `aidlc/` itself moves its mtime, which the poll sees.
   if (selection.statePath !== '') files.push(parent(selection.statePath) ?? '')
   if (selection.statePath !== '') files.push(join(parent(selection.statePath) ?? '', STAGE_POINTS_FILE))
+  files.push(join(workspace.aidlcDir, UNIT_SCOPE_FILE))
   files.push(workspace.aidlcDir)
   return files.filter(path => path !== '')
 }
@@ -511,10 +517,12 @@ type UnitView = {
   /** The Unit the session is on, by name; '' when none. */
   current: string
   /**
-   * The Unit this checkout has claimed, by name: its own state file's `Active Unit`, else the engine directive's unit
-   * (a worktree or not, each checkout has its own copy). '' when it names none of the Units.
+   * The Unit this checkout has claimed, by name: the engine's scope file (`aidlc/.aidlc-unit-scope.json`, written by
+   * `aidlc --claim`, deleted by `aidlc unit finish`) for this intent. '' when there is none, or it names none of the Units.
    */
   claimed: string
+  /** The engine's Unit Progress table, by Unit (empty when the state has none). */
+  rows: Map<string, Map<string, UnitCell>>
   /** Each Unit's story points, by name, and where they came from. */
   points: Map<string, UnitPoints>
   /** Item id → story points, for the Unit rows only: what each Unit weighs in its section's ring and the plan. */
@@ -549,6 +557,8 @@ async function unitsOf(
   parsed: ParsedState,
   step: { stage: string; unit: string },
   canWrite: boolean,
+  claimedUnit: string,
+  stateText: string,
 ): Promise<UnitView | null> {
   const { fsx } = ctx
   const construction = parsed.phases.find(phase => phase.key === 'CONSTRUCTION')
@@ -557,7 +567,8 @@ async function unitsOf(
   const units = await readUnitList(fsx, intentDir)
   if (!units) return null
   const points = await resolvePoints(ctx, root, intentDir, units, canWrite)
-  const progress = progressOf(units, parsed, await readUnitFacts(fsx, intentDir, units))
+  const table = parseUnitProgress(stateText)
+  const progress = progressOf(units, parsed, await readUnitFacts(fsx, intentDir, units), table)
   const named = [(parsed.fields['Active Unit'] ?? '').trim(), step.unit].find(name => units.some(unit => unit.name === name))
   const working = PER_UNIT_STAGES.includes(step.stage)
     ? units.find(unit => ['active', 'paused'].includes(progress.get(unit.name)?.phase ?? ''))?.name
@@ -565,8 +576,11 @@ async function unitsOf(
   return {
     units,
     progress,
-    current: named ?? working ?? '',
-    claimed: named ?? '',
+    current: (units.some(unit => unit.name === claimedUnit) ? claimedUnit : undefined) ?? named ?? working ?? '',
+    // The checkout's claim (the engine's scope file), not the state's Active Unit: the state is shared by every checkout
+    // and is rewritten between stages, while the scope file stays until `aidlc unit finish`.
+    claimed: units.some(unit => unit.name === claimedUnit) ? claimedUnit : '',
+    rows: table,
     points: points.byUnit,
     weights: new Map(units.map(unit => [unitItemId(unit.name), points.byUnit.get(unit.name)?.points ?? 0])),
     isUncommitted: points.isFilePresent && (await isUncommitted(ctx, root, points.path)),
@@ -622,7 +636,11 @@ function unitSectionOf(
     const facts = units.progress.get(unit.name) ?? { phase: 'planned', stage: '' }
     const waitsOn = unit.dependsOn.filter(dep => units.progress.get(dep)?.phase !== 'done')
     const word =
-      facts.phase === 'active' && facts.stage !== ''
+      facts.phase === 'awaiting'
+        ? t('aidlc.unit.awaitingAt', { stage: facts.stage })
+        : facts.phase === 'revising'
+          ? t('aidlc.unit.revisingAt', { stage: facts.stage })
+          : facts.phase === 'active' && facts.stage !== ''
         ? t('aidlc.unit.atStage', { stage: facts.stage })
         : facts.phase === 'paused'
           ? t(facts.stage === '' ? 'aidlc.unit.paused' : 'aidlc.unit.pausedAt', { stage: facts.stage })
@@ -683,26 +701,41 @@ function claimedSectionOf(
   // Current Stage is the one this checkout is on.
   const isOnItsWay = known.phase === 'active' || known.phase === 'paused' || known.phase === 'planned'
   const fallback = known.stage === '' && isOnItsWay && PER_UNIT_STAGES.includes(currentStage)
-  const statuses = unitStageStatuses(fallback ? { phase: known.phase === 'paused' ? 'paused' : 'active', stage: currentStage } : known)
+  const row = units.rows.get(unit.name)
+  const isPaused = (known.phase === 'paused')
+  // The engine's own row decides each stage where the state has one; else the receipts, with the workflow's Current
+  // Stage for a fresh claim.
+  const statuses = row
+    ? stageStatusesFromRow(row, isPaused)
+    : unitStageStatuses(fallback ? { phase: known.phase === 'paused' ? 'paused' : 'active', stage: currentStage } : known)
   const items: Item[] = phase.stages
     .map((stage, at) => ({ stage, ordinal: ordinalOf(phaseNo, at + 1) }))
     .filter(({ stage }) => PER_UNIT_STAGES.includes(stage.slug))
     .map(({ stage, ordinal }) => {
       const status = !stage.isExecuted || stage.marker === 'skipped' ? 'skipped' : (statuses.get(stage.slug) ?? 'planned')
-      const isOn = status === 'active' || status === 'paused'
-      // The stage's own gate ([?]) is the one the Unit on it waits at: its row says so, and the gate hangs after it.
-      const isAwaiting = isOn && itemStatus(stage) === 'awaiting'
+      const isOn = status === 'active' || status === 'paused' || status === 'awaiting' || status === 'revising'
+      // Waiting on the person's approval: the Unit's own [?] in the engine's table, else the stage's [?] in the plan
+      // while the Unit is on it. Its row says so, and the gate hangs after it.
+      const isAwaiting = status === 'awaiting' || ((status === 'active' || status === 'paused') && itemStatus(stage) === 'awaiting')
       const item: Item = {
         id: stage.slug,
         title: stage.slug,
         ordinal,
-        status: isAwaiting ? 'awaiting' : isOn ? 'open' : status,
+        status: isAwaiting ? 'awaiting' : status === 'revising' ? 'revising' : isOn ? 'open' : status,
         isCurrent: isOn,
         chips: [],
       }
       if (status === 'paused') item.statusWord = t('aidlc.unit.paused')
       return item
     })
+  // Between stages, or claimed and not started: the first stage not started is up next, so the Now card names it.
+  if (!items.some(item => item.isCurrent)) {
+    const next = items.find(item => item.status === 'planned')
+    if (next) {
+      next.isCurrent = true
+      next.statusWord = t('aidlc.word.upNext')
+    }
+  }
   const points = units.points.get(unit.name)?.points ?? 0
   // Its stages are counted one each, done of all ("1/5"): the Unit's points are counted once, under Units, and a
   // stage of a Unit has no points of its own, so no `pt` count and no `1 pt` on its rows.
@@ -730,6 +763,8 @@ const STATUS_OF_UNIT: Record<UnitProgress['phase'], ItemStatus> = {
   done: 'done',
   active: 'open',
   paused: 'open',
+  awaiting: 'awaiting',
+  revising: 'revising',
   between: 'partial',
   planned: 'planned',
 }
@@ -834,14 +869,19 @@ function collectGates(parsed: ParsedState, sections: Section[], view: Derived | 
     }
   }
 
+  // A claimed Unit's own stage rows say its approval; its row in the Units list would say it twice.
+  const hasClaimedRows = sections.some(section => section.isDetail === true)
   for (const section of sections) {
     for (const item of section.items) {
       if (item.status !== 'awaiting') continue
+      const isUnitRow = item.id.startsWith('unit:')
+      if (isUnitRow && hasClaimedRows) continue
       gates.push({
         id: `awaiting:${item.id}`,
         kind: 'awaiting-approval',
         tone: 'warning',
-        title: t('aidlc.gate.awaiting-approval.title', { stage: item.id }),
+        // A Unit row is named as drawn ("U1 api-core"), never by its id.
+        title: t('aidlc.gate.awaiting-approval.title', { stage: isUnitRow ? item.title : item.id }),
         caption: t('aidlc.gate.awaiting-approval.caption'),
         sectionId: section.id,
         afterItemId: item.id,

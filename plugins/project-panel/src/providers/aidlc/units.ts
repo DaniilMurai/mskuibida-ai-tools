@@ -51,7 +51,8 @@ export type UnitEvent = { event: UnitEventKind; stage: string; unit: string; at:
 
 /** How far one Unit has got. */
 export type UnitProgress = {
-  phase: 'done' | 'active' | 'paused' | 'between' | 'planned'
+  /** awaiting: its stage's work is done and waits on the person's approval ([?] in the engine's Unit Progress). */
+  phase: 'done' | 'active' | 'paused' | 'awaiting' | 'revising' | 'between' | 'planned'
   /** The per-unit stage it is on (active, paused) or last finished (between); '' otherwise. */
   stage: string
 }
@@ -174,6 +175,55 @@ export function parseUnitEvents(shard: string): UnitEvent[] {
 
 // ── progress ─────────────────────────────────────────────────────────────────
 
+/** One cell of the engine's `## Unit Progress` table, as its checkbox. */
+export type UnitCell = ' ' | '-' | '?' | 'R' | 'x' | 'S'
+
+/**
+ * The engine's `## Unit Progress` table (present with `Unit Ownership: team` and `Construction Iteration: unit-major`):
+ * by Unit, its marker per per-unit stage. The engine rewrites it on every `next` from receipts, artifacts and gate events,
+ * so it says what a receipt alone does not: a stage whose work is done but waits on the person's approval is `[?]`,
+ * though its `UNIT_COMPLETED` row is written. Empty when the state has no such table.
+ */
+export function parseUnitProgress(state: string): Map<string, Map<string, UnitCell>> {
+  const out = new Map<string, Map<string, UnitCell>>()
+  const start = state.search(/^## Unit Progress[^\S\n]*$/m)
+  if (start < 0) return out
+  const rest = state.slice(start).split('\n').slice(1)
+  const end = rest.findIndex(line => /^## /.test(line))
+  const lines = (end < 0 ? rest : rest.slice(0, end)).filter(line => line.trim().startsWith('|'))
+  const cells = (line: string) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(cell => cell.trim())
+  const header = lines[0] === undefined ? [] : cells(lines[0]).map(cell => cell.toLowerCase())
+  if (header[0] !== 'unit') return out
+  for (const line of lines.slice(1)) {
+    const row = cells(line)
+    const unit = row[0] ?? ''
+    if (unit === '' || /^-+$/.test(unit)) continue
+    const stages = new Map<string, UnitCell>()
+    header.forEach((name, at) => {
+      if (!PER_UNIT_STAGES.includes(name)) return
+      const mark = /^\[(.)\]$/.exec(row[at] ?? '')?.[1]
+      const cell = mark === 'X' ? 'x' : mark
+      if (cell === ' ' || cell === '-' || cell === '?' || cell === 'R' || cell === 'x' || cell === 'S') stages.set(name, cell)
+    })
+    if (stages.size > 0) out.set(unit, stages)
+  }
+  return out
+}
+
+/** A Unit's progress from its table row: built, on a stage (working, waiting, revising), between stages, or not started. */
+function progressFromRow(row: Map<string, UnitCell>, isPaused: boolean): UnitProgress {
+  const cellOf = (stage: string) => row.get(stage) ?? ' '
+  const live = PER_UNIT_STAGES.filter(stage => cellOf(stage) !== 'S')
+  if (live.length > 0 && live.every(stage => cellOf(stage) === 'x')) return { phase: 'done', stage: '' }
+  const on = live.find(stage => ['-', '?', 'R'].includes(cellOf(stage)))
+  if (on !== undefined) {
+    const cell = cellOf(on)
+    return { phase: cell === '?' ? 'awaiting' : cell === 'R' ? 'revising' : isPaused ? 'paused' : 'active', stage: on }
+  }
+  const last = live.filter(stage => cellOf(stage) === 'x').at(-1)
+  return last === undefined ? { phase: 'planned', stage: '' } : { phase: 'between', stage: last }
+}
+
 /** What the reads found, for `progressOf`. */
 export type UnitFacts = {
   /** Every shard's UNIT_* rows, oldest first (stable for one timestamp: shard order, then file order). */
@@ -189,7 +239,12 @@ export type UnitFacts = {
  * UNIT_* row exists): the latest row per (stage, Unit) decides. Otherwise artifacts do. code-generation's own
  * checkbox at [x] means every Unit is built, whatever the rows say.
  */
-export function progressOf(units: readonly Unit[], parsed: ParsedState, facts: UnitFacts): Map<string, UnitProgress> {
+export function progressOf(
+  units: readonly Unit[],
+  parsed: ParsedState,
+  facts: UnitFacts,
+  table: Map<string, Map<string, UnitCell>> = new Map(),
+): Map<string, UnitProgress> {
   const stageDone = parsed.phases
     .flatMap(phase => phase.stages)
     .some(stage => stage.slug === LAST_UNIT_STAGE && stage.marker === 'completed')
@@ -208,6 +263,12 @@ export function progressOf(units: readonly Unit[], parsed: ParsedState, facts: U
 
   const out = new Map<string, UnitProgress>()
   for (const unit of units) {
+    // The engine's own Unit Progress row, where the state has one, decides: it knows the approval gates.
+    const row = table.get(unit.name)
+    if (row !== undefined) {
+      out.set(unit.name, stageDone ? { phase: 'done', stage: '' } : progressFromRow(row, unit.name === activeUnit && isPaused))
+      continue
+    }
     const built = isLedger
       ? latest.get(`${LAST_UNIT_STAGE}\n${unit.name}`)?.event === 'UNIT_COMPLETED'
       : facts.builtByFiles.has(unit.name)
@@ -232,7 +293,13 @@ export function progressOf(units: readonly Unit[], parsed: ParsedState, facts: U
 }
 
 /** Where one Unit stands on each per-unit stage, for the Unit this checkout has claimed. */
-export type UnitStageStatus = 'done' | 'active' | 'paused' | 'planned'
+export type UnitStageStatus = 'done' | 'active' | 'paused' | 'awaiting' | 'revising' | 'skipped' | 'planned'
+
+/** Each per-unit stage's status straight from the Unit's row of the engine's Unit Progress table. */
+export function stageStatusesFromRow(row: Map<string, UnitCell>, isPaused: boolean): Map<string, UnitStageStatus> {
+  const of: Record<UnitCell, UnitStageStatus> = { ' ': 'planned', '-': isPaused ? 'paused' : 'active', '?': 'awaiting', R: 'revising', x: 'done', S: 'skipped' }
+  return new Map(PER_UNIT_STAGES.map(stage => [stage, of[row.get(stage) ?? ' ']]))
+}
 
 /**
  * Each per-unit stage's status for one Unit, from how far it has got: the stages before the one it is on are done,
@@ -248,9 +315,31 @@ export function unitStageStatuses(progress: UnitProgress): Map<string, UnitStage
       if (index < at) return [stage, 'done']
       if (index > at) return [stage, 'planned']
       if (progress.phase === 'between') return [stage, 'done']
+      if (progress.phase === 'awaiting' || progress.phase === 'revising') return [stage, progress.phase]
       return [stage, progress.phase === 'paused' ? 'paused' : 'active']
     }),
   )
+}
+
+/** The file the engine writes in a checkout's `aidlc/` when it claims a Unit for it (`aidlc --claim`), and `unit finish` deletes. */
+export const UNIT_SCOPE_FILE = '.aidlc-unit-scope.json'
+
+/** What a checkout's claim names: the intent (space and UUID) and the Unit. */
+export type UnitScope = { space: string; intentUuid: string; unit: string; owner: string }
+
+/** The scope file's claim; null when the text is no claim the engine would read (it checks the same fields). */
+export function parseUnitScope(text: string | null): UnitScope | null {
+  if (text === null) return null
+  try {
+    const raw: unknown = JSON.parse(text)
+    if (raw === null || typeof raw !== 'object') return null
+    const stamp = raw as Record<string, unknown>
+    if (stamp.version !== 1 || typeof stamp.space !== 'string' || typeof stamp.intent_uuid !== 'string') return null
+    if (typeof stamp.unit !== 'string' || stamp.unit === '') return null
+    return { space: stamp.space, intentUuid: stamp.intent_uuid, unit: stamp.unit, owner: typeof stamp.owner === 'string' ? stamp.owner : '' }
+  } catch {
+    return null
+  }
 }
 
 // ── reads ────────────────────────────────────────────────────────────────────

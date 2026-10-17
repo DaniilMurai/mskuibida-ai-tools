@@ -119,6 +119,8 @@ export const en = {
   'aidlc.chip.points': '{points} pt',
   'aidlc.chip.pointsDefault': '{points} pt, default',
   'aidlc.unit.atStage': '{stage}',
+  'aidlc.unit.awaitingAt': '{stage} awaits approval',
+  'aidlc.unit.revisingAt': 'revising {stage}',
   'aidlc.unit.paused': 'paused',
   'aidlc.unit.pausedAt': 'paused at {stage}',
   'aidlc.unit.stageDone': '{stage} done',
