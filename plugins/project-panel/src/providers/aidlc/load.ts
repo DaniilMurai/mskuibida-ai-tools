@@ -30,6 +30,7 @@ import { wording } from './truths'
 import type { Derived, Two } from './truths'
 import { hasMoreThanBranch, sessionContext } from './session'
 import { readTwo } from './two'
+import { readUnitMatrix, withKinds } from './unit-matrix'
 import { PER_UNIT_STAGES, LAST_UNIT_STAGE, UNIT_SCOPE_FILE, parseUnitProgress, parseUnitScope, progressOf, readUnitFacts, readUnitList, stageStatusesFromRow, unitStageStatuses, withReceipts } from './units'
 import { NO_STAGE_POINTS, STAGE_POINTS_FILE, parseStagePoints, stagePointsOf } from './stage-points'
 import { isResumedAfter } from './park'
@@ -569,7 +570,8 @@ async function unitsOf(
   const points = await resolvePoints(ctx, root, intentDir, units, canWrite)
   const facts = await readUnitFacts(fsx, intentDir, units)
   // The engine's table, with the stages its receipts say started since it was last written.
-  const table = withReceipts(parseUnitProgress(stateText), facts.events)
+  // A stage the Unit's kind does not owe is skipped, not done, though the engine's table marks it [x].
+  const table = withKinds(withReceipts(parseUnitProgress(stateText), facts.events), units, await readUnitMatrix(fsx, root))
   const progress = progressOf(units, parsed, facts, table)
   const named = [(parsed.fields['Active Unit'] ?? '').trim(), step.unit].find(name => units.some(unit => unit.name === name))
   const working = PER_UNIT_STAGES.includes(step.stage)

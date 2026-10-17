@@ -763,6 +763,49 @@ describe("the engine's Unit Progress table", () => {
     expect([...(table.get('u') ?? new Map())]).toEqual([['functional-design', '?'], ['nfr-requirements', ' ']])
   })
 
+  // The engine's stage file: functional-design's artifacts are all for service Units, so a ui Unit does not owe it, and
+  // the engine's table marks it [x] for one nobody has started.
+  const SERVICE_ONLY = [
+    '---',
+    'slug: functional-design',
+    'produces:',
+    '  - entities',
+    '  - traceability   # one per Unit',
+    'produces_kinds:',
+    '  entities: [service]',
+    '  traceability: [service, library]',
+    'consumes:',
+    '  - artifact: unit-of-work',
+    '---',
+    '# Functional Design',
+  ].join('\n')
+  const STAGE_FILE = `${s.ROOT}/.claude/aidlc-common/stages/construction/functional-design.md`
+
+  test("a stage the Unit's kind does not owe is skipped, not done: a Unit with nothing else is not started", async () => {
+    const rows = { 'api-core': ['x', ' ', ' ', ' ', ' ', '-'], 'web-shell': ['x', ' ', ' ', ' ', ' ', '-'] }
+    const model = await load(tree(withTable(stateText(), rows), { [POINTS_PATH]: POINTS, [STAGE_FILE]: SERVICE_ONLY }))
+    const list = unitList(model)
+    expect(list.items.find(item => item.id === 'unit:web-shell')?.status).toBe('planned')
+    // A service Unit owes it: its [x] is work done.
+    expect(list.items.find(item => item.id === 'unit:api-core')).toMatchObject({ status: 'partial', statusWord: 'functional-design done' })
+  })
+
+  test('without the stage files every stage counts, as the table says', async () => {
+    const model = await load(tree(withTable(stateText(), { 'web-shell': ['x', ' ', ' ', ' ', ' ', '-'] }), { [POINTS_PATH]: POINTS }))
+    expect(unitList(model).items.find(item => item.id === 'unit:web-shell')?.status).toBe('partial')
+  })
+
+  test('claimed, the stage its kind does not owe is skipped and not counted', async () => {
+    const t = tree(withTable(stateText(), { 'web-shell': ['x', ' ', ' ', ' ', ' ', '-'] }), { [POINTS_PATH]: POINTS, [STAGE_FILE]: SERVICE_ONLY, ...claimOf('web-shell') })
+    const model = await load(t)
+    const stages = construction(model).items.map(item => [item.id, item.status, item.isCurrent])
+    expect(stages.slice(0, 2)).toEqual([
+      ['functional-design', 'skipped', false],
+      ['nfr-requirements', 'planned', true],
+    ])
+    expect(construction(model).counts).toEqual({ done: 0, total: 4 })
+  })
+
   test('the table decides built, between and planned too', async () => {
     const model = await load(world({ 'api-core': ['x', 'x', 'x', 'x', 'x', 'x'], 'web-shell': ['x', ' ', ' ', ' ', ' ', '-'], 'api-billing': [' ', ' ', ' ', ' ', ' ', ' '] }, null))
     const list = unitList(model)

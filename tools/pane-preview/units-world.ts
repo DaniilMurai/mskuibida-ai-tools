@@ -1,5 +1,7 @@
 // A Construction-by-Unit workspace for the preview, read by the real AI-DLC provider: six Units with story points
 // (13, 5, 13, 3, 8, 3: 45 in all), U1 built, U3 at nfr-requirements. `claimed` names U3 as this checkout's Active Unit.
+// U6 is a packaging Unit: the engine's table marks functional-design [x] for it unrun (packaging owes none of its
+// artifacts), and the panel draws it not started.
 import { aidlc } from '../../plugins/project-panel/src/providers/aidlc'
 import * as s from '../../plugins/project-panel/fixtures/scenarios'
 import { ctxOf, mockHost, OPTIONS } from '../../plugins/project-panel/tests/world'
@@ -16,7 +18,23 @@ const UNITS = [
   ['U6', 'u6-installation', 3, []],
 ] as const
 
-const dependency = ['# Unit dependencies', '', '```yaml', 'units:', ...UNITS.flatMap(([, name, , deps]) => [`  - name: ${name}`, '    kind: service', `    depends_on: [${deps.join(', ')}]`]), '```', ''].join('\n')
+const kindOf = (name: string) => (name === 'u6-installation' ? 'packaging' : 'service')
+const dependency = ['# Unit dependencies', '', '```yaml', 'units:', ...UNITS.flatMap(([, name, , deps]) => [`  - name: ${name}`, `    kind: ${kindOf(name)}`, `    depends_on: [${deps.join(', ')}]`]), '```', ''].join('\n')
+// The engine's stage file, as the workspace's install has it: functional-design's artifacts by kind.
+const functionalDesign = ['---', 'produces:', '  - entities', '  - functional-spec', 'produces_kinds:', '  entities: [service, spec, library]', '  functional-spec: [service, spec, ui, library]', '---', ''].join('\n')
+// The engine's Unit Progress table: five per-unit stages, then the gate.
+const TABLE: Record<string, string[]> = {
+  'u1-api-core': ['x', 'x', 'x', 'x', 'x', 'x'],
+  'u3-day-page': ['x', '-', ' ', ' ', ' ', '-'],
+  'u6-installation': ['x', ' ', ' ', ' ', ' ', '-'],
+}
+const table = [
+  '## Unit Progress',
+  '| unit | owner | functional-design | nfr-requirements | nfr-design | infrastructure-design | code-generation | gate |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  ...UNITS.map(([, name]) => `| ${name} | - | ${(TABLE[name] ?? [' ', ' ', ' ', ' ', ' ', ' ']).map(cell => `[${cell}]`).join(' | ')} |`),
+  '',
+].join('\n')
 const index = ['# Units of work', '', '| Unit ID | Directory | Repo | Kind | Jira | Stories |', '|---|---|---|---|---|---|', ...UNITS.map(([id, name]) => `| ${id} | \`${name}\` | app | service | none | US |`), ''].join('\n')
 const points = ['unit,points,source', ...UNITS.map(([id, , pt]) => `${id},${pt},human`), ''].join('\n')
 
@@ -49,7 +67,7 @@ function state(claimed: boolean): string {
     },
   })
   const extra = ['- **Construction Checkpoints**: enabled', ...(claimed ? ['- **Active Unit**: u3-day-page', '- **Unit State**: in-progress'] : [])]
-  return text.replace('- **Revision Count**: 3', ['- **Revision Count**: 3', ...extra].join('\n'))
+  return text.replace('- **Revision Count**: 3', ['- **Revision Count**: 3', ...extra].join('\n')).replace('## Current Status', `${table}\n## Current Status`)
 }
 
 /** The model the provider builds for the workspace, with or without U3 claimed at this checkout. */
@@ -62,6 +80,7 @@ export async function unitsModel(claimed: boolean): Promise<PanelModel> {
       [`${UNITS_DIR}/unit-of-work-dependency.md`]: dependency,
       [`${UNITS_DIR}/unit-of-work.md`]: index,
       [`${INTENT_DIR}/unit-points.csv`]: points,
+      [`${s.ROOT}/.claude/aidlc-common/stages/construction/functional-design.md`]: functionalDesign,
       [`${INTENT_DIR}/audit/host-a.md`]: audit([
         ['UNIT_COMPLETED', 'code-generation', 'u1-api-core'],
         ['UNIT_STARTED', 'functional-design', 'u3-day-page'],

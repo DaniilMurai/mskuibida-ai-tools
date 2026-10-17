@@ -8,6 +8,7 @@ import type { RefreshEngine, RefreshPorts, Snapshot } from '../src/refresh'
 import { renderPane } from '../src/render'
 import type { Handlers } from '../src/render'
 import { pressAction } from '../src/render/press'
+import { steadyPresses } from '../src/render/steady'
 import { manifestPath, versionOfManifest } from '../src/version'
 import { t } from '../src/strings/en'
 import type { PanelModel, PanelOptions } from '../types'
@@ -155,9 +156,12 @@ function refreshPortsOf($: EngineInterface, settings: Settings): RefreshPorts {
   }
 }
 
-/** Where the register closure keeps its refresh engine; the helpers below take it as a plain argument. */
-/** The session's refresh engine, and the plugin's own version once its manifest has been read (for the pane's foot). */
-type EngineSlot = { engine: RefreshEngine | null; version?: Promise<string> }
+/**
+ * Where the register closure keeps its refresh engine, and the plugin's own version once its manifest has been read
+ * (for the pane's foot); the helpers below take it as a plain argument. `presses` keeps each drawing's press handle
+ * per button key (src/render/steady.ts), so a press on a drawing the surface has not replaced yet still lands.
+ */
+type EngineSlot = { engine: RefreshEngine | null; version?: Promise<string>; presses: { pane: Map<string, number>; bar: Map<string, number> } }
 
 function bindEngine($: EngineInterface, settings: Settings, slot: EngineSlot, startDir: string): RefreshEngine {
   slot.engine?.stop()
@@ -231,7 +235,7 @@ export const register: Register = (on, options) => {
   }
 
   // The refresh engine, bound at session.start. A module reload re-runs session.start, which stops this one.
-  const slot: EngineSlot = { engine: null }
+  const slot: EngineSlot = { engine: null, presses: { pane: new Map(), bar: new Map() } }
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -369,7 +373,7 @@ export const register: Register = (on, options) => {
     if (model === null || !isClosed) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    return (
+    return steadyPresses(
       <Box>
         <Text dimColor>{t('reopen.hint')} </Text>
         <Button
@@ -379,7 +383,8 @@ export const register: Register = (on, options) => {
             await openAsked($, await engineOf($, settings, slot)).catch(() => undefined)
           }}
         />
-      </Box>
+      </Box>,
+      slot.presses.bar,
     )
   })
 
@@ -392,23 +397,25 @@ export const register: Register = (on, options) => {
         return ''
       })
     const [model, expanded, version] = await Promise.all([read($, modelAtom), read($, expandedAtom), slot.version])
-    // No clock read here: a render that reads the clock is invalidated by it, and every redraw retires the drawn
-    // buttons' press handles, so a click landing across one was lost (the second click worked). The stamp's "now"
-    // is the engine's latest clock reading, which its polls move; it redraws the pane when the text would change.
+    // No clock read here: a render that reads the clock is invalidated by it, and redraws for nothing. The stamp's
+    // "now" is the engine's latest clock reading, which its polls move; it redraws the pane when the text would change.
     const now = slot.engine?.now() || model?.readAt || 0
     // A pane being drawn is a pane on screen: let a stopped engine notice (no state is written here).
     slot.engine?.noteRendered(now)
     void slot.engine?.wake().catch(() => undefined)
 
-    return renderPane($.ui.resolve(e), e.surface, e.props.bodyColumns, model, expanded, handlersOf($, settings, slot),
+    const tree = renderPane($.ui.resolve(e), e.surface, e.props.bodyColumns, model, expanded, handlersOf($, settings, slot),
     // M2 hook point data: the clock the header's "checked {ago}" reads.
     { now, checkedAt: slot.engine?.checkedAt() ?? 0 },
     version)
+    // Every button keeps the handle its key was first drawn with: a redraw no longer retires the handles of the
+    // drawing on screen, so a press that lands across one (a pane hidden and shown, a poll's redraw) still runs.
+    return steadyPresses(tree, slot.presses.pane)
   })
 
-  // A press on the pane is taken here, from its key and the state now, not left to the drawing's closure: a pane
-  // hidden and shown again repaints its last drawing, whose closures the surface had let go, so the first press
-  // found none and was lost. A key the pane does not draw now goes on to the closure, as before.
+  // A press on the pane is taken here, from its key and the state now, not left to the drawing's closure, so it acts
+  // on the state now whichever drawing it came from. (A press the host no longer holds a handle for never reaches this
+  // hook; the steady handles above keep that from happening.) A key the pane does not draw now goes on to the closure.
   on('ui.press', async ($, e, next) => {
     if (e.plugin !== $.plugin.name || e.component !== 'Pane' || e.requestId !== PANE) return next(e)
     const [model, expanded] = await Promise.all([read($, modelAtom), read($, expandedAtom)])
