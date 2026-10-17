@@ -598,7 +598,9 @@ Merged stages count as done, in the rings and the plan's percent, and so does ev
 - **A network that drops** (a laptop's connection to GitHub refusing for a few seconds is common) never blanks
   the PR chips: each list call (`gh pr list`, `glab mr list`) is retried once, and when it still fails the last listing that worked stands in
   (kept in the plugin's store across sessions), with the "PRs may be stale" line until the next good check.
-- **Tickets.** On a stage branch, only PRs of the same ticket count. Closed PRs never count.
+- **Tickets.** On a stage branch of the plan (its branch names a stage the plan has), only PRs of the same ticket count.
+  A branch the pattern reads that names no stage (`ms/BM-218/sprint-rules`, side work in its own worktree) is not a
+  stage branch: every ticket's stage and phase PRs count there, as on `main` (0.21.1). Closed PRs never count.
 - **One truth.** Outside git, without an `origin`, or without `origin/<default>` (after one fetch attempt), the
   provider draws exactly what 0.6.0 drew. A failing `gh` or `glab` (or `forge: none`) leaves the landings from the two files (done on a branch
   with no known PR is *local*) and drops the PR chips and gates.
@@ -874,6 +876,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.21.1** — a session on a side branch the stage pattern reads but that names no stage (`ms/BM-218/sprint-rules`) no longer filters PRs by its ticket, so the plan's stage and phase PRs (`ms/BM-5/delivery-planning`) map there too.
 - **0.21.0** — buttons keep one press handle per key across redraws, so the first press lands on a drawing the surface has not replaced yet (Put in prompt and folds no longer take a second click); a Unit stage its kind does not owe is skipped, not done, so an unstarted packaging Unit reads not started.
 - **0.20.1** — a stage that started after the engine last wrote its Unit Progress table is in progress, not up next, so the stale Next goes too.
 - **0.20.0** — the claim is the checkout's `aidlc/.aidlc-unit-scope.json`, not the state's Active Unit; Unit progress follows the engine's `## Unit Progress` table, so a stage waiting on approval is not shown done.

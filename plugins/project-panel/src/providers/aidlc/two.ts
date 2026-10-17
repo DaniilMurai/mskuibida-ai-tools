@@ -142,10 +142,15 @@ export async function readTwo(
     ),
   }
   const startMs = Date.parse(local.fields['Start Date'] ?? '')
+  // The session's branch, as the stages it carries: a stage branch (or a phase branch, which names no ticket) of this plan.
+  const carried = sessionBranch === '' ? { stages: [], isPhase: false } : carriedBy(sessionBranch, order, branches)
   const mapped = prs
     ? mapPrs(prs, order, {
         ...branches,
-        ticket: ticketOf(sessionBranch, options),
+        // Only a session on a stage branch of this plan sees just its own ticket's PRs. A branch the pattern reads but
+        // that names no stage (`ms/BM-218/sprint-rules`, side work) says nothing about the plan's ticket, so every
+        // ticket's stage and phase PRs count there, as anywhere else.
+        ticket: carried.stages.length > 0 && !carried.isPhase ? ticketOf(sessionBranch, options) : null,
         startMs: Number.isNaN(startMs) ? null : startMs,
       })
     : []
@@ -158,7 +163,6 @@ export async function readTwo(
   // (it only reports BEHIND under strict branch protection). Nothing to ask when every stage on the branch is
   // already on the default branch, or when the PR's own BEHIND gate will say it.
   // A session on a phase branch carries the phase's stages not on main yet; one on a stage branch, every one it names.
-  const carried = sessionBranch === '' ? { stages: [], isPhase: false } : carriedBy(sessionBranch, order, branches)
   const sessionStages = carried.isPhase ? carried.stages.filter(slug => markerOn(main, slug) !== 'completed') : carried.stages
   // A merged stage whose box here went back (a backward jump reopened it) is unmerged work again.
   const hasUnmerged = sessionStages.some(slug => markerOn(main, slug) !== 'completed' || markerOn(local, slug) !== 'completed')

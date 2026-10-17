@@ -510,6 +510,15 @@ describe('which PRs count', () => {
     expect(itemOf((await aload(elsewhere)).model, 'refined-mockups')).toMatchObject({ landing: 'in-pr', statusWord: 'in review' })
   })
 
+  test('a session on a side branch the pattern reads, naming no stage, sees every ticket: stage and phase PRs', async () => {
+    const stagePr = pr(66, 'ms/BM-5/refined-mockups')
+    const phasePr = pr(67, 'docs/inception')
+    const side = aworld({ local: state({ 'refined-mockups': 'x', 'domain-design': 'x' }), main: state({}), branch: 'ms/BM-218/sprint-rules', prs: [stagePr] })
+    expect(itemOf((await aload(side)).model, 'refined-mockups')).toMatchObject({ landing: 'in-pr', statusWord: 'in review' })
+    const phase = aworld({ local: state({ 'refined-mockups': 'x', 'domain-design': 'x' }), main: state({}), branch: 'ms/BM-218/sprint-rules', prs: [phasePr] })
+    expect(itemOf((await aload(phase)).model, 'domain-design')).toMatchObject({ landing: 'in-pr', group: 'pr-67' })
+  })
+
   test('closed PRs are ignored', async () => {
     const w = regression({ prs: [pr(33, branchOf('refined-mockups'), { state: 'CLOSED' })] })
     const { model } = await aload(w)
