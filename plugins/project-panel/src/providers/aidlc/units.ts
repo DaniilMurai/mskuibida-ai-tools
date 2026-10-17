@@ -213,8 +213,9 @@ export function parseUnitProgress(state: string): Map<string, Map<string, UnitCe
 /**
  * The table with what the receipts say since: the engine rewrites the table only when `/aidlc` routes, so a stage that
  * started after (`UNIT_STARTED`, `UNIT_RESUMED`, `UNIT_PAUSED` as its latest receipt) can still read `[ ]` there. Such
- * a cell becomes `[-]`. A cell the table has past not started (`[x]`, `[?]`, `[R]`, `[-]`) is the table's to say:
- * an approval gate is only there.
+ * a cell becomes `[-]`. So does a `[x]` one: a stage re-opened after its approval (`aidlc engine jump reopen`) starts
+ * again, and its start is the latest receipt while the table may still say done. A cell waiting on the person (`[?]`,
+ * `[R]`) or already running (`[-]`) is the table's to say: an approval gate is only there.
  */
 export function withReceipts(table: Map<string, Map<string, UnitCell>>, events: readonly UnitEvent[]): Map<string, Map<string, UnitCell>> {
   const latest = new Map<string, UnitEventKind>()
@@ -224,7 +225,8 @@ export function withReceipts(table: Map<string, Map<string, UnitCell>>, events: 
     const next = new Map(row)
     for (const stage of PER_UNIT_STAGES) {
       const kind = latest.get(`${stage}\n${unit}`)
-      if ((next.get(stage) ?? ' ') === ' ' && kind !== undefined && kind !== 'UNIT_COMPLETED') next.set(stage, '-')
+      const cell = next.get(stage) ?? ' '
+      if ((cell === ' ' || cell === 'x') && kind !== undefined && kind !== 'UNIT_COMPLETED') next.set(stage, '-')
     }
     out.set(unit, next)
   }
