@@ -32,6 +32,7 @@ import { hasMoreThanBranch, sessionContext } from './session'
 import { readTwo } from './two'
 import { PER_UNIT_STAGES, LAST_UNIT_STAGE, progressOf, readUnitFacts, readUnitList, unitStageStatuses } from './units'
 import { NO_STAGE_POINTS, STAGE_POINTS_FILE, parseStagePoints, stagePointsOf } from './stage-points'
+import { isResumedAfter } from './park'
 import type { StagePoints } from './stage-points'
 import { POINTS_FILE, isUncommitted, resolvePoints } from './points'
 import type { UnitPoints } from './points'
@@ -70,7 +71,9 @@ export async function loadAidlc(ctx: ProviderContext, detection: Detection): Pro
       ? NO_STAGE_POINTS
       : parseStagePoints(await fsx.read(stagePointsPath), parsed.phases.flatMap(phase => phase.stages.map(stage => stage.slug)))
   const sections = text === null ? [] : sectionsOf(parsed, step.stage, view, two, units, stagePoints)
-  const gates = collectGates(parsed, sections, view, mode === 'side-job')
+  // A park the engine left behind after work resumed (the audit has a later start) holds nothing.
+  const isParked = text !== null && (await isStillParked(fsx, parent(selection.statePath) ?? '', parsed.fields['Parked'] ?? ''))
+  const gates = collectGates(parsed, sections, view, mode === 'side-job', isParked)
   if (units?.isUncommitted) gates.unshift(pointsGate())
   if (stagePoints.unknown.length > 0 || stagePoints.unreadable.length > 0) gates.unshift(stagePointsGate(stagePoints))
   if (units && units.repeated.length > 0) gates.unshift(repeatedGate(units))
@@ -102,7 +105,11 @@ export async function loadAidlc(ctx: ProviderContext, detection: Detection): Pro
   // more to say than the branch's name.
   const context = isSideJob ? await sessionContext(ctx, branch, two) : []
   const isFolded = isSideJob && hasMoreThanBranch(context)
-  const next = isSideJob ? null : ((two && view && current ? prNext(two, view, current.id) : null) ?? nextOf(parsed).next)
+  // A stage that is running (in progress here, not parked, not waiting at a gate) has no next step yet: the workflow
+  // is doing it. Only a PR that asks something of the person (a review, a merge) still names one.
+  const isRunning = isParked === false && current !== undefined && (current.status === 'open' || current.status === 'revising')
+  const asked = two && view && current ? prNext(two, view, current.id) : null
+  const next = isSideJob ? null : (asked ?? (isRunning ? null : nextOf(parsed).next))
 
   return {
     version: 2,
@@ -481,6 +488,20 @@ function stagePointsGate(points: StagePoints): Gate {
   }
 }
 
+/**
+ * The state says `Parked:` and no audit shard has work started after it. Read only when the state says parked: the
+ * shards can be large.
+ */
+async function isStillParked(fsx: ProviderContext['fsx'], intentDir: string, since: string): Promise<boolean> {
+  if (since === '') return false
+  const auditDir = join(intentDir, 'audit')
+  const shards = (await fsx.list(auditDir)).filter(entry => entry.kind === 'file' && entry.name.endsWith('.md'))
+  for (const entry of shards) {
+    if (isResumedAfter((await fsx.read(join(auditDir, entry.name))) ?? '', since)) return false
+  }
+  return true
+}
+
 // ── Construction by Unit ─────────────────────────────────────────────────────
 
 /** The Units of the intent and how far each has got, ready to become Construction's rows. */
@@ -729,12 +750,12 @@ export function formatWhen(value: string): string {
  * on the stage an open PR blocks (its next stage, or one of its own) hangs after that PR's gates instead,
  * and says what it waits for.
  */
-function collectGates(parsed: ParsedState, sections: Section[], view: Derived | null, isSideJob: boolean): Gate[] {
+function collectGates(parsed: ParsedState, sections: Section[], view: Derived | null, isSideJob: boolean, isParked: boolean): Gate[] {
   // The rows tied to the viewer first: someone (or a merge) waits on them. They are drawn under Needs attention only.
   const gates: Gate[] = [...(view?.rows ?? []), ...(view?.gates ?? [])]
 
   const since = parsed.fields['Parked'] ?? ''
-  if (since !== '') {
+  if (since !== '' && isParked) {
     const stage = parsed.fields['Parked At Stage'] ?? ''
     const holder = sections.find(section => section.items.some(item => item.id === stage))
     // A per-unit stage drawn as Units: the section is still known, the row is the Unit being worked.
