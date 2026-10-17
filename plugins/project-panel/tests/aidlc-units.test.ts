@@ -311,21 +311,21 @@ describe('Construction drawn as Units', () => {
     expect(section.sideCount).toBe('1/4 units')
   })
 
-  test('the ring: the Units weigh 4 rows shared by points, each once-run stage 1', async () => {
+  test('the ring: each Unit weighs its story points, each once-run stage 1 point', async () => {
     const t = world()
     const section = unitList(await load(t, jiraHost(t, () => issue(13))))
-    // Points 8 + 3 + 13 + 5 = 29. Done: U1, 4 x 8/29 rows. All: 4 + 2 = 6 rows.
-    expect(section.percent).toBe(Math.round(((4 * 8) / 29 / 6) * 100))
+    // Points 8 + 3 + 13 + 5 = 29, and 2 for build-and-test and ci-pipeline. Done: U1's 8.
+    expect(section.percent).toBe(Math.round((8 / 31) * 100))
     expect(section.counts).toEqual({ done: 1, total: 6 })
   })
 
-  test('the plan: every other stage is one row, Construction its rows by points', async () => {
+  test('the plan: every stage is 1 story point, every Unit its own', async () => {
     const t = world()
     const model = await load(t, jiraHost(t, () => issue(13)))
-    // Done: 2 Inception stages + 32/29. All: 2 + 6 = 8 rows.
-    const percent = Math.round(((2 + 32 / 29) / 8) * 100)
+    // Done: 2 Inception stages (2 pt) + U1 (8 pt). All: 2 + 29 + 2 = 33 pt.
+    const percent = Math.round((10 / 33) * 100)
     expect(model.overall.percent).toBe(percent)
-    expect(model.overall.label).toBe(`${percent}% done, Construction by story points, 3 of 8`)
+    expect(model.overall.label).toBe(`${percent}% done by story points, 10 of 33 pt`)
   })
 
   test("a side job asks Jira for the Unit the file lacks, but writes nothing", async () => {

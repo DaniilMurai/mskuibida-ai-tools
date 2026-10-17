@@ -153,7 +153,7 @@ describe('real sample, bound session on its stage branch', () => {
     ])
   })
 
-  test('watch lists the state, the directive, the binding, the cursor, the space file and the intent and aidlc directories', async () => {
+  test('watch lists the state, the directive, the binding, the cursor, the space file, the intent directory, its stage points and aidlc', async () => {
     const model = await load(real.tree, real.ROOT, real.sessions.live)
     const intent = `${real.ROOT}/aidlc/spaces/default/intents/${real.LIVE_INTENT}`
     expect(model.watch).toEqual([
@@ -163,6 +163,7 @@ describe('real sample, bound session on its stage branch', () => {
       `${real.ROOT}/aidlc/spaces/default/intents/active-intent`,
       `${real.ROOT}/aidlc/active-space`,
       intent,
+      `${intent}/stage-story-points.txt`,
       `${real.ROOT}/aidlc`,
     ])
   })
