@@ -8,7 +8,7 @@ import { baseLine, derive, mapPrs, statusOfMarker } from '../src/providers/aidlc
 import type { Two } from '../src/providers/aidlc/truths'
 import { parseState } from '../src/providers/aidlc/parse-state'
 import { NOW, OPTIONS } from './world'
-import { PREFIX, REPO, REPO_URL, aload, aworld, ascripted, branchOf, itemOf, pr, sectionOf, state } from './aidlc-world'
+import { CONSTRUCTION, INCEPTION, PREFIX, REPO, REPO_URL, aload, aworld, ascripted, branchOf, itemOf, pr, sectionOf, state } from './aidlc-world'
 import type { AWorld } from './aidlc-world'
 
 const MERGED_AT = '2026-10-03T10:00:00Z'
@@ -727,5 +727,82 @@ describe('truths.ts, on plain data', () => {
     const local = parseState(state({}, { current: 'domain-design' }))
     const t2 = two({ main: parseState(state({}, { current: 'domain-design' })) })
     expect(baseLine(local, t2, derive(local, t2), 'domain-design')).toBe('')
+  })
+})
+
+describe('a phase branch: one PR for a whole phase (docs/inception)', () => {
+  test('an open PR from docs/inception carries every Inception stage: one group, the chip on the first, the word on all', async () => {
+    const w = aworld({
+      local: state({ 'requirements-analysis': 'x', 'user-stories': 'x', 'refined-mockups': 'x' }, { current: 'domain-design' }),
+      main: state({}, { current: 'requirements-analysis' }),
+      prs: [pr(50, 'docs/inception')],
+    })
+    const { model } = await aload(w)
+    for (const id of INCEPTION) {
+      expect(itemOf(model, id).group).toBe('pr-50')
+      expect(itemOf(model, id).statusWord).toBe('in review')
+    }
+    expect(itemOf(model, INCEPTION[0]!).chips.map(chip => chip.label)).toEqual(['#50'])
+    for (const id of INCEPTION.slice(1)) expect(itemOf(model, id).chips).toEqual([])
+    // Construction's stages are not the phase's.
+    expect(itemOf(model, 'functional-design')).not.toHaveProperty('group')
+  })
+
+  test('stages of the phase already on main stay merged: the phase PR is not a redo of them', async () => {
+    const landed = { 'requirements-analysis': 'x', 'user-stories': 'x' }
+    const w = aworld({
+      local: state({ ...landed, 'refined-mockups': 'x' }, { current: 'domain-design' }),
+      main: state(landed, { current: 'refined-mockups' }),
+      prs: [pr(56, 'docs/inception')],
+    })
+    const { model } = await aload(w)
+    for (const id of ['requirements-analysis', 'user-stories']) {
+      expect(itemOf(model, id)).toMatchObject({ status: 'done', landing: 'merged' })
+      expect(itemOf(model, id)).not.toHaveProperty('group')
+    }
+    for (const id of ['refined-mockups', 'domain-design', 'units-generation', 'contract-design']) expect(itemOf(model, id).group).toBe('pr-56')
+    // The chip sits on the first stage the PR still brings.
+    expect(itemOf(model, 'refined-mockups').chips.map(chip => chip.label)).toEqual(['#56'])
+  })
+
+  test('a session on the phase branch does not reopen what already landed', async () => {
+    const landed = { 'requirements-analysis': 'x', 'user-stories': 'x' }
+    const w = aworld({ local: state(landed), main: state(landed), branch: 'docs/inception', prs: [] })
+    const { model } = await aload(w)
+    for (const id of ['requirements-analysis', 'user-stories']) expect(itemOf(model, id).status).toBe('done')
+  })
+
+  test('merged, it lands every Inception stage on main', async () => {
+    const all = Object.fromEntries(INCEPTION.map(id => [id, 'x']))
+    const w = aworld({ local: state(all), main: state(all), prs: [pr(51, 'docs/inception', { state: 'MERGED', mergedAt: MERGED_AT })] })
+    const { model } = await aload(w)
+    for (const id of INCEPTION) expect(itemOf(model, id)).toMatchObject({ status: 'done', landing: 'merged' })
+    expect(INCEPTION.some(id => itemOf(model, id).chips.some(chip => chip.label === '#51'))).toBe(true)
+  })
+
+  test('a branch that only starts with a phase may be a part of it: it carries nothing', async () => {
+    const w = aworld({ local: state({}), main: state({}), prs: [pr(55, 'inception/mvp-to-refined-mockups')] })
+    const { model } = await aload(w)
+    for (const id of INCEPTION) expect(itemOf(model, id).chips).toEqual([])
+  })
+
+  test('any case, any prefix, any phase: the last segment decides', async () => {
+    const w = aworld({ local: state({}), main: state({}), prs: [pr(52, 'semka/Construction')] })
+    const { model } = await aload(w)
+    for (const id of CONSTRUCTION) expect(itemOf(model, id).group).toBe('pr-52')
+    expect(itemOf(model, 'domain-design')).not.toHaveProperty('group')
+  })
+
+  test('a phase branch names no ticket, so a session on a stage branch still sees it', async () => {
+    const w = aworld({ local: state({}), main: state({}), branch: branchOf('domain-design'), prs: [pr(53, 'docs/inception')] })
+    const { model } = await aload(w)
+    expect(itemOf(model, 'user-stories').group).toBe('pr-53')
+  })
+
+  test('a branch that names a stage maps to that stage, not its phase', async () => {
+    const w = aworld({ local: state({}), main: state({}), prs: [pr(54, 'dev/SHOP-7/user-stories')] })
+    const { model } = await aload(w)
+    expect(itemOf(model, 'user-stories').chips.map(chip => chip.label)).toEqual(['#54'])
+    expect(itemOf(model, 'domain-design').chips).toEqual([])
   })
 })

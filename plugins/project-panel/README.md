@@ -541,6 +541,12 @@ Merged stages count as done, in the rings and the plan's percent, and so do stag
   merged **after** the earliest reopened one is **stale** (an amber `✓`, the word `stale`, not done): it was built on
   what is being redone. Stages in progress, in review or not started keep their own status. Neither counts as done
   in the rings or the percent, and a narrow row keeps both words. From the forge's changed-files read; no model call.
+- **Phase branches (0.18.0).** A branch whose last segment is a phase's name (`docs/inception`, `semka/Construction`,
+  any case) carries every executed stage of that phase: one PR for the whole phase, drawn as a fold, its chip on the first
+  stage it still brings. Stages of the phase already on main stay merged (the phase PR is not a redo of them; its changed
+  files can still reopen one), and a session on the phase branch does not reopen them either. A phase branch names no
+  ticket, so a session on a stage branch still sees it. Only the last segment counts: `inception/mvp-to-refined-mockups`
+  may be a part of the phase, and carries nothing unless the stage pattern reads it.
 - **Fold names.** After the separator a fold may name stages with commas, and words that are no stage are dropped:
   `dev/ABC-5/refined-mockups--folded--requirements-analysis,user-stories` carries requirements-analysis, user-stories
   and refined-mockups. A fold's stages are consecutive, so the ones between the named ones are carried too.
@@ -838,6 +844,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.18.0** — phase branches (`docs/inception`) carry their whole phase; a press on the pane is taken by a `ui.press` hook, so the first press after the pane is shown again lands.
 - **0.17.0** — points shown: every phase counts its points (`7/8 pt`), every stage row says what it weighs (`1 pt`).
 - **0.16.0** — the plan by story points: every stage 1 point, a Unit its own, overridable per stage in `stage-story-points.txt`.
 - **0.15.0** — Construction by Unit counted by story points (`8/29 pt`) with the Units done beside them (`1/4 units`); a Unit claimed at this checkout (`Active Unit`) narrows Construction to its own stages, with every Unit under a folded Units section.

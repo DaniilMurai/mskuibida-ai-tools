@@ -17,7 +17,8 @@ import { SHORT_MS, mains, missingRefs, prefixes, tops } from './memo'
 import { changedFiles, defaultBranch, forgeOf, listChanges, refOf } from './prs'
 import { parseState } from './parse-state'
 import { reviewCtxOf } from '../review/viewer'
-import { RANK, mapPrs, markerOn, reopenCandidates, stagesOf, ticketOf } from './truths'
+import { RANK, carriedBy, mapPrs, markerOn, reopenCandidates, ticketOf } from './truths'
+import type { BranchOptions } from './truths'
 import type { Two } from './truths'
 import type { ParsedState } from './types'
 
@@ -133,10 +134,17 @@ export async function readTwo(
   const main = mainText === null ? null : parseState(mainText)
 
   const order = local.phases.flatMap(p => p.stages.filter(s => s.isExecuted && s.marker !== 'skipped').map(s => s.slug))
+  // A phase branch (docs/inception) carries every executed stage of its phase.
+  const branches: BranchOptions = {
+    ...options,
+    phases: Object.fromEntries(
+      local.phases.map(p => [p.key.toLowerCase(), p.stages.filter(s => s.isExecuted && s.marker !== 'skipped').map(s => s.slug)]),
+    ),
+  }
   const startMs = Date.parse(local.fields['Start Date'] ?? '')
   const mapped = prs
     ? mapPrs(prs, order, {
-        ...options,
+        ...branches,
         ticket: ticketOf(sessionBranch, options),
         startMs: Number.isNaN(startMs) ? null : startMs,
       })
@@ -149,7 +157,9 @@ export async function readTwo(
   // How far the session's branch is behind the default branch, asked of git whatever the forge says about the PR
   // (it only reports BEHIND under strict branch protection). Nothing to ask when every stage on the branch is
   // already on the default branch, or when the PR's own BEHIND gate will say it.
-  const sessionStages = sessionBranch === '' ? [] : stagesOf(sessionBranch, order, options)
+  // A session on a phase branch carries the phase's stages not on main yet; one on a stage branch, every one it names.
+  const carried = sessionBranch === '' ? { stages: [], isPhase: false } : carriedBy(sessionBranch, order, branches)
+  const sessionStages = carried.isPhase ? carried.stages.filter(slug => markerOn(main, slug) !== 'completed') : carried.stages
   // A merged stage whose box here went back (a backward jump reopened it) is unmerged work again.
   const hasUnmerged = sessionStages.some(slug => markerOn(main, slug) !== 'completed' || markerOn(local, slug) !== 'completed')
   const isPrBehind = prs?.some(pr => pr.state === 'OPEN' && pr.headRefName === sessionBranch && pr.mergeStateStatus === 'BEHIND') ?? false
