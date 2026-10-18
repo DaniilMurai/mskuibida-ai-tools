@@ -446,7 +446,8 @@ its UUID where `intents.json` has one) — a worktree or the main checkout — C
   its `UNIT_COMPLETED` receipt is written, so it is drawn waiting on approval, never done: `functional-design awaits
   approval` on the Unit's row, one `awaits your approval` row under Needs attention, and Next is `/aidlc`. The engine
   rewrites the table only when `/aidlc` routes, so a stage that started since can still read `[ ]` there: a cell at
-  `[ ]` whose latest receipt is `UNIT_STARTED`, `UNIT_RESUMED` or `UNIT_PAUSED` is in progress (0.20.1). A cell past `[ ]`
+  `[ ]` whose latest receipt is `UNIT_STARTED`, `UNIT_RESUMED` or `UNIT_PAUSED` is in progress (0.20.1). So is a cell at `[x]` with such a receipt last: a stage re-opened after its approval
+  (`aidlc engine jump reopen`) starts again while the table can still say done (0.21.2). Any other cell past `[ ]`
   stays the table's. A stage a Unit's kind does not owe is `[x]` there too, unrun (0.21.0): units-generation tags each
   Unit `kind: service|spec|ui|packaging|library`, and a per-unit stage none of whose `produces` its `produces_kinds` map
   gives that kind does not apply (the engine's own rule). The panel reads those maps from the workspace's engine install
@@ -876,6 +877,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.21.2** — a Unit stage re-opened after its approval (its latest receipt a start) is in progress, even while the engine's table still says `[x]`.
 - **0.21.1** — a session on a side branch the stage pattern reads but that names no stage (`ms/BM-218/sprint-rules`) no longer filters PRs by its ticket, so the plan's stage and phase PRs (`ms/BM-5/delivery-planning`) map there too.
 - **0.21.0** — buttons keep one press handle per key across redraws, so the first press lands on a drawing the surface has not replaced yet (Put in prompt and folds no longer take a second click); a Unit stage its kind does not owe is skipped, not done, so an unstarted packaging Unit reads not started.
 - **0.20.1** — a stage that started after the engine last wrote its Unit Progress table is in progress, not up next, so the stale Next goes too.

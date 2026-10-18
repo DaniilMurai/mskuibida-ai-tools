@@ -755,6 +755,33 @@ describe("the engine's Unit Progress table", () => {
     expect(unitList(model).items.find(item => item.id === 'unit:api-billing')).toMatchObject({ status: 'open', statusWord: 'nfr-requirements' })
   })
 
+  test('a stage re-opened after its approval is running again, though the table still says done', async () => {
+    // code-generation was approved, then re-opened (`aidlc engine jump reopen`): its latest receipt is a start.
+    const reopened = audit(
+      ['2026-10-02T10:00:00Z', 'UNIT_STARTED', 'code-generation', 'api-billing'],
+      ['2026-10-02T11:00:00Z', 'UNIT_COMPLETED', 'code-generation', 'api-billing'],
+      ['2026-10-02T12:00:00Z', 'UNIT_STARTED', 'code-generation', 'api-billing'],
+    )
+    const t = tree(withTable(stateText(), { 'api-billing': ['x', 'x', 'x', 'x', 'x', 'x'] }), {
+      [`${INTENT_DIR}/audit/host-a.md`]: reopened,
+      [POINTS_PATH]: POINTS,
+      ...claimOf('api-billing'),
+    })
+    const model = await load(t)
+    expect(construction(model).items.find(item => item.id === 'code-generation')).toMatchObject({ status: 'open', isCurrent: true })
+    expect(construction(model).counts).toEqual({ done: 4, total: 5 })
+    expect(unitList(model).items.find(item => item.id === 'unit:api-billing')).toMatchObject({ status: 'open', statusWord: 'code-generation' })
+    expect(model.next).toBeUndefined()
+  })
+
+  test('a [x] stage whose latest receipt is its completion stays done', () => {
+    const table = withReceipts(new Map([['u', new Map<string, UnitCell>([['code-generation', 'x']])]]), [
+      { event: 'UNIT_STARTED', stage: 'code-generation', unit: 'u', at: '1' },
+      { event: 'UNIT_COMPLETED', stage: 'code-generation', unit: 'u', at: '2' },
+    ])
+    expect(table.get('u')?.get('code-generation')).toBe('x')
+  })
+
   test('the table wins over a receipt for what it knows: a [?] stays waiting on approval', () => {
     const table = withReceipts(new Map([['u', new Map<string, UnitCell>([['functional-design', '?'], ['nfr-requirements', ' ']])]]), [
       { event: 'UNIT_COMPLETED', stage: 'functional-design', unit: 'u', at: '1' },
