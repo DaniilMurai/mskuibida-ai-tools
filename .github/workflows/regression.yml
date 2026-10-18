@@ -97,16 +97,11 @@ jobs:
           claude plugin validate .
           claude plugin validate plugins/worktree-cleanup
           claude plugin validate plugins/question-forms
-          claude plugin validate plugins/rule-guard
-          claude plugin validate plugins/stage-guard
           claude plugin validate plugins/story-points
 
-      - name: Test the AI-DLC guard plugins
-        # rule-guard, stage-guard and story-points: Python hooks and scripts with unittest suites.
-        run: |
-          for p in rule-guard stage-guard story-points; do
-            python3 -m unittest discover -s "plugins/$p/tests" || exit 1
-          done
+      - name: Test story-points
+        # Python hook and script with a unittest suite.
+        run: python3 -m unittest discover -s plugins/story-points/tests
 
   upstream-aidlc:
     # project-panel's AI-DLC provider is keyed on upstream's state-file field names,

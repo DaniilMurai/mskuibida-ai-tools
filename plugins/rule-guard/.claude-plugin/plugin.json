@@ -1,9 +1,0 @@
-{
-  "name": "rule-guard",
-  "displayName": "Rule guard",
-  "version": "2.0.0",
-  "description": "Keeps the ## Corrections heading out of an AI-DLC project's team.md and project.md: a lesson kept at a stage's learnings question is saved by the learnings tool under a section the file already has.",
-  "author": {
-    "name": "Maksym Skuibida"
-  }
-}

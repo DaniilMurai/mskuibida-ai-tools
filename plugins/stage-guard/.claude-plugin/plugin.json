@@ -1,9 +1,0 @@
-{
-  "name": "stage-guard",
-  "displayName": "Stage guard",
-  "version": "2.0.0",
-  "description": "One AI-DLC stage per branch and pull request: refuses to start or continue a stage on the main branch, on another stage's branch, while the previous stage's pull request is unmerged, or on top of an earlier stage whose approved work has changed since its approval; several stages share one pull request only when the developer types /stage-guard:fold. Can also refuse Construction until the intent's start check is confirmed with /stage-guard:confirm-start-check. Branch prefixes, ticket key pattern and main branch come from an optional .stage-guard.json.",
-  "author": {
-    "name": "Maksym Skuibida"
-  }
-}
