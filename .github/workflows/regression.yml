@@ -1,6 +1,6 @@
 name: regression
 
-# Gates for four plugins. worktree-cleanup: its regression suite. model-fit, project-panel and ask-guard:
+# Gates for the plugins. worktree-cleanup: its regression suite. model-fit, project-panel and ask-guard:
 # the Claude Code CLI validates the manifests and the mods, then runs each mod's own tests. Every plugin: versions
 # are consistent, and bumped on PRs that change what users receive (scripts/check-versions.py).
 #
@@ -92,11 +92,21 @@ jobs:
           claude plugin validate plugins/ask-guard
           claude plugin test plugins/ask-guard
 
-      - name: Validate the marketplace and the worktree-cleanup and question-forms plugins
+      - name: Validate the marketplace and the plugins without a test command
         run: |
           claude plugin validate .
           claude plugin validate plugins/worktree-cleanup
           claude plugin validate plugins/question-forms
+          claude plugin validate plugins/rule-guard
+          claude plugin validate plugins/stage-guard
+          claude plugin validate plugins/story-points
+
+      - name: Test the AI-DLC guard plugins
+        # rule-guard, stage-guard and story-points: Python hooks and scripts with unittest suites.
+        run: |
+          for p in rule-guard stage-guard story-points; do
+            python3 -m unittest discover -s "plugins/$p/tests" || exit 1
+          done
 
   upstream-aidlc:
     # project-panel's AI-DLC provider is keyed on upstream's state-file field names,

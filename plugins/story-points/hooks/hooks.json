@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^mcp__.+__(?:(?=\\w*(?:[Cc]reate|[Ee]dit|[Uu]pdate|[Tt]ransition))(?=\\w*[Ii]ssue)\\w+|execute(?:Write|Destructive))$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"${CLAUDE_PROJECT_DIR:-.}/.story-points.json\" ] || exit 0; command -v python3 >/dev/null 2>&1 || { echo 'Refused by the story-points plugin: python3 is not installed, so Jira writes cannot be checked for the story-point field. Install Python 3 or disable the plugin.' >&2; exit 2; }; python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/story_point_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

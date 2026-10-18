@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -d \"${CLAUDE_PROJECT_DIR:-.}/aidlc/spaces\" ] || exit 0; command -v python3 >/dev/null 2>&1 || { echo 'Refused by the rule-guard plugin: python3 is not installed, so the AI-DLC rule files cannot be guarded. Install Python 3 or disable the plugin.' >&2; exit 2; }; python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/rule_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

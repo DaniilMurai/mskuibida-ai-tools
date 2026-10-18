@@ -40,6 +40,24 @@
       "source": "./plugins/question-forms",
       "description": "Every AI-DLC questions file becomes a form in one private artifact: the agent writes the questions as rows, you answer in the page, and the agent copies your answers word for word into the file's [Answer]: tags. Also renders text-only questions and board forms that sort cards into boxes.",
       "version": "1.3.2"
+    },
+    {
+      "name": "rule-guard",
+      "source": "./plugins/rule-guard",
+      "description": "For AI-DLC projects: keeps the ## Corrections heading out of team.md and project.md, so a kept lesson is saved under a section the file already has.",
+      "version": "2.0.0"
+    },
+    {
+      "name": "stage-guard",
+      "source": "./plugins/stage-guard",
+      "description": "For AI-DLC projects: one stage per branch and pull request, merged before the next starts; several stages share a pull request only when the developer types /stage-guard:fold; optional start check before Construction. Branch prefixes and an optional ticket key come from the project's .stage-guard.json.",
+      "version": "2.0.0"
+    },
+    {
+      "name": "story-points",
+      "source": "./plugins/story-points",
+      "description": "For AI-DLC projects: keeps each intent's unit-points.csv (read by project-panel) with the developers' story-point estimates, typed with /story-points:set or synced from Jira when the project's .story-points.json names a tracker; checks a Unit is estimated before it is claimed.",
+      "version": "2.0.0"
     }
   ]
 }
