@@ -34,6 +34,12 @@
       "source": "./plugins/ask-guard",
       "description": "Keeps the question dialog readable: a question the model writes longer than 250 characters (configurable) is sent back with word to put the context in a markdown message first and ask in one line. Other plugins' dialogs pass untouched.",
       "version": "0.1.0"
+    },
+    {
+      "name": "question-forms",
+      "source": "./plugins/question-forms",
+      "description": "Every AI-DLC questions file becomes a form in one private artifact: the agent writes the questions as rows, you answer in the page, and the agent copies your answers word for word into the file's [Answer]: tags. Also renders text-only questions and board forms that sort cards into boxes.",
+      "version": "1.3.2"
     }
   ]
 }

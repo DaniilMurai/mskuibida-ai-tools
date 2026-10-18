@@ -1,0 +1,686 @@
+<title>AI-DLC question forms</title>
+<!--
+  AI-DLC question forms — the one template for every AI-DLC questions file.
+
+  Published ONCE per developer as a private Artifact with the `db` capability
+  (capabilities: {db: {}}, icon "form"); never regenerated per stage. Every questions
+  file becomes a form INSIDE this artifact, always, written as rows by the agent with the
+  ArtifactData tool (see SKILL.md next to this file). The page renders whatever the rows
+  say, live, so a question can be added, changed or removed without republishing anything.
+
+  Data contract (the only thing an agent writes):
+
+    forms/<id>                       {title, stage, file, status: "open"|"done",
+                                      createdAt (ISO), intro?, savedAt?, answers?}
+      id: [a-z0-9._-]+ — e.g. 261016-daily-page-mvp-intent-capture
+    forms/<id>/questions/<qid>       {n: 1, text, ctx?, kind: "single"|"multi",
+                                      options: [{k: "A", t: "…"}], other?: false,
+                                      proposed?: {k: "A", why: "…"}, hint?}
+      qid: the file's question id (Q1, Q2 …). other defaults to true.
+
+    Markdown the page renders (functions md and inline; nothing else):
+      ctx (questions and cards) — blocks separated by a blank line. A block whose every line
+        starts with "- " is a list, one level only (leading spaces are dropped, so an indented
+        line is not a sub-item); any other block is a paragraph, its single line breaks kept.
+        Inside both: `code` and **bold**.
+      text, options[].t, proposed.why, proposed.t, hint, from, outcomes, boxes[].t/hint,
+        groups[].t/hint — `code` and **bold** only, no blocks or lists.
+      title, stage, file, intro — plain text.
+      Not rendered: •, –, numbered or nested lists, headings, links, _italic_; they show as
+      literal text. A sentence before a list needs a blank line, or the list stays plain lines.
+
+    Text question — no options, only a text field (no Other):
+    forms/<id>/questions/<qid>       {n, text, ctx?, kind: "text", hint?, proposed?: {t: "…"}}
+      proposed.t is a suggested answer the developer can take with one press.
+
+    Board form — cards sorted into boxes instead of questions answered one by one:
+    forms/<id>                       {…, view: "board",
+                                      boxes: [{k: "fix", t: "…", hint?, tone?: "ink"|"accent"|"warn"|"muted"}]}
+      2–4 boxes, side by side when the page is wide enough, stacked when it is not.
+      groups?: [{k, t, hint?}] with boxes[].group, and boxes[].sink: true — a grouped board: the
+      groups side by side, each group's boxes stacked, sink boxes in a full row below. A card can
+      move only within its group or to a sink box; a card proposed into a sink box names its group
+      in `group` (card field), else it may go to any box.
+    forms/<id>/questions/<qid>       {n, text, ctx?, kind: "card", from?, group?, proposed: {k: "<box k>", why?},
+                                      outcomes?: {"<box k>": "what happens when the card sits here"}}
+      text is the card's short title; from is one line on who asked for what. A card starts
+      in its proposed box. On a grouped board the group alone decides where it can go, and
+      outcomes only describes; on a board without groups, outcomes (when present) limits the
+      boxes offered to its keys and the proposed box.
+
+  What the page writes (the only thing an agent reads back, one `get` of forms/<id>):
+
+    forms/<id>.answers[qid] = {k: ["A"] | ["A","C"] | ["X"], note: "…", at: ISO}
+      text question: {k: [], note: "<the answer>"} · card: {k: ["<box k>"], note}
+      On Done every card is written, moved or not.
+    forms/<id>.status       = "done" when the developer presses Done; "open" again
+                              after a later edit.   forms/<id>.savedAt = ISO of Done.
+
+  Tag format when copying into the questions file:  A · A, C · X — each followed by
+  " — <note>" when a note was written. A note is required for X, optional otherwise.
+  A text question's tag is the note itself; empty means still open.
+
+  Link to a form: <artifact url>#<id>. No hash: the list of forms.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column. A form is a numbered list of sections; options are selectable rows,
+   the note sits under them, the proposal apart. A fixed bar carries save state and Done. */
+:root {
+  --bg: #f4f6f5; --surface: #ffffff; --fg: #17221f; --muted: #5a6964; --line: #d7dfdc;
+  --accent: #c8781a; --accent-soft: #fbefdf; --ink: #1d4a40; --ink-soft: #e3eeea;
+  --ok: #2f7a4d; --warn: #a33a2a; --warn-soft: #fbe7e2;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
+  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
+  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); padding: 0 16px; }
+main { max-width: 760px; margin: 0 auto; padding-block: 36px 140px; display: grid; gap: 36px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.eyebrow a { color: inherit; text-decoration: none; }
+.eyebrow a:hover { text-decoration: underline; }
+h1 { font: 700 clamp(28px, 5vw, 38px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--muted); font-size: 14px; min-width: 0; }
+.file { font: 500 12.5px var(--mono); background: var(--ink-soft); color: var(--ink); padding: 4px 8px; border-radius: 4px; max-width: 100%; overflow-wrap: anywhere; }
+.pill { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.done { color: var(--ok); border-color: var(--ok); }
+.pill.open { color: var(--accent); border-color: var(--accent); }
+
+#list { display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: inherit; text-decoration: none; }
+.row:hover { border-color: var(--ink); }
+.row b { font: 600 17px/1.3 var(--display); }
+.row small { color: var(--muted); display: block; margin-top: 2px; }
+.row .pill { justify-self: end; }
+.empty { padding: 20px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); display: grid; gap: 8px; max-width: 66ch; }
+.empty p { margin: 0; }
+
+#questions { display: grid; gap: 44px; }
+section.q { display: grid; gap: 14px; scroll-margin-top: 24px; }
+.qhead { display: flex; gap: 12px; align-items: baseline; }
+.qid { font: 500 13px/1 var(--mono); color: var(--ink); background: var(--ink-soft); padding: 5px 8px; border-radius: 4px; flex: none; }
+h2 { font: 600 22px/1.25 var(--display); margin: 0; text-wrap: balance; min-width: 0; }
+.ctx { display: grid; gap: 10px; max-width: 66ch; }
+.ctx p, .ctx ul { margin: 0; }
+.ctx ul { padding-left: 20px; display: grid; gap: 6px; }
+code { font: 500 13px var(--mono); background: var(--ink-soft); padding: 1px 5px; border-radius: 3px; }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+.options { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 13px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.opt > span { min-width: 0; }
+.opt:hover { border-color: var(--ink); }
+.opt:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.opt input { margin: 3px 0 0; accent-color: var(--ink); width: 16px; height: 16px; }
+.opt input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.optletter { font: 500 13px var(--mono); color: var(--muted); margin-right: 6px; }
+.note { display: grid; gap: 6px; }
+.note label { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.note label b { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+textarea { width: 100%; box-sizing: border-box; min-height: 56px; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+section.q.needs-note textarea { border-color: var(--warn); }
+section.q.needs-note .note label { color: var(--warn); }
+.proposal { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--accent-soft); border-radius: 8px; }
+.proposal p { margin: 0; flex: 1 1 320px; min-width: 0; font-size: 14px; }
+.proposal b { font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-right: 6px; }
+button { font: 600 14px var(--body); border-radius: 6px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.use { background: transparent; color: var(--fg); border: 1px solid var(--accent); padding: 6px 12px; }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.barin { max-width: 760px; margin: 0 auto; display: flex; gap: 10px 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+#status { color: var(--muted); font-size: 14px; min-width: 0; flex: 1 1 240px; }
+#status.ok { color: var(--ok); }
+#status.warn { color: var(--warn); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.done { background: var(--ink); color: var(--surface); border: 0; padding: 10px 20px; }
+.done:disabled { opacity: .5; cursor: default; }
+.done.is-done { background: var(--ok); }
+.bar[hidden] { display: none; }
+
+/* Board: boxes side by side when the column is wide enough, stacked otherwise. */
+main { container-type: inline-size; }
+body.wide main, body.wide .barin { max-width: 1320px; }
+.board { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 980px) { .board { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); align-items: stretch; } }
+.box { --tone: var(--ink); background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--tone); border-radius: 10px; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.box.tone-accent { --tone: var(--accent); }
+.box.tone-warn { --tone: var(--warn); }
+.box.tone-muted { --tone: var(--muted); }
+.box.over { box-shadow: 0 0 0 2px var(--tone); }
+.boxhead { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.boxhead h3 { font: 600 17px/1.25 var(--display); margin: 0; display: flex; justify-content: flex-start; gap: 10px; align-items: baseline; }
+.boxhead .count { font: 500 12px var(--mono); color: var(--tone); }
+.boxhead p { margin: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards { display: grid; gap: 10px; padding: 12px; align-content: start; min-height: 72px; }
+.cards:empty { border: 1px dashed var(--line); border-radius: 8px; margin: 12px; padding: 0; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.card[draggable="true"] { cursor: grab; }
+.card.dragging { opacity: .45; }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chead { display: flex; gap: 10px; align-items: baseline; }
+.chead .qid { font-size: 12px; padding: 3px 6px; }
+.ctitle { font: 600 15px/1.35 var(--body); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.card p { margin: 0; font-size: 13.5px; }
+.card .from { color: var(--muted); }
+.card .outcome { border-left: 3px solid var(--tone, var(--ink)); padding-left: 8px; }
+.card .outcome:empty, .card .sugg:empty { display: none; }
+.card .sugg { color: var(--muted); font-size: 13px; }
+.card .sugg b { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin-right: 4px; }
+.card.moved .sugg b { color: var(--muted); }
+/* Cards are compact: id, title, expand button and one row of move buttons. Details open per card
+   or all at once from the bar; an open card that is wide enough puts its details in two columns. */
+.card { container-type: inline-size; gap: 10px; padding: 12px 14px; }
+.chead { align-items: center; }
+.ctitle { flex: 1 1 auto; font-size: 14.5px; }
+.cflag { flex: none; font: 500 11px/1 var(--mono); color: var(--muted); }
+.cexp { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted); }
+.cexp:hover { color: var(--fg); border-color: var(--line); }
+.cexp svg { transition: transform .15s; }
+.card.open .cexp svg { transform: rotate(180deg); }
+.cdetail { display: none; }
+.card.open .cdetail { display: block; border-top: 1px solid var(--line); padding-top: 10px; }
+.cin { display: grid; gap: 8px; }
+.cmain, .cside { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.cmain .ctx { font-size: 14px; }
+.addnote { justify-self: start; background: none; border: 0; padding: 0; font: 500 13px var(--body); color: var(--ink); cursor: pointer; }
+.card.noting .addnote { display: none; }
+.cnote { display: none; }
+.card.noting .cnote { display: grid; }
+@container (min-width: 560px) { .cin { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px 20px; } }
+.allbtn { background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 9px 14px; }
+.allbtn:hover { border-color: var(--ink); }
+.allbtn[hidden] { display: none; }
+
+/* Grouped board: one container for the groups, split by a divider, each group a small title; a
+   group's boxes are sections split by a line, each tinted with its own tone. Sink boxes get a row
+   below. */
+.gboard { display: grid; gap: 16px; }
+.grow { display: grid; gap: 0; grid-template-columns: minmax(0, 1fr); align-items: stretch; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+@container (min-width: 720px) { .grow { grid-template-columns: repeat(var(--g, 2), minmax(0, 1fr)); } .group + .group { border-top: 0; border-left: 1px solid var(--line); } }
+.group { background: var(--surface); display: grid; gap: 0; align-content: start; min-width: 0; grid-template-rows: auto; }
+@container (max-width: 719.98px) { .group + .group { border-top: 1px solid var(--line); } }
+/* Title and hint each keep to one line, so every group's header has the same height and the sections line up. */
+.ghead { display: grid; gap: 2px; padding: 12px 18px 10px; border-bottom: 1px solid var(--line); min-width: 0; }
+.ghead h3 { font: 600 12.5px/1.3 var(--body); margin: 0; color: var(--muted); }
+.ghead h3, .ghead p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ghead p { margin: 0; font-size: 12px; color: var(--muted); }
+.gboxes { display: grid; gap: 0; }
+.group .box { --box-bg: color-mix(in srgb, var(--tone) 6%, var(--surface)); background: var(--box-bg); border: 0; border-radius: 0; }
+.group .box.tone-accent { --box-bg: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.group .box.tone-warn { --box-bg: color-mix(in srgb, var(--warn) 11%, var(--surface)); }
+.group .box + .box { border-top: 1px solid var(--line); }
+.group .boxhead { border-bottom: 0; padding: 14px 18px 4px; }
+.group .boxhead p { padding-left: 16px; }
+.group .boxhead h3 > span:first-child::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); margin-right: 8px; vertical-align: 2px; }
+.group .cards { padding: 8px 18px 18px; gap: 10px; }
+.group .card { background: var(--surface); }
+.box.sink { border-top-style: dashed; position: relative; }
+/* The handle on the sink's top edge exists only on a wide window (see the media block below). */
+.sinkgrip { display: none; }
+body.resizing, body.resizing * { cursor: ns-resize !important; user-select: none; }
+.box.sink .cards { padding: 10px 18px 18px; gap: 12px; }
+.box.sink .cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  /* one row of cards and a quarter of the next, so it is plain that the box scrolls (set by sizeSinks) */
+  max-height: var(--sink-max, 130px); overflow-y: auto; scrollbar-gutter: stable; }
+.box.sink .cards, body.wide .box .cards {
+  /* scroll shadows: a soft edge appears only where there is more to scroll */
+  background:
+    linear-gradient(var(--box-bg, var(--surface)) 30%, transparent) center top,
+    linear-gradient(transparent, var(--box-bg, var(--surface)) 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--fg) 16%, transparent), transparent) center top,
+    radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--fg) 16%, transparent), transparent) center bottom;
+  background-repeat: no-repeat; background-size: 100% 28px, 100% 28px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll; }
+.box.no-drop { opacity: .4; }
+
+/* On a window wide and tall enough, the page scrolls only until the header is gone: the board is
+   exactly as tall as the screen above the bar, so at the end of the page it fills it, and from
+   there each box scrolls on its own. The sink row is one row of cards and a quarter; the groups take the rest.
+   Phones scroll the page as usual. */
+@media (min-width: 760px) and (min-height: 560px) {
+  body.wide main { padding-block: 20px 80px; gap: 16px; }
+  body.wide header { gap: 6px; }
+  body.wide h1 { font-size: clamp(24px, 3vw, 30px); }
+  body.wide #questions { height: calc(100dvh - 100px); min-height: 360px; }
+  body.wide .board { height: 100%; min-height: 0; align-items: stretch; }
+  body.wide .gboard { height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; gap: 12px; }
+  body.wide .grow { min-height: 0; height: 100%; align-items: stretch; }
+  body.wide .group { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
+  body.wide .gboxes { min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  body.wide .box { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
+  body.wide .box.sink .boxhead { padding: 12px 18px 8px; }
+  body.wide .sinkgrip { display: block; position: absolute; left: 0; right: 0; top: -9px; height: 16px; cursor: ns-resize; z-index: 1; touch-action: none; }
+  body.wide .sinkgrip::after { content: ""; position: absolute; left: 50%; top: 6px; width: 48px; height: 4px; margin-left: -24px; border-radius: 2px; background: var(--line); transition: background .15s; }
+  body.wide .sinkgrip:hover::after, body.wide .sinkgrip:focus-visible::after, body.resizing .sinkgrip::after { background: var(--muted); }
+  body.wide .sinkgrip:focus-visible { outline: none; }
+  body.wide .boxhead h3 { font-size: 15px; }
+  body.wide .boxhead p { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.wide .box .cards { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+  body.wide .box .cards:empty { min-height: 48px; }
+}
+.moves { display: flex; flex-wrap: wrap; gap: 6px; }
+.move { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 4px 9px; font: 500 12.5px var(--body); }
+.move:hover { border-color: var(--ink); color: var(--fg); }
+.box.tone-ink .card { --tone: var(--ink); } .box.tone-accent .card { --tone: var(--accent); }
+.box.tone-warn .card { --tone: var(--warn); } .box.tone-muted .card { --tone: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .opt, .row, .box { transition: border-color .15s, box-shadow .15s; } }
+</style>
+
+<main>
+  <header id="head">
+    <span class="eyebrow"><a href="#" id="home">AI-DLC · question forms</a></span>
+    <h1 id="title">Question forms</h1>
+    <p class="lede" id="lede">Connecting to saved answers…</p>
+    <div class="meta" id="meta" hidden></div>
+  </header>
+  <div id="list" hidden></div>
+  <div id="questions" hidden></div>
+</main>
+<div class="bar" id="bar" hidden><div class="barin">
+  <span id="status">Connecting…</span>
+  <div class="actions">
+    <button class="allbtn" id="expandall" type="button" hidden>Expand all</button>
+    <button class="allbtn" id="collapseall" type="button" hidden>Collapse all</button>
+    <button class="done" id="done" type="button" disabled>Mark as done</button>
+  </div>
+</div></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = { title: $("title"), lede: $("lede"), meta: $("meta"), list: $("list"), qs: $("questions"), bar: $("bar"), status: $("status"), done: $("done") };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  const md = (s) => String(s ?? "").trim().split(/\n\s*\n/).filter(Boolean).map((b) => {
+    const lines = b.split("\n");
+    if (lines.every((l) => /^\s*-\s+/.test(l))) return "<ul>" + lines.map((l) => "<li>" + inline(l.replace(/^\s*-\s+/, "")) + "</li>").join("") + "</ul>";
+    return "<p>" + lines.map(inline).join("<br>") + "</p>";
+  }).join("");
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); } catch { return iso || ""; } };
+  const setStatus = (t, cls) => { el.status.textContent = t; el.status.className = cls || ""; };
+  const formId = () => { const h = decodeURIComponent(location.hash.replace(/^#/, "")); return /^[a-z0-9._-]+$/i.test(h) ? h : ""; };
+
+  let db = null;
+  const view = { id: "", unsub: [], form: null, mode: "", expanded: new Set(), closing: false, boxesKey: "", loaded: false, rendered: new Map(), drag: null, questions: new Map(), answers: {}, touched: {}, pending: {}, inflight: false, timer: null, confirmDone: false };
+
+  function teardown() { view.unsub.forEach((u) => { try { u(); } catch {} }); view.unsub = []; view.questions = new Map(); view.rendered = new Map(); view.expanded = new Set(); view.mode = ""; view.boxesKey = ""; view.loaded = false; view.drag = null; view.answers = {}; view.touched = {}; view.pending = {}; view.confirmDone = false; el.qs.innerHTML = ""; document.body.classList.remove("wide"); }
+
+  /* ---------- index ---------- */
+  function showIndex() {
+    teardown(); view.id = ""; view.form = null;
+    el.title.textContent = "Question forms";
+    el.lede.textContent = "Every stage's questions file, as a form. Pick one; nothing is pre-selected, and Claude copies what you save word for word into the file.";
+    el.meta.hidden = true; el.qs.hidden = true; el.bar.hidden = true; el.list.hidden = false;
+    el.list.innerHTML = '<div class="empty"><p>Loading forms…</p></div>';
+    if (!db) return;
+    const u = db.collection("forms").orderBy("createdAt", "desc").limit(100).onSnapshot((snap) => {
+      if (snap.empty) { el.list.innerHTML = '<div class="empty"><p><b>No forms yet.</b></p><p>Claude creates one here for every questions file a stage writes and gives you its link, which ends in <code>#</code> and the form’s id.</p></div>'; return; }
+      el.list.innerHTML = snap.docs.map((d) => { const f = d.data(); const n = Object.keys(f.answers || {}).length; return `<a class="row" href="#${esc(d.id)}"><span><b>${esc(f.title || d.id)}</b><small>${esc(f.stage || "")}${f.stage ? " · " : ""}${fmt(f.createdAt)}${n ? ` · ${n} answered` : ""}</small></span><span class="pill ${f.status === "done" ? "done" : "open"}">${f.status === "done" ? "done" : "open"}</span></a>`; }).join("");
+    }, () => { el.list.innerHTML = '<div class="empty"><p>Couldn’t load the forms. Reload the page.</p></div>'; });
+    view.unsub.push(u);
+  }
+
+  /* ---------- one form ---------- */
+  function showForm(id) {
+    teardown(); view.id = id;
+    el.list.hidden = true; el.qs.hidden = false; el.bar.hidden = false; el.meta.hidden = false;
+    el.title.textContent = id; el.lede.textContent = ""; el.meta.innerHTML = ""; el.qs.innerHTML = '<p class="hint">Loading questions…</p>';
+    setStatus("Connecting…"); el.done.disabled = true;
+    if (!db) return;
+    const ref = db.doc("forms/" + id);
+    view.unsub.push(ref.onSnapshot((snap) => {
+      if (!snap.exists) { view.form = null; el.title.textContent = "No such form"; el.lede.textContent = "Nothing is stored under this id. Check the link Claude gave you, or go back to the list."; el.qs.innerHTML = ""; el.bar.hidden = true; return; }
+      const f = snap.data(); view.form = f;
+      el.title.textContent = f.title || id;
+      el.lede.textContent = f.intro || (f.view === "board"
+        ? "Each card starts in the box Claude suggests. Move it with its buttons or by dragging; Done saves where every card sits."
+        : "Nothing is pre-selected. Pick an option or write your own; a note is optional unless you choose Other. Answers save as you go.");
+      el.meta.innerHTML = `${f.stage ? `<span>${esc(f.stage)}</span>` : ""}${f.file ? `<span class="file">${esc(f.file)}</span>` : ""}<span class="pill ${f.status === "done" ? "done" : "open"}">${f.status === "done" ? "done" : "open"}</span>`;
+      layout();
+      const remote = f.answers || {};
+      for (const [qid, a] of Object.entries(remote)) { if (!view.pending[qid] && !(view.touched[qid] && Date.now() - view.touched[qid] < 2000)) { view.answers[qid] = a; paintAnswer(qid); } }
+      el.done.disabled = false; el.done.classList.toggle("is-done", f.status === "done");
+      el.done.textContent = f.status === "done" ? "Done ✓ — press to re-mark" : "Mark as done";
+      if (!view.inflight && !Object.keys(view.pending).length) setStatus(f.status === "done" ? `Done ${fmt(f.savedAt)}. Tell Claude in chat that the form is done.` : (Object.keys(remote).length ? `Saved ${fmt(latest(remote))}` : "No answers yet."), f.status === "done" ? "ok" : "");
+      updateCount();
+    }, () => setStatus("Couldn’t load the form. Reload the page.", "warn")));
+    view.unsub.push(ref.collection("questions").orderBy("n").onSnapshot((snap) => {
+      const next = new Map(); snap.docs.forEach((d) => next.set(d.id, { id: d.id, ...d.data() }));
+      view.questions = next; view.loaded = true; sync();
+    }, () => setStatus("Couldn’t load the questions. Reload the page.", "warn")));
+  }
+  const latest = (answers) => Object.values(answers).map((a) => a.at || "").sort().pop() || "";
+  const isBoard = () => view.mode === "board";
+  const ordered = () => [...view.questions.values()].sort((a, b) => (a.n ?? 0) - (b.n ?? 0));
+
+  /* The form row decides the layout: a list of questions, or a board of boxes. */
+  function layout() {
+    const mode = view.form && view.form.view === "board" ? "board" : "list";
+    const key = mode === "board" ? JSON.stringify([view.form.boxes || [], view.form.groups || []]) : "";
+    if (mode === view.mode && key === view.boxesKey) return;
+    view.mode = mode; view.boxesKey = key; view.rendered = new Map();
+    document.body.classList.toggle("wide", mode === "board");
+    $("expandall").hidden = $("collapseall").hidden = mode !== "board";
+    el.qs.innerHTML = "";
+    if (mode === "board") el.qs.appendChild(renderBoard(view.form.boxes || []));
+    sync();
+  }
+  function sync() {
+    if (!view.mode) return;
+    if (!view.loaded) { if (!isBoard()) el.qs.innerHTML = '<p class="hint">Loading questions…</p>'; return; }
+    const qs = ordered();
+    if (!isBoard()) {
+      if (!qs.length) { el.qs.innerHTML = '<p class="hint">No questions yet. Claude adds them as rows; they appear here as soon as they are written.</p>'; view.rendered = new Map(); updateCount(); return; }
+      el.qs.querySelectorAll(":scope > .hint").forEach((n) => n.remove());
+    }
+    const seen = new Set();
+    qs.forEach((q, i) => {
+      seen.add(q.id); const sig = JSON.stringify(q);
+      let node = document.getElementById("q-" + q.id);
+      if (!node || view.rendered.get(q.id) !== sig) {
+        const fresh = isBoard() ? renderCard(q) : renderQuestion(q);
+        if (node) node.replaceWith(fresh); else (isBoard() ? el.qs.querySelector("[data-cards]") || el.qs : el.qs).appendChild(fresh);
+        node = fresh; view.rendered.set(q.id, sig); paintAnswer(q.id);
+      }
+      if (!isBoard()) { const want = el.qs.children[i]; if (want !== node) el.qs.insertBefore(node, want || null); }
+    });
+    el.qs.querySelectorAll("[data-qid]").forEach((n) => { if (!seen.has(n.dataset.qid)) { view.rendered.delete(n.dataset.qid); n.remove(); } });
+    paintCounts(); updateCount();
+  }
+
+  /* ---------- board ---------- */
+  const boxes = () => (view.form && view.form.boxes) || [];
+  const boxLabel = (k) => boxes().find((b) => b.k === k)?.t || k;
+  const boxDef = (k) => boxes().find((b) => b.k === k);
+  const grouped = () => boxes().some((b) => b.group || b.sink);
+  /* With groups, a card stays in its group (its own `group`, else its proposed box's) or goes to a
+     sink box (Don't do). A card with no group at all may go anywhere. */
+  const cardGroup = (q) => q.group || boxDef(q.proposed?.k)?.group || "";
+  const allowed = (q, k) => {
+    const box = boxDef(k); if (!q || !box) return false;
+    if (grouped() && !box.sink && cardGroup(q) && box.group !== cardGroup(q)) return false;
+    if (grouped()) return true;
+    return !q.outcomes || Object.prototype.hasOwnProperty.call(q.outcomes, k) || q.proposed?.k === k;
+  };
+  function boxOf(qid) {
+    const q = view.questions.get(qid); const a = view.answers[qid]?.k?.[0];
+    if (a && boxes().some((b) => b.k === a)) return a;
+    if (q?.proposed?.k && boxes().some((b) => b.k === q.proposed.k)) return q.proposed.k;
+    return boxes()[0]?.k || "";
+  }
+  const boxHtml = (x) => `<section class="box tone-${esc(x.tone || "ink")}${x.sink ? " sink" : ""}" data-box="${esc(x.k)}" aria-labelledby="box-${esc(x.k)}">
+      ${x.sink ? `<div class="sinkgrip" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Drag to resize ${esc(x.t)}"></div>` : ""}
+      <div class="boxhead"><h3 id="box-${esc(x.k)}"><span>${inline(x.t)}</span><span class="count" data-count="${esc(x.k)}">0</span></h3>${x.hint ? `<p>${inline(x.hint)}</p>` : ""}</div>
+      <div class="cards" data-cards="${esc(x.k)}"></div></section>`;
+  function renderBoard(list) {
+    const b = document.createElement("div");
+    if (grouped()) {
+      /* Groups side by side, each group's boxes stacked; sink boxes take a full row below. */
+      const defs = (view.form && view.form.groups) || [];
+      const keys = [...new Set(list.filter((x) => !x.sink).map((x) => x.group || ""))];
+      const groups = keys.map((k) => ({ k, t: "", hint: "", ...(defs.find((g) => g.k === k) || {}) }));
+      b.className = "gboard";
+      b.innerHTML = `<div class="grow" style="--g:${Math.max(1, groups.length)}">${groups.map((g) => `<section class="group" data-group="${esc(g.k)}">
+          ${g.t || g.hint ? `<div class="ghead">${g.t ? `<h3>${inline(g.t)}</h3>` : ""}${g.hint ? `<p>${inline(g.hint)}</p>` : ""}</div>` : ""}
+          <div class="gboxes">${list.filter((x) => !x.sink && (x.group || "") === g.k).map(boxHtml).join("")}</div></section>`).join("")}</div>
+        ${list.filter((x) => x.sink).map(boxHtml).join("")}`;
+    } else {
+      b.className = "board"; b.style.setProperty("--n", String(Math.max(1, list.length)));
+      b.innerHTML = list.map(boxHtml).join("");
+    }
+    bindSinkGrips(b);
+    b.querySelectorAll(".box").forEach((box) => {
+      box.addEventListener("dragover", (e) => { if (!view.drag || !allowed(view.questions.get(view.drag), box.dataset.box)) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; box.classList.add("over"); });
+      box.addEventListener("dragleave", (e) => { if (!box.contains(e.relatedTarget)) box.classList.remove("over"); });
+      box.addEventListener("drop", (e) => { e.preventDefault(); box.classList.remove("over"); if (view.drag) place(view.drag, box.dataset.box, false); });
+    });
+    return b;
+  }
+  function renderCard(q) {
+    const c = document.createElement("article"); c.className = "card"; c.id = "q-" + q.id; c.dataset.qid = q.id; c.draggable = true; c.tabIndex = -1;
+    c.innerHTML = `<div class="chead"><span class="qid">${esc(q.id)}</span><h4 class="ctitle">${inline(q.text)}</h4>
+        <span class="cflag" aria-hidden="true"></span>
+        <button type="button" class="cexp" aria-expanded="false" aria-label="Show details of ${esc(q.id)}"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+      <div class="moves" role="group" aria-label="Move this card"></div>
+      <div class="cdetail"><div class="cin"><div class="cmain">
+        ${q.from ? `<p class="from">${inline(q.from)}</p>` : ""}
+        ${q.ctx ? `<div class="ctx">${md(q.ctx)}</div>` : ""}
+        <button type="button" class="addnote">Add a note</button>
+        <div class="note cnote"><label for="${esc(q.id)}-note"><b>Note</b><span>Optional — a condition, a reason, what to change.</span></label>
+          <textarea id="${esc(q.id)}-note" rows="2"></textarea></div>
+      </div><div class="cside">
+        <p class="outcome"></p>
+        <p class="sugg"></p>
+      </div></div></div>`;
+    if (view.expanded.has(q.id)) setOpen(c, true);
+    c.querySelector(".cexp").addEventListener("click", () => setOpen(c, !c.classList.contains("open")));
+    c.querySelector(".addnote").addEventListener("click", () => { c.classList.add("noting"); c.querySelector("textarea").focus(); });
+    c.addEventListener("dragstart", (e) => { view.drag = q.id; c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", q.id); } catch {}
+      el.qs.querySelectorAll(".box").forEach((b) => b.classList.toggle("no-drop", b.dataset.box !== boxOf(q.id) && !allowed(q, b.dataset.box))); });
+    c.addEventListener("dragend", () => { view.drag = null; c.classList.remove("dragging"); el.qs.querySelectorAll(".box.over, .box.no-drop").forEach((b) => b.classList.remove("over", "no-drop")); });
+    const ta = c.querySelector("textarea");
+    ta.addEventListener("focus", () => { c.draggable = false; });
+    ta.addEventListener("blur", () => { c.draggable = true; });
+    ta.addEventListener("input", () => collect(q.id));
+    c.querySelector(".moves").addEventListener("click", (e) => { const to = e.target.closest(".move")?.dataset.to; if (to) place(q.id, to, true); });
+    return c;
+  }
+  function setOpen(card, open) {
+    card.classList.toggle("open", open);
+    card.querySelector(".cexp")?.setAttribute("aria-expanded", String(open));
+    if (open) view.expanded.add(card.dataset.qid); else view.expanded.delete(card.dataset.qid);
+  }
+  function setAllOpen(open) { el.qs.querySelectorAll(".card").forEach((c) => setOpen(c, open)); }
+  function paintCard(qid) {
+    const node = document.getElementById("q-" + qid); const q = view.questions.get(qid); if (!node || !q) return;
+    const k = boxOf(qid);
+    const list = [...el.qs.querySelectorAll("[data-cards]")].find((n) => n.dataset.cards === k);
+    if (list && node.parentElement !== list) {
+      const after = [...list.children].find((n) => (view.questions.get(n.dataset.qid)?.n ?? 0) > (q.n ?? 0));
+      list.insertBefore(node, after || null);
+    }
+    node.querySelector(".outcome").innerHTML = q.outcomes && q.outcomes[k] ? inline(q.outcomes[k]) : "";
+    const pk = q.proposed?.k; const why = q.proposed?.why ? " — " + inline(q.proposed.why) : "";
+    node.querySelector(".sugg").innerHTML = pk ? (pk === k ? `<b>Suggested here</b>${why}` : `<b>Suggested</b>${inline(boxLabel(pk))}${why}`) : "";
+    node.classList.toggle("moved", !!pk && pk !== k);
+    node.querySelector(".moves").innerHTML = boxes().filter((b) => b.k !== k && allowed(q, b.k)).map((b) => `<button type="button" class="move" data-to="${esc(b.k)}">→ ${inline(b.t)}</button>`).join("");
+    const ta = node.querySelector("textarea"); const note = view.answers[qid]?.note || "";
+    if (document.activeElement !== ta) ta.value = note;
+    node.classList.toggle("noting", !!note.trim() || node.classList.contains("noting"));
+    node.querySelector(".cflag").textContent = [pk && pk !== k ? "moved" : "", note.trim() ? "note" : ""].filter(Boolean).join(" · ");
+    paintCounts();
+  }
+  function place(qid, k, keepFocus) {
+    const q = view.questions.get(qid); if (!allowed(q, k)) return;
+    record(qid, [k], document.getElementById(qid + "-note")?.value ?? (view.answers[qid]?.note || ""));
+    paintCard(qid);
+    if (keepFocus) document.getElementById("q-" + qid)?.focus({ preventScroll: false });
+  }
+  /* The sink row shows one row of cards and a quarter by default. On a wide window its top edge
+     can be dragged; the chosen height is kept in this browser only. */
+  const WIDE = window.matchMedia("(min-width: 760px) and (min-height: 560px)");
+  const SINK_KEY = "qf-sink-height";
+  const readSinkHeight = () => { try { return parseInt(localStorage.getItem(SINK_KEY) || "", 10) || 0; } catch { return 0; } };
+  const saveSinkHeight = (px) => { try { localStorage.setItem(SINK_KEY, String(px)); } catch {} };
+  function sizeSinks() {
+    el.qs.querySelectorAll(".box.sink .cards").forEach((list) => {
+      const chosen = WIDE.matches ? readSinkHeight() : 0;
+      if (chosen) { list.style.setProperty("--sink-max", `${chosen}px`); return; }
+      const card = [...list.children].find((c) => !c.classList.contains("open")) || list.firstElementChild;
+      const h = card ? card.offsetHeight : 76;
+      const gap = parseFloat(getComputedStyle(list).rowGap) || 10;
+      list.style.setProperty("--sink-max", `${Math.round(h + gap + h / 4)}px`);
+    });
+  }
+  function bindSinkGrips(root) {
+    root.querySelectorAll(".sinkgrip").forEach((grip) => {
+      const list = grip.parentElement.querySelector(".cards");
+      const board = () => el.qs.getBoundingClientRect().height;
+      const clamp = (px) => Math.max(60, Math.min(Math.round(px), Math.round(board() - 220)));
+      const set = (px) => { const v = clamp(px); list.style.setProperty("--sink-max", `${v}px`); saveSinkHeight(v); };
+      let startY = 0, startH = 0;
+      grip.addEventListener("pointerdown", (e) => {
+        if (!WIDE.matches) return;
+        startY = e.clientY; startH = list.clientHeight - (parseFloat(getComputedStyle(list).paddingTop) || 0) - (parseFloat(getComputedStyle(list).paddingBottom) || 0);
+        grip.setPointerCapture(e.pointerId); document.body.classList.add("resizing"); e.preventDefault();
+      });
+      grip.addEventListener("pointermove", (e) => { if (grip.hasPointerCapture(e.pointerId)) set(startH + (startY - e.clientY)); });
+      const stop = (e) => { if (grip.hasPointerCapture(e.pointerId)) grip.releasePointerCapture(e.pointerId); document.body.classList.remove("resizing"); };
+      grip.addEventListener("pointerup", stop); grip.addEventListener("pointercancel", stop);
+      grip.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        const cur = parseFloat(getComputedStyle(list).maxHeight) || 120;
+        set(cur + (e.key === "ArrowUp" ? 24 : -24));
+      });
+      grip.addEventListener("dblclick", () => { try { localStorage.removeItem(SINK_KEY); } catch {} sizeSinks(); });
+    });
+  }
+  WIDE.addEventListener?.("change", () => sizeSinks());
+  function paintCounts() {
+    if (!isBoard()) return;
+    requestAnimationFrame(sizeSinks);
+    el.qs.querySelectorAll("[data-count]").forEach((c) => { const list = [...el.qs.querySelectorAll("[data-cards]")].find((n) => n.dataset.cards === c.dataset.count); c.textContent = String(list ? list.children.length : 0); });
+  }
+
+  /* ---------- list ---------- */
+  function renderQuestion(q) {
+    if (q.kind === "text") return renderText(q);
+    const s = document.createElement("section"); s.className = "q"; s.id = "q-" + q.id; s.dataset.qid = q.id;
+    const multi = q.kind === "multi"; const type = multi ? "checkbox" : "radio";
+    const opts = (q.options || []).map((o) => `<label class="opt"><input type="${type}" name="${esc(q.id)}" value="${esc(o.k)}" id="${esc(q.id)}-${esc(o.k)}"><span><span class="optletter">${esc(o.k)}.</span>${inline(o.t)}</span></label>`).join("");
+    const other = q.other === false ? "" : `<label class="opt"><input type="${type}" name="${esc(q.id)}" value="X" id="${esc(q.id)}-X"><span><span class="optletter">X.</span>Other (please specify)</span></label>`;
+    const proposal = q.proposed && q.proposed.k ? `<div class="proposal"><p><b>Proposed</b>${esc(q.proposed.k)}. ${inline(q.proposed.why || "")}</p><button class="use" type="button" data-k="${esc(q.proposed.k)}">Choose ${esc(q.proposed.k)}</button></div>` : "";
+    s.innerHTML = `<div class="qhead"><span class="qid">${esc(q.id)}</span><h2>${inline(q.text)}</h2></div>
+      ${q.ctx ? `<div class="ctx">${md(q.ctx)}</div>` : ""}
+      ${q.hint || multi ? `<p class="hint">${inline(q.hint || "Select all that apply.")}</p>` : ""}
+      <div class="options">${opts}${other}</div>
+      <div class="note"><label for="${esc(q.id)}-note"><b>Note</b><span id="${esc(q.id)}-notelabel">Optional — a small change to an option, a condition, a reason. Required for Other.</span></label>
+        <textarea id="${esc(q.id)}-note" rows="2"></textarea></div>
+      ${proposal}`;
+    s.querySelectorAll("input").forEach((i) => i.addEventListener("change", () => { if (!multi) { /* radio */ } collect(q.id); }));
+    s.querySelector("textarea").addEventListener("input", () => collect(q.id));
+    s.querySelector(".use")?.addEventListener("click", (e) => { const inp = document.getElementById(q.id + "-" + e.currentTarget.dataset.k); if (inp) { if (!multi) s.querySelectorAll("input").forEach((i) => (i.checked = false)); inp.checked = true; collect(q.id); inp.focus(); } });
+    return s;
+  }
+  function renderText(q) {
+    const s = document.createElement("section"); s.className = "q"; s.id = "q-" + q.id; s.dataset.qid = q.id;
+    const proposal = q.proposed && q.proposed.t ? `<div class="proposal"><p><b>Proposed</b>${inline(q.proposed.t)}</p><button class="use" type="button">Use this text</button></div>` : "";
+    s.innerHTML = `<div class="qhead"><span class="qid">${esc(q.id)}</span><h2>${inline(q.text)}</h2></div>
+      ${q.ctx ? `<div class="ctx">${md(q.ctx)}</div>` : ""}
+      ${q.hint ? `<p class="hint">${inline(q.hint)}</p>` : ""}
+      <div class="note"><label for="${esc(q.id)}-note"><b>Answer</b><span>In your own words.</span></label>
+        <textarea id="${esc(q.id)}-note" rows="3"></textarea></div>
+      ${proposal}`;
+    const ta = s.querySelector("textarea");
+    ta.addEventListener("input", () => collect(q.id));
+    s.querySelector(".use")?.addEventListener("click", () => { ta.value = q.proposed.t; collect(q.id); ta.focus(); });
+    return s;
+  }
+
+  function paintAnswer(qid) {
+    if (isBoard()) { paintCard(qid); return; }
+    const node = document.getElementById("q-" + qid); if (!node) return;
+    const a = view.answers[qid] || { k: [], note: "" };
+    node.querySelectorAll("input").forEach((i) => (i.checked = (a.k || []).includes(i.value)));
+    const ta = node.querySelector("textarea"); if (document.activeElement !== ta) ta.value = a.note || "";
+    flagNote(qid);
+  }
+  function flagNote(qid) {
+    const node = document.getElementById("q-" + qid); if (!node || view.questions.get(qid)?.kind === "text") return;
+    const a = view.answers[qid]; const needs = !!a && (a.k || []).includes("X") && !(a.note || "").trim();
+    node.classList.toggle("needs-note", needs);
+    const lbl = document.getElementById(qid + "-notelabel"); if (lbl) lbl.textContent = (a && (a.k || []).includes("X")) ? "Your own words — required for Other." : "Optional — a small change to an option, a condition, a reason. Required for Other.";
+  }
+  function collect(qid) {
+    const node = document.getElementById("q-" + qid); if (!node) return;
+    const note = node.querySelector("textarea").value;
+    const k = isBoard() ? [boxOf(qid)] : [...node.querySelectorAll("input:checked")].map((i) => i.value);
+    record(qid, k, note);
+  }
+  function record(qid, k, note) {
+    view.answers[qid] = { k, note, at: new Date().toISOString() }; view.touched[qid] = Date.now(); view.pending[qid] = view.answers[qid];
+    view.confirmDone = false; flagNote(qid); updateCount(); setStatus("Unsaved changes…");
+    clearTimeout(view.timer); view.timer = setTimeout(flush, 450);
+  }
+  async function flush() {
+    if (view.inflight || !db || !view.id || !Object.keys(view.pending).length) return;
+    const batch = view.pending; view.pending = {}; view.inflight = true; setStatus("Saving…");
+    const id = view.id;
+    try {
+      const patch = { answers: {} }; for (const [qid, a] of Object.entries(batch)) patch.answers[qid] = { k: a.k, note: a.note, at: a.at };
+      /* An edit after Done reopens the form; a save that Done itself is waiting for never does. */
+      if (view.form && view.form.status === "done" && !view.closing) patch.status = "open";
+      await db.doc("forms/" + id).update(patch);
+      if (view.id === id && !Object.keys(view.pending).length) setStatus(`Saved ${fmt(new Date().toISOString())}`, "ok");
+    } catch (e) {
+      Object.assign(view.pending, batch);
+      setStatus(e && e.code === "invalid_argument" ? "You can view this form but not save to it. Ask the owner for Contributor access." : "Couldn’t save. Check your connection; it retries when you change something.", "warn");
+    } finally { view.inflight = false; if (Object.keys(view.pending).length) setTimeout(flush, 800); }
+  }
+  function answered(qid) {
+    const q = view.questions.get(qid); const a = view.answers[qid];
+    if (q?.kind === "card") return true;
+    if (q?.kind === "text") return !!(a?.note || "").trim();
+    return !!(a?.k || []).length;
+  }
+  function updateCount() {
+    const n = [...view.questions.keys()].filter(answered).length;
+    el.done.title = `${n} of ${view.questions.size} answered`;
+  }
+  function unanswered() { return [...view.questions.keys()].filter((qid) => !answered(qid)); }
+  function missingNotes() { return [...view.questions.keys()].filter((qid) => (view.answers[qid]?.k || []).includes("X") && !(view.answers[qid]?.note || "").trim()); }
+
+  el.done.addEventListener("click", async () => {
+    if (!db || !view.id) return;
+    const miss = missingNotes();
+    if (miss.length) { setStatus(`${miss.join(", ")}: write your own words for Other, or pick an option.`, "warn"); document.getElementById("q-" + miss[0])?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    const open = unanswered();
+    if (open.length && !view.confirmDone) { view.confirmDone = true; setStatus(`${open.length} unanswered (${open.join(", ")}) — they stay open questions for Claude. Press Done again to confirm.`, "warn"); return; }
+    if (isBoard()) {
+      /* A card left where it started is an answer too: write every card's box. */
+      const now = new Date().toISOString();
+      for (const qid of view.questions.keys()) {
+        const k = boxOf(qid);
+        if (view.answers[qid]?.k?.[0] !== k) { view.answers[qid] = { k: [k], note: view.answers[qid]?.note || "", at: now }; view.pending[qid] = view.answers[qid]; }
+      }
+    }
+    el.done.disabled = true; clearTimeout(view.timer); view.closing = true;
+    try {
+      /* Wait until every answer is saved: an autosave may be in flight, and more may be pending. */
+      for (let i = 0; i < 100 && (view.inflight || Object.keys(view.pending).length); i++) {
+        if (!view.inflight) await flush(); else await new Promise((r) => setTimeout(r, 100));
+      }
+      if (view.inflight || Object.keys(view.pending).length) throw new Error("unsaved");
+      await db.doc("forms/" + view.id).update({ status: "done", savedAt: new Date().toISOString() }); view.confirmDone = false;
+    } catch { setStatus("Couldn’t mark the form as done. Try again.", "warn"); }
+    finally { view.closing = false; el.done.disabled = false; }
+  });
+
+  $("expandall").addEventListener("click", () => setAllOpen(true));
+  $("collapseall").addEventListener("click", () => setAllOpen(false));
+
+  /* ---------- boot ---------- */
+  function route() { const id = formId(); if (id) showForm(id); else showIndex(); }
+  window.addEventListener("hashchange", route);
+  route();
+  (async () => {
+    db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null;
+    if (!db) { el.lede.textContent = "Sign in to claude.ai to see your forms."; el.list.innerHTML = ""; el.qs.innerHTML = ""; el.bar.hidden = true; return; }
+    route();
+  })();
+})();
+</script>

@@ -92,10 +92,11 @@ jobs:
           claude plugin validate plugins/ask-guard
           claude plugin test plugins/ask-guard
 
-      - name: Validate the marketplace and the worktree-cleanup plugin
+      - name: Validate the marketplace and the worktree-cleanup and question-forms plugins
         run: |
           claude plugin validate .
           claude plugin validate plugins/worktree-cleanup
+          claude plugin validate plugins/question-forms
 
   upstream-aidlc:
     # project-panel's AI-DLC provider is keyed on upstream's state-file field names,
