@@ -1,0 +1,19 @@
+**Stage:** Domain Design
+**Review outcome:** No open findings remain.
+**Why now:** First review completed.
+
+**Review artifact:** `aidlc/spaces/default/intents/260101-demo-shop/inception/domain-design/domain-model.md`
+
+| ID | Severity | Where | Status |
+|---|---|---|---|
+| R-01 | Minor | glossary.md > Order | Accepted risk |
+| R-02 | Major | domain-model.md > Cart aggregate | Resolved |
+| R-03 | Minor | domain-model.md > Events | Rejected: the name is deliberate |
+
+> R-01 Finding: The glossary calls an order a "basket" once.
+
+> R-01 Required action: Optionally replace "basket" with "order".
+
+**Decision options:**
+- **Approve** - continue; no findings are open.
+- **Request Changes** - return to the listed artifacts so the required actions can be addressed.

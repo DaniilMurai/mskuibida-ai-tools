@@ -1,0 +1,13 @@
+[
+  {"slug": "user-stories", "number": "2.4", "name": "User Stories", "phase": "inception",
+   "produces": ["stories", "personas", "user-stories-assessment", "traceability"],
+   "reviewer": "aidlc-product-lead-agent", "review_class": "advisory"},
+  {"slug": "delivery-planning", "number": "2.9", "name": "Delivery Planning", "phase": "inception",
+   "produces": ["bolt-plan", "team-allocation"]},
+  {"slug": "functional-design", "number": "3.1", "name": "Functional Design", "phase": "construction",
+   "produces": ["entities", "rules", "functional-spec", "traceability"],
+   "reviewer": "aidlc-architecture-reviewer-agent", "review_class": "adversarial"},
+  {"slug": "code-generation", "number": "3.5", "name": "Code Generation", "phase": "construction",
+   "produces": ["code-generation-plan", "unit-test-instructions", "code-summary", "traceability"],
+   "reviewer": "aidlc-architecture-reviewer-agent", "review_class": "adversarial"}
+]

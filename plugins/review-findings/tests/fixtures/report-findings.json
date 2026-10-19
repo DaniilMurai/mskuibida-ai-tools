@@ -1,0 +1,31 @@
+{
+  "findings": [
+    {
+      "file": "src/cart.py",
+      "line": 42,
+      "summary": "The discount is applied before the tax is added. Totals come out too low.",
+      "short_summary": "Discount applied before tax",
+      "failure_scenario": "A cart of 100 with a 10% discount and 20% tax totals 108 instead of 110.",
+      "category": "correctness",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "file": "src/cart.py",
+      "line": 77,
+      "summary": "A cart with a `None` price may raise in `total()`. The caller never passes one today.",
+      "short_summary": "None price may raise",
+      "failure_scenario": "An import that leaves a price empty makes the checkout page fail.",
+      "category": "robustness",
+      "verdict": "PLAUSIBLE"
+    },
+    {
+      "file": "src/shop/checkout.py",
+      "line": 9,
+      "summary": "The retry loop sleeps 5 s | no backoff.",
+      "short_summary": "Fixed retry delay",
+      "failure_scenario": "Under load every client retries at the same moment.",
+      "category": "performance"
+    }
+  ],
+  "level": "medium"
+}

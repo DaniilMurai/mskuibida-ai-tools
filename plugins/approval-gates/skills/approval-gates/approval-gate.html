@@ -1,0 +1,443 @@
+<title>AI-DLC approval gates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  AI-DLC approval gates — the one template for reading a stage's documents at its approval gate.
+
+  Published ONCE per developer as a private Artifact with the `db` capability
+  (capabilities: {db: {}}, icon "document"); never regenerated per stage. Every gate is rows
+  INSIDE this artifact, written by the agent with the ArtifactData tool (see SKILL.md next to
+  this file; scripts/gate_bundle.py builds the rows). The page renders whatever the rows say, live.
+  Same look as the question forms (question-forms/skills/question-forms/question-form.html).
+
+  Data contract (what the agent writes — always NEW rows, a fresh id per presentation):
+
+    gates/<id>                  {title, stage, stageName, phase?, intent, project?, unit?, round, why?,
+                                 status: "open"|"decided", createdAt (ISO), summary?, brief?,
+                                 review?: {verdict, reviewer, iteration, file}, nextStage?,
+                                 options: [{k: "approve"|"changes"|"other", t, d}],
+                                 documents: [{key, title, path, kind, bytes}]}
+      id: <intent>-<stage>[-<unit>]-<YYYYMMDDTHHMM>
+      summary, brief: Markdown (the agent's summary; the review brief as the engine prints it).
+    gates/<id>/documents/<key>  {n, key, title, path, kind: "markdown"|"questions"|"json"|"review", text}
+      text: the file as is (JSON pretty-printed), at most 200 000 bytes.
+
+    Markdown is rendered with marked, passed through DOMPurify; ```mermaid fences are drawn with mermaid
+    when the document is shown (on an error the source stays, with a note).
+
+  What the page writes (the only thing the agent reads back, one `get` of gates/<id>):
+
+    gates/<id>.notes[<document key>] = "text"                 the developer's note for Claude on a document
+    gates/<id>.decision = {k: "approve"|"changes", note, at}  a DRAFT decision; the answer is given in chat
+    gates/<id>.status   = "decided" once a draft decision is saved
+
+  Link to a gate: <artifact url>#<id>. No hash: the list of gates.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<style>
+/* Layout: one reading column under a header. A gate is a summary, the review brief, then the documents:
+   a sticky list on the left (chips on a phone) and the selected document beside it, each with a note for
+   Claude. A fixed bar carries the draft decision. */
+:root {
+  --bg: #f4f6f5; --surface: #ffffff; --fg: #17221f; --muted: #5a6964; --line: #d7dfdc;
+  --accent: #c8781a; --accent-soft: #fbefdf; --ink: #1d4a40; --ink-soft: #e3eeea;
+  --ok: #2f7a4d; --warn: #a33a2a; --warn-soft: #fbe7e2; --bar-h: 150px;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
+  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
+  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1080px; margin: 0 auto; padding-block: 36px calc(var(--bar-h) + 24px); display: grid; gap: 32px; }
+header { display: grid; gap: 8px; max-width: 760px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.eyebrow a { color: inherit; text-decoration: none; }
+.eyebrow a:hover { text-decoration: underline; }
+h1 { font: 700 clamp(28px, 5vw, 38px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--muted); font-size: 14px; min-width: 0; }
+.file { font: 500 12.5px var(--mono); background: var(--ink-soft); color: var(--ink); padding: 4px 8px; border-radius: 4px; max-width: 100%; overflow-wrap: anywhere; }
+.pill { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.decided, .pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.open { color: var(--accent); border-color: var(--accent); }
+.pill.warn { color: var(--warn); border-color: var(--warn); }
+.pill.quiet { font-size: 10.5px; padding: 3px 6px; }
+[hidden] { display: none !important; }
+a { color: var(--ink); }
+code { font: 500 .87em var(--mono); background: var(--ink-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.hint { color: var(--muted); font-size: 14px; margin: 0; }
+button { font: 600 14px var(--body); border-radius: 6px; cursor: pointer; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea { width: 100%; box-sizing: border-box; min-height: 56px; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+#list { display: grid; gap: 10px; max-width: 760px; }
+#list h2 { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 2px; overflow-wrap: anywhere; }
+#list h2:first-child { margin-top: 0; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: inherit; text-decoration: none; }
+.row:hover { border-color: var(--ink); }
+.row b { font: 600 17px/1.3 var(--display); }
+.row small { color: var(--muted); display: block; margin-top: 2px; }
+.empty { padding: 20px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); display: grid; gap: 8px; max-width: 66ch; }
+.empty p { margin: 0; }
+
+#gate { display: grid; gap: 24px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; max-width: 760px; display: grid; gap: 10px; min-width: 0; }
+.card > h2, .card > summary { font: 600 13px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin: 0; }
+details.card > summary { cursor: pointer; display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: center; list-style-position: inside; }
+details.card[open] > summary { margin-bottom: 4px; }
+.verdict { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 14px; color: var(--muted); text-transform: none; letter-spacing: 0; font-family: var(--body); font-weight: 400; }
+
+.docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: start; }
+#nav { position: sticky; top: 16px; display: grid; gap: 4px; align-content: start; }
+#nav h2 { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.navitem { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; background: transparent; color: var(--fg); border: 1px solid transparent; padding: 8px 10px; border-radius: 6px; font-weight: 500; min-width: 0; }
+.navitem > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.navitem:hover { border-color: var(--line); }
+.navitem[aria-current="true"] { background: var(--ink-soft); border-color: var(--ink); color: var(--ink); }
+.navitem .has-note { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.navend { display: flex; align-items: center; gap: 6px; flex: none; }
+#docpane { display: grid; gap: 20px; min-width: 0; max-width: 780px; }
+.dochead { display: grid; gap: 8px; }
+.dochead h2 { font: 600 22px/1.25 var(--display); margin: 0; text-wrap: balance; }
+.dochead .meta { gap: 8px 10px; }
+
+.md { min-width: 0; overflow-wrap: break-word; }
+.md > :first-child { margin-top: 0; }
+.md h1, .md h2, .md h3, .md h4 { font-family: var(--display); line-height: 1.25; margin: 1.6em 0 .5em; text-wrap: balance; }
+.md h1 { font-size: 26px; } .md h2 { font-size: 21px; } .md h3 { font-size: 17.5px; } .md h4 { font-size: 15.5px; }
+.md p, .md ul, .md ol, .md blockquote, .md pre { margin: 0 0 1em; }
+.md ul, .md ol { padding-left: 22px; }
+.md li + li { margin-top: .25em; }
+.md blockquote { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; color: var(--muted); }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 1.6em 0; }
+.md pre, .jsonbox pre, .src { font: 400 13px/1.5 var(--mono); background: var(--ink-soft); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0 0 1em; white-space: pre; }
+.md pre code { background: none; padding: 0; font-size: inherit; }
+.tablewrap { overflow-x: auto; margin: 0 0 1em; border: 1px solid var(--line); border-radius: 8px; }
+.md table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.md th, .md td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.md th { background: var(--ink-soft); font-weight: 600; white-space: nowrap; }
+.md tr:last-child td { border-bottom: 0; }
+.md img { max-width: 100%; }
+.diagram { overflow-x: auto; margin: 0 0 1em; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.diagram svg { max-width: none; height: auto; }
+.diagram .note, .jsonnote { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+.jsonbox { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.jsonbox summary { cursor: pointer; padding: 10px 14px; font: 500 12.5px var(--mono); color: var(--muted); }
+.jsonbox pre { margin: 0; border-radius: 0 0 10px 10px; max-height: 70vh; }
+.plain { white-space: pre-wrap; font: 400 13.5px/1.5 var(--mono); }
+
+.note { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 16px; }
+.note label { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.note label b { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.note .stat { margin-left: auto; font-size: 12.5px; }
+.note .stat.warn { color: var(--warn); }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.barin { max-width: 1080px; margin: 0 auto; display: grid; gap: 10px; }
+.barrow { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
+#status { color: var(--muted); font-size: 14px; min-width: 0; flex: 1 1 240px; }
+#status.ok { color: var(--ok); }
+#status.warn { color: var(--warn); }
+#dnote { min-height: 40px; height: 40px; flex: 1 1 260px; width: auto; min-width: 0; resize: vertical; max-height: 30vh; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.decide { background: transparent; color: var(--ink); border: 1px solid var(--ink); padding: 9px 16px; }
+.decide:hover { background: var(--ink-soft); }
+.decide[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.decide.changes { color: var(--warn); border-color: var(--warn); }
+.decide.changes:hover { background: var(--warn-soft); }
+.decide.changes[aria-pressed="true"] { background: var(--warn); color: var(--surface); }
+.decide:disabled { opacity: .5; cursor: default; }
+.bar[hidden] { display: none; }
+
+@media (max-width: 860px) {
+  main { padding-block: 24px calc(var(--bar-h) + 16px); }
+  .docs { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  #nav { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
+  #nav h2 { flex: 0 0 100%; margin: 0; }
+  .navitem { border-color: var(--line); padding: 6px 10px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow" id="eyebrow"><span>AI-DLC approval gates</span></div>
+    <h1 id="title">Approval gates</h1>
+    <p class="lede" id="lede">Connecting to your gates…</p>
+    <div class="meta" id="meta" hidden></div>
+  </header>
+  <div id="list" hidden></div>
+  <div id="gate" hidden>
+    <section class="card" id="summary" hidden><h2>Summary</h2><div class="md" id="summarymd"></div></section>
+    <details class="card" id="brief" open hidden>
+      <summary>Review brief <span class="verdict" id="verdict"></span></summary>
+      <div class="md" id="briefmd"></div>
+    </details>
+    <div class="docs" id="docs">
+      <nav id="nav" aria-label="Documents"></nav>
+      <article id="docpane"></article>
+    </div>
+  </div>
+</main>
+<div class="bar" id="bar" hidden><div class="barin">
+  <div class="barrow">
+    <span id="status">Connecting…</span>
+    <div class="actions">
+      <button class="decide approve" id="d-approve" type="button" aria-pressed="false" disabled>Approve</button>
+      <button class="decide changes" id="d-changes" type="button" aria-pressed="false" disabled>Request changes</button>
+    </div>
+  </div>
+  <textarea id="dnote" rows="1" aria-label="Note with your draft decision" placeholder="Note with your draft decision (optional)"></textarea>
+</div></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = { eyebrow: $("eyebrow"), title: $("title"), lede: $("lede"), meta: $("meta"), list: $("list"), gate: $("gate"),
+    summary: $("summary"), summaryMd: $("summarymd"), brief: $("brief"), briefMd: $("briefmd"), verdict: $("verdict"),
+    nav: $("nav"), pane: $("docpane"), bar: $("bar"), status: $("status"), dnote: $("dnote"), approve: $("d-approve"), changes: $("d-changes") };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); } catch { return iso || ""; } };
+  const clock = () => new Date().toLocaleTimeString([], { timeStyle: "short" });
+  const gateId = () => { const h = decodeURIComponent(location.hash.replace(/^#/, "")); return /^[a-z0-9._-]+$/i.test(h) ? h : ""; };
+  const setStatus = (t, cls) => { el.status.textContent = t; el.status.className = cls || ""; };
+  const WHY = { first: "First presentation", revision: "After a revision", stale: "Review was out of date" };
+  const KIND = { questions: "questions", json: "JSON", review: "review" };
+  const upper = (s) => String(s || "").replace(/^./, (c) => c.toUpperCase());
+
+  let db = null;
+  const view = { id: "", unsub: [], gate: null, docs: new Map(), docsLoaded: false, sel: "", notes: {}, unsaved: false, saving: false,
+    noteTimer: null, decideTimer: null, shown: "", navSig: "", diagrams: 0 };
+  const hasMd = () => typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
+
+  function teardown() {
+    view.unsub.forEach((u) => { try { u(); } catch {} });
+    Object.assign(view, { unsub: [], gate: null, docs: new Map(), docsLoaded: false, sel: "", notes: {}, unsaved: false, saving: false, shown: "", navSig: "" });
+    clearTimeout(view.noteTimer); clearTimeout(view.decideTimer);
+    el.nav.innerHTML = ""; el.pane.innerHTML = ""; el.summary.hidden = true; el.brief.hidden = true;
+  }
+
+  /* ---------- markdown ---------- */
+  if (hasMd()) {
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        const href = node.getAttribute("href") || "";
+        if (/^https?:\/\//i.test(href)) { node.setAttribute("target", "_blank"); node.setAttribute("rel", "noopener noreferrer"); }
+        else node.removeAttribute("href");
+      }
+    });
+  }
+  const isDark = () => { const t = document.documentElement.getAttribute("data-theme"); return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; };
+  function renderMarkdown(target, text, breaks) {
+    if (!hasMd()) { target.innerHTML = '<pre class="plain"></pre>'; target.firstChild.textContent = text; return; }
+    let html;
+    try { html = DOMPurify.sanitize(marked.parse(String(text ?? ""), { gfm: true, breaks: !!breaks }), { USE_PROFILES: { html: true } }); }
+    catch { target.innerHTML = '<pre class="plain"></pre>'; target.firstChild.textContent = text; return; }
+    target.innerHTML = html;
+    target.querySelectorAll("table").forEach((t) => { const w = document.createElement("div"); w.className = "tablewrap"; t.replaceWith(w); w.appendChild(t); });
+    target.querySelectorAll("pre > code.language-mermaid").forEach((code) => drawDiagram(code.parentElement, code.textContent));
+  }
+  /* A diagram is drawn when its document is shown; the source stays when it cannot be drawn. */
+  function drawDiagram(pre, source) {
+    const box = document.createElement("div"); box.className = "diagram";
+    const src = document.createElement("pre"); src.className = "src"; src.textContent = source; box.appendChild(src);
+    pre.replaceWith(box);
+    if (typeof mermaid === "undefined") { box.insertAdjacentHTML("afterbegin", '<p class="note">The diagram library did not load, so the source is shown.</p>'); return; }
+    const id = "mmd" + (++view.diagrams);
+    try {
+      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: isDark() ? "dark" : "neutral", fontFamily: "IBM Plex Sans, system-ui, sans-serif" });
+      Promise.resolve(mermaid.render(id, source)).then((out) => { box.innerHTML = out.svg; })
+        .catch(() => { document.getElementById("d" + id)?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="note">This diagram could not be drawn, so its source is shown.</p>'); });
+    } catch { box.insertAdjacentHTML("afterbegin", '<p class="note">This diagram could not be drawn, so its source is shown.</p>'); }
+  }
+
+  /* ---------- index ---------- */
+  function showIndex() {
+    teardown(); view.id = "";
+    el.title.textContent = "Approval gates";
+    el.eyebrow.innerHTML = "<span>AI-DLC approval gates</span>";
+    el.lede.textContent = "Every stage's documents, read before you are asked to approve. Pick a gate; your notes and a draft decision go back to Claude.";
+    el.meta.hidden = true; el.gate.hidden = true; el.bar.hidden = true; el.list.hidden = false; el.lede.hidden = false;
+    el.list.innerHTML = '<div class="empty"><p>Loading gates…</p></div>';
+    if (!db) return;
+    view.unsub.push(db.collection("gates").orderBy("createdAt", "desc").limit(100).onSnapshot((snap) => {
+      if (snap.empty) { el.list.innerHTML = '<div class="empty"><p><b>No gates yet.</b></p><p>Claude adds one here at every approval gate and gives you its link, which ends in <code>#</code> and the gate’s id.</p></div>'; return; }
+      const groups = new Map();
+      snap.docs.forEach((d) => { const g = d.data(); const k = g.intent || "Other"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push({ id: d.id, g }); });
+      el.list.innerHTML = [...groups].map(([intent, rows]) => `<h2>${esc(intent)}</h2>` + rows.map(({ id, g }) => {
+        const n = (g.documents || []).length; const decided = g.status === "decided";
+        return `<a class="row" href="#${esc(id)}"><span><b>${esc(g.title || g.stageName || id)}</b><small>Round ${esc(g.round || 1)} · ${esc(fmt(g.createdAt))}${n ? ` · ${n} document${n === 1 ? "" : "s"}` : ""}</small></span><span class="pill ${decided ? "decided" : "open"}">${decided ? "decided" : "open"}</span></a>`;
+      }).join("")).join("");
+    }, () => { el.list.innerHTML = '<div class="empty"><p>Couldn’t load the gates. Reload the page.</p></div>'; }));
+  }
+
+  /* ---------- one gate ---------- */
+  function showGate(id) {
+    teardown(); view.id = id;
+    el.list.hidden = true; el.gate.hidden = false; el.bar.hidden = false; el.meta.hidden = true; el.lede.hidden = false;
+    el.title.textContent = id; el.lede.textContent = "Loading the gate…";
+    el.eyebrow.innerHTML = '<a href="#">All gates</a>';
+    el.nav.innerHTML = ""; el.pane.innerHTML = '<p class="hint">Loading documents…</p>';
+    setStatus("Connecting…"); setDeciding(false);
+    if (!db) return;
+    const ref = db.doc("gates/" + id);
+    view.unsub.push(ref.onSnapshot((snap) => {
+      if (!snap.exists) {
+        view.gate = null; el.title.textContent = "Waiting for this gate";
+        el.lede.textContent = "Nothing is stored under this id yet. Claude writes the gate just before it asks you, and this page fills in when it lands. If nothing happens, check the link Claude gave you.";
+        el.meta.hidden = true; el.summary.hidden = true; el.brief.hidden = true; $("docs").hidden = true; setDeciding(false); setStatus("Waiting for Claude to write the gate…"); return;
+      }
+      view.gate = snap.data(); $("docs").hidden = false; paintGate();
+    }, () => { setStatus("Couldn’t load the gate. Reload the page.", "warn"); el.lede.textContent = "Couldn’t load the gate."; }));
+    view.unsub.push(ref.collection("documents").orderBy("n").onSnapshot((snap) => {
+      const next = new Map(); snap.docs.forEach((d) => next.set(d.data().key || d.id, d.data()));
+      view.docs = next; view.docsLoaded = true; paintDocs();
+    }, () => { el.pane.innerHTML = '<div class="empty"><p>Couldn’t load the documents. Reload the page.</p></div>'; }));
+  }
+
+  function paintGate() {
+    const g = view.gate; if (!g) return;
+    el.title.textContent = g.title || g.stageName || view.id;
+    el.eyebrow.innerHTML = `<a href="#">All gates</a><span>AI-DLC approval gate · ${esc(g.intent || "")}</span>`;
+    el.lede.textContent = g.project || "";
+    el.lede.hidden = !g.project;
+    const decided = g.status === "decided";
+    el.meta.hidden = false;
+    el.meta.innerHTML = [g.phase ? `<span>${esc(upper(g.phase))}</span>` : "", `<span>Round ${esc(g.round || 1)}</span>`,
+      g.why ? `<span>${esc(WHY[g.why] || g.why)}</span>` : "", g.createdAt ? `<span>${esc(fmt(g.createdAt))}</span>` : "",
+      `<span class="pill ${decided ? "decided" : "open"}">${decided ? "draft decided" : "open"}</span>`].join("");
+    if (g.summary) { el.summary.hidden = false; renderMarkdown(el.summaryMd, g.summary); } else el.summary.hidden = true;
+    if (g.brief) {
+      el.brief.hidden = false; renderMarkdown(el.briefMd, g.brief, true);
+      const r = g.review;
+      el.verdict.innerHTML = r ? `<span class="pill ${/^ready$/i.test(r.verdict) ? "ok" : "warn"}">${esc(r.verdict || "")}</span><span>${esc([r.reviewer, r.iteration ? "iteration " + r.iteration : ""].filter(Boolean).join(" · "))}</span>` : "";
+    } else el.brief.hidden = true;
+    if (!view.unsaved && !view.saving) view.notes = Object.assign({}, g.notes || {});
+    paintBar(); paintDocs();
+  }
+
+  /* ---------- documents ---------- */
+  function docList() {
+    const idx = (view.gate && view.gate.documents) || [];
+    const byKey = new Map(idx.map((d) => [d.key, d]));
+    const out = []; view.docs.forEach((d, key) => out.push(Object.assign({}, byKey.get(key) || {}, d)));
+    idx.forEach((d) => { if (!view.docs.has(d.key)) out.push(Object.assign({ pending: true }, d)); });
+    return out;
+  }
+  function paintDocs() {
+    if (!view.gate) return;
+    const docs = docList();
+    if (!docs.length) { el.nav.innerHTML = ""; el.pane.innerHTML = view.docsLoaded ? '<div class="empty"><p><b>No documents yet.</b></p><p>Claude writes them with the gate; they appear here as soon as they land.</p></div>' : '<p class="hint">Loading documents…</p>'; return; }
+    if (!docs.some((d) => d.key === view.sel)) view.sel = docs[0].key;
+    const sig = JSON.stringify([docs.map((d) => [d.key, d.title, d.kind, !!d.pending]), view.sel, Object.keys(view.notes).filter((k) => (view.notes[k] || "").trim())]);
+    if (sig !== view.navSig) {
+      view.navSig = sig;
+      el.nav.innerHTML = "<h2>Documents</h2>" + docs.map((d) => `<button type="button" class="navitem" data-key="${esc(d.key)}" aria-current="${d.key === view.sel}"><span>${esc(d.title || d.key)}</span><span class="navend">${(view.notes[d.key] || "").trim() ? '<i class="has-note" title="You left a note"></i>' : ""}${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}</span></button>`).join("");
+    }
+    const doc = docs.find((d) => d.key === view.sel);
+    const key = JSON.stringify([view.id, doc.key, doc.text, doc.pending, isDark()]);
+    if (key === view.shown) return;
+    view.shown = key;
+    const body = doc.pending ? '<p class="hint">This document is still being written.</p>' : '<div id="docbody"></div>';
+    el.pane.innerHTML = `<div class="dochead"><h2>${esc(doc.title || doc.key)}</h2><div class="meta">${doc.path ? `<span class="file">${esc(doc.path)}</span>` : ""}${KIND[doc.kind] ? `<span class="pill quiet">${KIND[doc.kind]}</span>` : ""}</div></div>${body}
+      <section class="note"><label for="note-ta"><b>Note for Claude</b><span>on this document. Saved as you type.</span><span class="stat" id="notestat"></span></label><textarea id="note-ta" placeholder="Something to change, check or keep in mind (optional)"></textarea></section>`;
+    if (!doc.pending) paintBody($("docbody"), doc);
+    const ta = $("note-ta"); ta.value = view.notes[doc.key] || "";
+    ta.addEventListener("input", () => noteEdited(doc.key, ta.value));
+    ta.addEventListener("blur", () => { if (view.unsaved) flushNotes(); });
+  }
+  function paintBody(target, doc) {
+    if (doc.kind === "json") {
+      const text = String(doc.text ?? ""); const lines = text.split("\n").length;
+      target.innerHTML = `<details class="jsonbox"${lines <= 60 ? " open" : ""}><summary>JSON · ${lines} line${lines === 1 ? "" : "s"}</summary><pre></pre></details>`;
+      target.querySelector("pre").textContent = text;
+    } else { target.className = "md"; renderMarkdown(target, doc.text); }
+  }
+  el.nav.addEventListener("click", (e) => {
+    const b = e.target.closest(".navitem"); if (!b) return;
+    if (view.unsaved) flushNotes();
+    view.sel = b.dataset.key; view.navSig = ""; paintDocs();
+    if (matchMedia("(max-width: 860px)").matches) el.pane.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  /* ---------- notes ---------- */
+  function noteEdited(key, text) {
+    view.notes[key] = text; view.unsaved = true; setNoteStat("Unsaved…");
+    clearTimeout(view.noteTimer); view.noteTimer = setTimeout(flushNotes, 700);
+  }
+  function setNoteStat(t, cls) { const s = $("notestat"); if (s) { s.textContent = t; s.className = "stat" + (cls ? " " + cls : ""); } }
+  async function flushNotes() {
+    clearTimeout(view.noteTimer);
+    if (view.saving || !view.unsaved || !db || !view.id) return;
+    view.saving = true; const sent = JSON.stringify(view.notes); setNoteStat("Saving…");
+    const ok = await patch({ notes: Object.assign({}, view.notes) });
+    view.saving = false;
+    if (ok) { if (JSON.stringify(view.notes) === sent) { view.unsaved = false; setNoteStat("Saved " + clock()); } else flushNotes(); }
+    else { setNoteStat("Couldn’t save. It retries when you type.", "warn"); }
+  }
+  async function patch(fields) {
+    try { await db.doc("gates/" + view.id).update(fields); return true; }
+    catch (e) {
+      setStatus(e && e.code === "invalid_argument" ? "You can read this gate but not save to it. Ask the owner for Contributor access." : "Couldn’t save. Check your connection and try again.", "warn");
+      return false;
+    }
+  }
+
+  /* ---------- the draft decision ---------- */
+  function setDeciding(on) { el.approve.disabled = el.changes.disabled = !on; }
+  function paintBar() {
+    const g = view.gate; if (!g) return;
+    const opt = (k, fallback) => { const o = (g.options || []).find((x) => x.k === k); return { t: (o && o.t) || fallback, d: (o && o.d) || "" }; };
+    const a = opt("approve", "Approve"), c = opt("changes", "Request changes");
+    el.approve.textContent = a.t; el.approve.title = a.d; el.changes.textContent = c.t; el.changes.title = c.d;
+    setDeciding(true);
+    const d = g.decision;
+    el.approve.setAttribute("aria-pressed", String(!!d && d.k === "approve"));
+    el.changes.setAttribute("aria-pressed", String(!!d && d.k === "changes"));
+    if (d && document.activeElement !== el.dnote) el.dnote.value = d.note || "";
+    if (d) setStatus(`Draft saved: ${d.k === "approve" ? a.t : c.t}${d.at ? " · " + fmt(d.at) : ""}. Now answer the question in chat. You can change the draft until then.`, "ok");
+    else setStatus("Read the documents, then draft a decision here. You give the real answer in chat.");
+  }
+  async function decide(k) {
+    if (!db || !view.id) return;
+    clearTimeout(view.decideTimer); setDeciding(false); setStatus("Saving…");
+    const decision = { k, note: el.dnote.value.trim(), at: new Date().toISOString() };
+    const ok = await patch({ decision, status: "decided" });
+    setDeciding(true);
+    if (ok && view.gate) { view.gate = Object.assign({}, view.gate, { decision, status: "decided" }); paintBar(); }
+  }
+  el.approve.addEventListener("click", () => decide("approve"));
+  el.changes.addEventListener("click", () => decide("changes"));
+  el.dnote.addEventListener("input", () => {
+    const d = view.gate && view.gate.decision; if (!d) return;
+    setStatus("Unsaved note…"); clearTimeout(view.decideTimer); view.decideTimer = setTimeout(() => decide(d.k), 800);
+  });
+  if (window.ResizeObserver) new ResizeObserver(() => { document.documentElement.style.setProperty("--bar-h", el.bar.offsetHeight + "px"); }).observe(el.bar);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { view.shown = ""; paintDocs(); });
+  new MutationObserver(() => { view.shown = ""; paintDocs(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  /* ---------- boot ---------- */
+  function route() { const id = gateId(); if (id) showGate(id); else showIndex(); }
+  window.addEventListener("hashchange", route);
+  route();
+  (async () => {
+    db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null;
+    if (!db) { el.lede.textContent = "Sign in to claude.ai to read this gate."; el.lede.hidden = false; el.list.innerHTML = ""; el.pane.innerHTML = ""; el.nav.innerHTML = ""; el.bar.hidden = true; return; }
+    route();
+  })();
+})();
+</script>
