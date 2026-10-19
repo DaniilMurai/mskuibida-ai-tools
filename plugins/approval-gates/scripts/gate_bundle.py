@@ -153,6 +153,26 @@ def clip(text, size):
 
 # ---------------------------------------------------------------- documents
 
+def split_parts(text):
+    """[text] when the text fits a row, else the text in parts of at most MAX_DOC_BYTES each, split at its
+    `## ` headings (the page joins the parts back in order); a single section longer than a row is cut."""
+    if len(text.encode("utf-8")) <= MAX_DOC_BYTES:
+        return [text]
+    sections = re.split(r"(?m)^(?=## )", text)
+    parts, current = [], ""
+    for section in sections:
+        if current and len((current + section).encode("utf-8")) > MAX_DOC_BYTES:
+            parts.append(current)
+            current = ""
+        current += section
+        if len(current.encode("utf-8")) > MAX_DOC_BYTES:
+            parts.append(cut(current))
+            current = ""
+    if current:
+        parts.append(current)
+    return [p for p in parts if p.strip()] or [cut(text)]
+
+
 def cut(text):
     """The text, cut to MAX_DOC_BYTES when longer, with a closing line that says how much is missing."""
     raw = text.encode("utf-8")
@@ -174,7 +194,7 @@ def read_document(path, kind):
             text = json.dumps(json.loads(text), indent=2, ensure_ascii=False)
         except ValueError:
             pass  # shown as it is
-    return cut(text)
+    return text
 
 
 def kind_of(name):
@@ -244,9 +264,18 @@ def build_documents(folder, project, produces):
         used.add(key)
         text = read_document(path, kind)
         rel = os.path.relpath(path, project)
-        row = {"n": len(docs) + 1, "key": key, "title": humanize(key), "path": rel, "kind": kind, "text": text}
-        index = {"key": key, "title": row["title"], "path": rel, "kind": kind, "bytes": os.path.getsize(path)}
-        docs.append((row, index, path))
+        parts = split_parts(text) if kind != "json" else [cut(text)]
+        n = len(docs) + 1
+        index = {"key": key, "title": humanize(key), "path": rel, "kind": kind, "bytes": os.path.getsize(path)}
+        if len(parts) > 1:
+            index["parts"] = len(parts)
+        for number, part in enumerate(parts, 1):
+            row = {"n": n, "key": key, "title": index["title"], "path": rel, "kind": kind, "text": part}
+            doc_id = key
+            if len(parts) > 1:
+                row.update(part=number, parts=len(parts))
+                doc_id = f"{key}-p{number}"
+            docs.append((dict(row, id=doc_id), index if number == 1 else None, path))
     return docs
 
 
@@ -373,7 +402,7 @@ def build(args):
         {"k": "approve", "t": "Approve", "d": f"Continue to {next_name}" if next_name else "Continue"},
         {"k": "changes", "t": "Request Changes", "d": "Provide revision feedback"},
     ]
-    gate["documents"] = [index for _row, index, _path in docs]
+    gate["documents"] = [index for _row, index, _path in docs if index]
     return gate_id, gate, [row for row, _index, _path in docs]
 
 
@@ -420,9 +449,10 @@ def main(argv=None):
     sizes.append(write_json(path, gate))
     writes.append({"op": "set", "collection": "gates", "doc_id": gate_id, "file_path": path})
     for row in docs:
-        path = os.path.join(out, "documents", row["key"] + ".json")
+        doc_id = row.pop("id")
+        path = os.path.join(out, "documents", doc_id + ".json")
         sizes.append(write_json(path, row))
-        writes.append({"op": "set", "collection": f"gates/{gate_id}/documents", "doc_id": row["key"], "file_path": path})
+        writes.append({"op": "set", "collection": f"gates/{gate_id}/documents", "doc_id": doc_id, "file_path": path})
     main_path = os.path.join(out, "writes.json")
     write_json(main_path, writes)
     batches = batches_of(writes, sizes)
@@ -434,7 +464,7 @@ def main(argv=None):
             write_json(paths[-1], batch)
         print(f"approval-gates: {len(writes)} writes do not fit one batch; send {len(paths)} batches, in order "
               f"({', '.join(os.path.basename(p) for p in paths)})", file=sys.stderr)
-    print(json.dumps({"id": gate_id, "stage": args.stage, "unit": args.unit, "documents": [d["key"] for d in docs],
+    print(json.dumps({"id": gate_id, "stage": args.stage, "unit": args.unit, "documents": [d["key"] for d in gate["documents"]],
                       "writes": main_path, "batches": paths, "round": gate["round"]}))
     return 0
 

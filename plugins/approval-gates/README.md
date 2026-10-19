@@ -18,10 +18,15 @@ hooks/gate_guard.py                       the guard (hooks/hooks.json registers 
 
 ## What you see
 
-A page per gate, newest first in a list grouped by intent. A gate shows its stage, round and review
-verdict, the agent's summary, the review brief, and a document list on the left (chips on a phone).
-Markdown renders with tables and Mermaid diagrams; JSON is collapsible. At the bottom a bar holds a draft
-decision (Approve or Request changes, with a note). It saves as you press, and says to answer in chat.
+A page per gate, newest first in a list grouped by intent. A gate uses the whole width: a compact
+header with the stage, round and what comes next; an outline on the left (every document and its
+sections, with Expand all and Collapse all); and a column of collapsible blocks: the agent's summary,
+the review (verdict, open-finding count, a findings table whose rows open to the finding, where and
+required action), then every document, each with its sections collapsible and a Note button for a
+note to Claude. Markdown renders with tables and Mermaid diagrams; JSON, questions and review copies
+start collapsed. A document longer than a database row is split at its headings and joined back on
+the page. At the bottom a thin bar holds a draft decision (Approve or Request changes, with a note);
+it saves as you press, and says to answer in chat.
 
 ## What the agent does
 

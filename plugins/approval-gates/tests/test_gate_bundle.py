@@ -174,17 +174,41 @@ class TestRows(Case):
         self.assertEqual(bundle.stage_name("user-stories", None), "User Stories")
         self.assertEqual(bundle.stage_name("user-stories", {"name": "Stories, Of Users"}), "Stories, Of Users")
 
-    def test_long_document_is_truncated(self):
+    def test_long_document_is_split_at_headings(self):
+        path = os.path.join(record(self.project), "inception", "user-stories", "personas.md")
+        section = "## Part %d\n\n" + "x" * 60_000 + "\n\n"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("intro\n\n" + "".join(section % n for n in range(1, 6)))
+        summary = self.summary("--stage", "user-stories", "--no-brief")
+        self.assertEqual(summary["documents"].count("personas"), 1)
+        index = {d["key"]: d for d in self.gate()["documents"]}
+        self.assertEqual(index["personas"]["parts"], 2)
+        self.assertEqual(index["personas"]["bytes"], os.path.getsize(path))
+        first, second = self.document("personas-p1"), self.document("personas-p2")
+        self.assertEqual((first["part"], first["parts"], second["part"], second["parts"]), (1, 2, 2, 2))
+        self.assertEqual(first["key"], second["key"], "personas")
+        self.assertEqual(first["n"], second["n"])
+        self.assertTrue(first["text"].startswith("intro\n\n## Part 1"))
+        self.assertTrue(second["text"].startswith("## Part 4"))
+        self.assertNotIn("truncated", first["text"] + second["text"])
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(first["text"] + second["text"], f.read())
+        for part in (first, second):
+            self.assertLess(len(part["text"].encode("utf-8")), 200_000)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "documents", "personas.json")))
+        with open(summary["writes"], encoding="utf-8") as f:
+            ids = [w["doc_id"] for w in json.load(f) if w["collection"].endswith("/documents")]
+        self.assertEqual(ids[:3], ["stories", "personas-p1", "personas-p2"])
+
+    def test_one_huge_section_is_cut(self):
         path = os.path.join(record(self.project), "inception", "user-stories", "personas.md")
         with open(path, "w", encoding="utf-8") as f:
-            f.write("x" * 250_000)
+            f.write("## One\n" + "x" * 250_000)
         self.summary("--stage", "user-stories", "--no-brief")
         text = self.document("personas")["text"]
-        self.assertTrue(text.startswith("x" * 1000))
-        self.assertTrue(text.endswith("\n\u2026 (truncated, 50000 bytes more; open the file)"), text[-80:])
+        self.assertTrue(text.endswith("bytes more; open the file)"), text[-80:])
         self.assertLess(len(text.encode("utf-8")), 200_100)
-        index = {d["key"]: d for d in self.gate()["documents"]}
-        self.assertEqual(index["personas"]["bytes"], 250_000)
+        self.assertNotIn("parts", {d["key"]: d for d in self.gate()["documents"]}["personas"])
 
     def test_hidden_and_lock_files_are_skipped(self):
         folder = os.path.join(record(self.project), "inception", "user-stories")
