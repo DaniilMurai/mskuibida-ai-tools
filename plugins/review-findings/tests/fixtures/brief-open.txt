@@ -1,0 +1,31 @@
+**Stage:** Domain Design
+**Review outcome:** 2 findings are open.
+**Why now:** First review completed.
+
+**Review artifact:** `aidlc/spaces/default/intents/260101-demo-shop/inception/domain-design/domain-model.md`
+
+| ID | Severity | Where | Status |
+|---|---|---|---|
+| R-01 | Minor | glossary.md > Order | Accepted risk |
+| R-02 | Major | domain-model.md > Cart aggregate ... | New |
+| R-03 | Minor | domain-model.md > Events | Unresolved |
+
+> R-01 Finding: The glossary calls an order a "basket" once. The rest of the model says "order".
+
+> R-01 Where: glossary.md > Order, second sentence
+
+> R-01 Required action: Replace "basket" with "order".
+
+> R-02 Finding: The `Cart` rule `checkout | expire` is ambiguous. Two events can fire on the same cart, and the model does not say which one wins.
+> A reader cannot tell what happens to reserved stock.
+
+> R-02 Where: domain-model.md > Cart aggregate, invariants list
+
+> R-02 Required action: State the winning event.
+> Add one line on what happens to reserved stock.
+
+> R-03 Finding: The Events table lists `OrderPlaced` but the flow text calls it `CheckoutDone`.
+
+**Decision options:**
+- **Approve** - continue; findings stay open and are recorded as accepted risks.
+- **Request Changes** - return to the listed artifacts so the required actions can be addressed.

@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion|Bash|Edit|MultiEdit|Write|NotebookEdit|ArtifactData",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/findings_guard.py\"; elif ls \"${REVIEW_FINDINGS_DIR:-$HOME/.claude/review-findings}\"/*.json >/dev/null 2>&1; then echo 'Refused by the review-findings plugin: python3 is not installed, and the folder ~/.claude/review-findings still holds pending review findings, so they cannot be checked. Developer: install Python 3, or delete that folder in a terminal (rm -r ~/.claude/review-findings).' >&2; exit 2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|ReportFindings|AskUserQuestion|ArtifactData",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/findings_guard.py\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v python3 >/dev/null 2>&1 || exit 0; python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/findings_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
