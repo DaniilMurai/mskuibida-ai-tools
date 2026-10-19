@@ -620,7 +620,7 @@ function pointsGate(): Gate {
 }
 
 /**
- * Construction as Units: one row per Unit in the dependency block's order (each counted once built, by its share of
+ * Construction as Units: one row per Unit in build order (`buildOrder`; each counted once built, by its share of
  * the story points), then the stages that run once (build-and-test, ci-pipeline) as rows of their own.
  */
 function unitSectionOf(

@@ -1,7 +1,7 @@
 // Construction by Unit of work: the Units, their story points and their receipts in, one row per Unit out.
 import { test, expect, describe } from 'claude-code/testing'
 import { aidlc } from '../src/providers/aidlc'
-import { parseUnitDag, parseUnitEvents, parseUnitIndex, parseUnitProgress, parseUnitScope, progressOf, unitStageStatuses, withReceipts } from '../src/providers/aidlc/units'
+import { buildOrder, parseUnitDag, parseUnitEvents, parseUnitIndex, parseUnitProgress, parseUnitScope, progressOf, unitStageStatuses, withReceipts } from '../src/providers/aidlc/units'
 import type { Unit, UnitCell, UnitFacts, UnitProgress } from '../src/providers/aidlc/units'
 import { cloudIdsOf, jiraServerOf, parsePointsCsv, storyPointsOf, withRows } from '../src/providers/aidlc/points'
 import { isResumedAfter } from '../src/providers/aidlc/park'
@@ -676,6 +676,34 @@ describe('a park the engine left behind, and a running stage', () => {
     expect(isResumedAfter(shard('UNIT_STARTED', '2026-10-02T11:00:00Z'), since)).toBe(false)
     expect(isResumedAfter(shard('ARTIFACT_CREATED', '2026-10-02T12:00:00Z'), since)).toBe(false)
     expect(isResumedAfter(shard('STAGE_STARTED', '2026-10-02T12:00:00Z'), 'not a time')).toBe(false)
+  })
+})
+
+describe('buildOrder', () => {
+  const unit = (name: string, id: string, dependsOn: string[] = []): Unit => ({ name, kind: '', dependsOn, id, jira: '' })
+
+  test('by the step each Unit can be built at, then by number', () => {
+    // reviewdesk's shape: U31, the thin slice, comes right after U1, and most Units wait on it.
+    const units = [
+      unit('u1-skeleton', 'U1'),
+      unit('u2-accounts', 'U2', ['u31-thin-slice']),
+      unit('u4-extras', 'U4', ['u3-pr-list']),
+      unit('u3-pr-list', 'U3', ['u31-thin-slice']),
+      unit('u5-commenting', 'U5', ['u1-skeleton']),
+      unit('u12-local-git', 'U12', ['u1-skeleton']),
+      unit('u31-thin-slice', 'U31', ['u1-skeleton']),
+    ]
+    expect(buildOrder(units).map(one => one.id)).toEqual(['U1', 'U5', 'U12', 'U31', 'U2', 'U3', 'U4'])
+  })
+
+  test('the number from the directory when the index has none; a dependency on no listed Unit is ignored', () => {
+    const units = [unit('u10-b', '', ['gone']), unit('u2-a', '')]
+    expect(buildOrder(units).map(one => one.name)).toEqual(['u2-a', 'u10-b'])
+  })
+
+  test('a cycle does not hang: its Units come last, by number', () => {
+    const units = [unit('u3-c', 'U3', ['u2-b']), unit('u2-b', 'U2', ['u3-c']), unit('u9-free', 'U9')]
+    expect(buildOrder(units).map(one => one.id)).toEqual(['U9', 'U2', 'U3'])
   })
 })
 
