@@ -5,6 +5,7 @@ estimates: from an issue tracker (Jira) when the project configures one, by hand
     points.py plan  [--intent X] [--source ai|human] [UNIT ...]
     points.py apply --issues FILE [--intent X] [--source ai|human] [--dry-run] [UNIT ...]   (tracker only)
     points.py set   UNIT POINTS [--intent X] [--source human|ai]
+    points.py show  [--intent X]
     points.py claim [--issues FILE] [--intent X] [--ref REF] UNIT
 
 Run it from the project root (`$CLAUDE_PROJECT_DIR`, else the git toplevel, else the current directory
@@ -41,6 +42,11 @@ carry no intent marker, so it cannot be narrowed to one intent; two open issues 
 `set UNIT POINTS` writes the row with source `human` (`--source ai` is an assistant's own suggestion,
 only when the developer asked for one). A value off the scale is written and reported (exit 1). A
 missing file is created with its header.
+
+`show` prints, as JSON, what the `review` skill needs to open a review form: the file, the intent, the
+Unit documents (`inception/units-generation/unit-of-work.md` and its dependency file, when they exist),
+the scale, whether a tracker is configured, and the row that counts for each Unit (the last one).
+A missing file is no rows, not an error.
 
 `claim` is the check before a Unit is claimed, run after `apply` (or `set`). It reads
 `unit-points.csv` as it is on REF (default `origin/main`; fetch first, a missing REF is an error),
@@ -537,6 +543,8 @@ def parse(argv):
             s.add_argument("--ref", default="origin/main", help="the git ref whose unit-points.csv counts")
         if name == "apply":
             s.add_argument("--dry-run", action="store_true")
+    s = sub.add_parser("show", help="the file's rows, the scale and the Unit documents, as JSON")
+    s.add_argument("--intent")
     s = sub.add_parser("set", help="record the developers' estimate of a Unit")
     s.add_argument("unit", metavar="UNIT")
     s.add_argument("points", metavar="POINTS")
@@ -573,6 +581,28 @@ def cmd_set(args, cfg, path):
     return 1 if look else 0
 
 
+UNIT_DOCS = ("unit-of-work.md", "unit-of-work-dependency.md")
+
+
+def cmd_show(cfg, root, record_dir, path):
+    sheet = read_sheet(path) if os.path.exists(path) else PointsFile(HEADER + "\n")
+    rows = []
+    for unit in sorted(sheet.rows, key=number):
+        _, (_, pts, source) = sheet.current(unit)
+        rows.append({"unit": unit, "points": pts or None, "source": source or None})
+    docs = os.path.join(record_dir, "inception", "units-generation")
+    print(json.dumps({
+        "file": os.path.relpath(path, root),
+        "intent": os.path.basename(record_dir),
+        "unitDocs": [os.path.relpath(os.path.join(docs, name), root) for name in UNIT_DOCS
+                     if os.path.isfile(os.path.join(docs, name))],
+        "scale": [int(n) if n.is_integer() else n for n in cfg["scale"]],
+        "tracker": cfg["tracker"]["type"] if cfg["tracker"] else None,
+        "rows": rows,
+    }, indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv=None, cwd=None):
     args = parse(sys.argv[1:] if argv is None else argv)
     try:
@@ -585,6 +615,8 @@ def main(argv=None, cwd=None):
         path = os.path.join(record_dir, POINTS_FILE)
         if args.command == "set":
             return cmd_set(args, cfg, path)
+        if args.command == "show":
+            return cmd_show(cfg, root, record_dir, path)
         sheet = read_sheet(path)
         wanted = [unit_id(u) for u in args.units]
         if args.command == "plan":

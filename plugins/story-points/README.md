@@ -2,9 +2,13 @@
 
 Keeps an [AI-DLC](https://github.com/awslabs/aidlc-workflows) intent's `unit-points.csv` in step with
 the developers' story-point estimates. Jira is optional: with it, the estimates are synced from Jira;
-without it, a developer types them with `/story-points:set`.
+without it, a developer types them with `/story-points:set` or picks them in a review form with
+`/story-points:review`.
 
 - `/story-points:set U3 5` records a developer's estimate. No tracker needed.
+- `/story-points:review` shows every Unit of the intent as a card in an artifact, with its current
+  value marked as an AI suggestion or a developer estimate; the developer presses a number per Unit and
+  their picks are recorded. No tracker needed.
 - `/story-points:sync` copies the estimates from Jira's story-point field into the file.
 - Both can check a Unit before it is claimed: it has a developer's estimate, and (with Jira) the other
   Units of its epic do too, or the developer approves explicitly.
@@ -76,12 +80,27 @@ guessing.
    another intent than the active one). The row gets source `human`. The assistant only ever runs it
    with a number the developer typed; if they ask for a suggestion, the assistant says one and, if
    asked to record it, uses `--source ai`, which is never taken as an estimate.
+   To go through every Unit at once, `/story-points:review` opens the review form (below).
 2. The changed file is committed on its own, the way the project reviews such changes.
 3. Before a Unit is claimed: `git fetch origin main`, then `points.py claim U3`. The row on
    `origin/main` (`--ref` picks another) must have source `human`, or the Unit is blocked. There is no
    epic to check.
 
 `plan` reports that no tracker is configured, and `apply` exits 2 with the same message.
+
+### The review form
+
+`/story-points:review` puts the intent's Units into one private artifact per developer, **AI-DLC story
+points**, published once from `skills/review/points-review.html` and reused for every review (the Units
+are rows in its database). Each Unit is a card with a short title, what it builds, its dependencies and
+a row of numbers from the scale. The value in the file carries a corner mark: an amber sparkle for an AI
+suggestion, a navy person for a developer estimate. A value off the scale shows as an extra dashed card.
+The developer's pick turns navy with the person mark; pressing the AI's number keeps it as theirs.
+
+The skill sends the link, then, as a separate message, asks for `form is done` (in the Claude desktop
+app, a single suggested reply button). Once the developer has pressed Done in the form and sent that,
+the skill runs `set` for every picked Unit, so each pick becomes a `human` row. A Unit left without a
+pick keeps its row. With a Jira tracker configured the skill stops: the estimates live in Jira.
 
 ## With Jira
 
@@ -123,7 +142,9 @@ missing and a config exists, it refuses those writes.
 ```
 skills/set/SKILL.md          /story-points:set - record an estimate; the claim check without Jira
 skills/sync/SKILL.md         /story-points:sync - read the Unit issues through the Jira MCP server, then run the script
-scripts/points.py            plan, apply, set and claim (Python 3, standard library only)
+skills/review/SKILL.md       /story-points:review - every Unit in a form; the picks become human rows
+skills/review/points-review.html  the review form's one page; its header comment is the data contract
+scripts/points.py            plan, apply, set, show and claim (Python 3, standard library only)
 hooks/hooks.json             PreToolUse on Jira create, edit, update and transition calls of any MCP server
 hooks/story_point_guard.py   refuses a call that sets the story-point field
 tests/test_points.py         python3 -m unittest discover -s plugins/story-points/tests

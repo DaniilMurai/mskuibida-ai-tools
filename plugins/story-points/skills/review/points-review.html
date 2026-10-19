@@ -1,0 +1,364 @@
+<title>AI-DLC story points</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  AI-DLC story points — the one template for reviewing an intent's story points without Jira.
+
+  Published ONCE per developer as a private Artifact with the `db` capability
+  (capabilities: {db: {}}, icon "cards"); never regenerated per review. Every review is rows
+  INSIDE this artifact, written by the agent with the ArtifactData tool (see SKILL.md next to
+  this file). The page renders whatever the rows say, live.
+
+  Data contract (what the agent writes):
+
+    reviews/<id>                 {title, intent, file, scale: [1, 2, 3, 5, 8],
+                                  status: "open"|"done", createdAt (ISO), picks: {}, savedAt?}
+      id: [a-z0-9._-]+ — the intent's directory name, lowercased.
+    reviews/<id>/units/<Unit>    {n: 3, unit: "U3", name: "api-billing", title, ctx?,
+                                  points: 5 | null, source: "ai" | "human" | null,
+                                  dependsOn?: ["U1"]}
+      points/source: the row that counts in unit-points.csv now; null/null without a row.
+      title: one line a person understands without the ids. name: the Unit's slug.
+
+    Markdown the page renders in ctx: blocks separated by a blank line; a block whose every line
+    starts with "- " is a one-level list; inside both, `code` and **bold**. title: `code` and
+    **bold** only. Nothing else renders.
+
+  What the page writes (the only thing the agent reads back, one `get` of reviews/<id>):
+
+    reviews/<id>.picks[<Unit>] = {points: 5, at: ISO}   the developer pressed 5 on that Unit
+                               = null                    they cleared it again
+      Pressing the number the row already holds is a pick too: it confirms an AI suggestion
+      as the developer's own estimate.
+    reviews/<id>.status        = "done" when the developer presses Done; "open" again after
+                                 a later pick.   reviews/<id>.savedAt = ISO of Done.
+
+  Link to a review: <artifact url>#<id>. No hash: the list of reviews.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column of Unit cards, each ending in a row of estimate cards like a planning-poker
+   hand. Navy marks the developer, amber the assistant. A fixed bar carries save state and Done. */
+:root {
+  --bg: #f2f4f7; --surface: #ffffff; --fg: #151b26; --muted: #5a6474; --line: #d6dce6;
+  --human: #24427a; --human-soft: #e2e9f6; --on-human: #ffffff;
+  --ai: #b06f0c; --ai-soft: #fbefd9;
+  --ok: #2c7a4f; --warn: #a63a2b;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442;
+  --human: #8fb0ec; --human-soft: #1d2a42; --on-human: #0f1624;
+  --ai: #eab062; --ai-soft: #3a2b14;
+  --ok: #6cc28f; --warn: #ef8f7c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442;
+  --human: #8fb0ec; --human-soft: #1d2a42; --on-human: #0f1624;
+  --ai: #eab062; --ai-soft: #3a2b14;
+  --ok: #6cc28f; --warn: #ef8f7c; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 780px; margin: 0 auto; padding-block: 36px 150px; display: grid; gap: 28px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--human); display: flex; gap: 12px; flex-wrap: wrap; }
+.eyebrow a { color: inherit; text-decoration: none; }
+.eyebrow a:hover { text-decoration: underline; }
+h1 { font: 700 clamp(28px, 5vw, 38px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--muted); font-size: 14px; min-width: 0; }
+.file { font: 500 12.5px var(--mono); background: var(--human-soft); color: var(--human); padding: 4px 8px; border-radius: 4px; max-width: 100%; overflow-wrap: anywhere; }
+.pill { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.done { color: var(--ok); border-color: var(--ok); }
+.pill.open { color: var(--human); border-color: var(--human); }
+
+/* The legend and the tally: what the two marks mean, and how far the hand is. */
+.key { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+.key span { display: inline-flex; gap: 8px; align-items: center; }
+.key .tally { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; flex: none; }
+.mark svg { width: 12px; height: 12px; }
+.mark.ai { background: var(--ai-soft); color: var(--ai); box-shadow: inset 0 0 0 1px var(--ai); }
+.mark.human { background: var(--human); color: var(--on-human); }
+
+#list { display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: inherit; text-decoration: none; }
+.row:hover { border-color: var(--human); }
+.row b { font: 600 17px/1.3 var(--display); }
+.row small { color: var(--muted); display: block; margin-top: 2px; }
+.empty { padding: 20px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); display: grid; gap: 8px; max-width: 66ch; }
+.empty p { margin: 0; }
+
+/* A Unit. */
+#units { display: grid; gap: 16px; }
+.unit { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 16px; display: grid; gap: 12px; scroll-margin-top: 24px; min-width: 0; }
+.uhead { display: flex; gap: 10px 12px; align-items: center; flex-wrap: wrap; }
+.uid { font: 500 13px/1 var(--mono); color: var(--human); background: var(--human-soft); padding: 5px 8px; border-radius: 4px; flex: none; }
+.uname { font: 500 13px var(--mono); color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+.state { margin-left: auto; }
+.state.need { color: var(--ai); border-color: var(--ai); }
+.state.set { color: var(--human); border-color: var(--human); }
+h2 { font: 600 20px/1.3 var(--display); margin: 0; text-wrap: balance; min-width: 0; }
+.ctx { display: grid; gap: 8px; max-width: 68ch; font-size: 14.5px; }
+.ctx p, .ctx ul { margin: 0; }
+.ctx ul { padding-left: 20px; display: grid; gap: 4px; }
+code { font: 500 13px var(--mono); background: var(--human-soft); padding: 1px 5px; border-radius: 3px; }
+.deps { font-size: 13px; color: var(--muted); margin: 0; }
+
+/* The hand: one card per value on the scale. */
+.hand { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.pt { position: relative; width: 52px; height: 66px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  font: 700 22px/1 var(--display); font-variant-numeric: tabular-nums; display: grid; place-items: center; cursor: pointer; padding: 0;
+  transition: transform .12s ease, border-color .12s ease, background-color .12s ease; }
+.pt:hover { border-color: var(--human); transform: translateY(-2px); }
+.pt:focus-visible { outline: 2px solid var(--human); outline-offset: 2px; }
+.pt .mark { position: absolute; top: -8px; right: -8px; outline: 2px solid var(--surface); }
+.pt.is-ai { border-color: var(--ai); background: var(--ai-soft); }
+.pt.is-human { border-color: var(--human); box-shadow: inset 0 0 0 1px var(--human); }
+.pt.picked { background: var(--human); border-color: var(--human); color: var(--on-human); transform: translateY(-4px); box-shadow: 0 6px 14px -8px var(--human); }
+.pt.picked .mark.ai { display: none; }
+.pt.off { border-style: dashed; }
+.pt:disabled { cursor: default; transform: none; }
+.ufoot { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font-size: 14px; color: var(--muted); }
+.ufoot b { color: var(--fg); font-weight: 600; }
+.clear { background: none; border: 0; padding: 0; font: 500 13px var(--body); color: var(--human); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.clear:focus-visible { outline: 2px solid var(--human); outline-offset: 2px; }
+.warnline { color: var(--warn); }
+
+button { font: 600 14px var(--body); border-radius: 6px; cursor: pointer; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line);
+  padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.barin { max-width: 780px; margin: 0 auto; display: flex; gap: 10px 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+#status { color: var(--muted); font-size: 14px; min-width: 0; flex: 1 1 260px; }
+#status.ok { color: var(--ok); }
+#status.warn { color: var(--warn); }
+.done { background: var(--human); color: var(--on-human); border: 0; padding: 10px 20px; }
+.done:focus-visible { outline: 2px solid var(--human); outline-offset: 2px; }
+.done:disabled { opacity: .5; cursor: default; }
+.done.is-done { background: var(--ok); }
+@media (max-width: 420px) { .unit { padding: 16px; } .hand { gap: 7px; } .pt { width: 44px; height: 58px; font-size: 20px; } }
+@media (prefers-reduced-motion: reduce) { .pt { transition: none; } .pt:hover, .pt.picked { transform: none; } }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow"><a href="#">Story points</a><span id="crumb"></span></div>
+    <h1 id="title">Story points</h1>
+    <p class="lede" id="lede">Loading…</p>
+    <div class="meta" id="meta" hidden></div>
+  </header>
+  <div class="key" id="key" hidden>
+    <span><i class="mark ai" data-icon="ai"></i>AI suggestion</span>
+    <span><i class="mark human" data-icon="human"></i>Developer estimate</span>
+    <span class="tally" id="tally"></span>
+  </div>
+  <div id="list"></div>
+  <div id="units" hidden></div>
+</main>
+<div class="bar" id="bar" hidden><div class="barin">
+  <span id="status">Connecting…</span>
+  <button class="done" id="done" type="button" disabled>Done</button>
+</div></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = { title: $("title"), lede: $("lede"), meta: $("meta"), crumb: $("crumb"), key: $("key"), tally: $("tally"), list: $("list"), units: $("units"), bar: $("bar"), status: $("status"), done: $("done") };
+  const ICON = {
+    ai: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0.8l1.7 4.6 4.6 1.7-4.6 1.7L8 13.4 6.3 8.8 1.7 7.1l4.6-1.7z"/><path fill="currentColor" d="M13.2 10.6l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>',
+    human: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="4.6" r="3.1" fill="currentColor"/><path fill="currentColor" d="M1.8 15.2c.4-3.5 3-5.6 6.2-5.6s5.8 2.1 6.2 5.6z"/></svg>',
+  };
+  const mark = (kind) => `<i class="mark ${kind}" title="${kind === "ai" ? "AI suggestion" : "Developer estimate"}">${ICON[kind]}</i>`;
+  document.querySelectorAll("[data-icon]").forEach((n) => { n.innerHTML = ICON[n.dataset.icon]; });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  const md = (s) => String(s ?? "").trim().split(/\n\s*\n/).filter(Boolean).map((b) => {
+    const lines = b.split("\n");
+    if (lines.every((l) => /^\s*-\s+/.test(l))) return "<ul>" + lines.map((l) => "<li>" + inline(l.replace(/^\s*-\s+/, "")) + "</li>").join("") + "</ul>";
+    return "<p>" + lines.map(inline).join("<br>") + "</p>";
+  }).join("");
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); } catch { return iso || ""; } };
+  const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+  const setStatus = (t, cls) => { el.status.textContent = t; el.status.className = cls || ""; };
+  const reviewId = () => { const h = decodeURIComponent(location.hash.replace(/^#/, "")); return /^[a-z0-9._-]+$/i.test(h) ? h : ""; };
+
+  let db = null;
+  const view = { id: "", unsub: [], review: null, units: new Map(), loaded: false, picks: {}, pending: {}, inflight: false, readOnly: false };
+
+  function teardown() {
+    view.unsub.forEach((u) => { try { u(); } catch {} });
+    Object.assign(view, { unsub: [], review: null, units: new Map(), loaded: false, picks: {}, pending: {}, readOnly: false });
+    el.units.innerHTML = "";
+  }
+
+  /* ---------- the list of reviews ---------- */
+  function showIndex() {
+    teardown(); view.id = "";
+    el.title.textContent = "Story points"; el.crumb.textContent = "";
+    el.lede.textContent = "Each intent's Units with their story points. Pick a number on every Unit you estimate; Claude writes your picks into unit-points.csv as the developers' estimates.";
+    el.meta.hidden = true; el.key.hidden = true; el.units.hidden = true; el.bar.hidden = true; el.list.hidden = false;
+    el.list.innerHTML = '<div class="empty"><p>Loading reviews…</p></div>';
+    if (!db) return;
+    view.unsub.push(db.collection("reviews").orderBy("createdAt", "desc").limit(100).onSnapshot((snap) => {
+      if (snap.empty) { el.list.innerHTML = '<div class="empty"><p><b>No reviews yet.</b></p><p>Run <code>/story-points:review</code> in Claude Code. Claude puts the intent\'s Units here and sends you the link.</p></div>'; return; }
+      el.list.innerHTML = snap.docs.map((d) => {
+        const r = d.data(); const n = Object.values(r.picks || {}).filter(Boolean).length; const done = r.status === "done";
+        return `<a class="row" href="#${esc(d.id)}"><span><b>${esc(r.title || d.id)}</b><small>${esc(r.intent || "")} · ${fmt(r.createdAt)}${n ? ` · ${n} picked` : ""}</small></span><span class="pill ${done ? "done" : "open"}">${done ? "done" : "open"}</span></a>`;
+      }).join("");
+    }, () => { el.list.innerHTML = '<div class="empty"><p>Couldn’t load the reviews. Reload the page.</p></div>'; }));
+  }
+
+  /* ---------- one review ---------- */
+  function showReview(id) {
+    teardown(); view.id = id;
+    el.list.hidden = true; el.units.hidden = false; el.bar.hidden = false; el.meta.hidden = false; el.key.hidden = false;
+    el.title.textContent = id; el.crumb.textContent = ""; el.lede.textContent = ""; el.meta.innerHTML = "";
+    el.units.innerHTML = '<p class="lede">Loading Units…</p>';
+    setStatus("Connecting…"); el.done.disabled = true;
+    if (!db) return;
+    const ref = db.doc("reviews/" + id);
+    view.unsub.push(ref.onSnapshot((snap) => {
+      if (!snap.exists) {
+        el.title.textContent = "No such review"; el.lede.textContent = "Nothing is stored under this id. Check the link Claude sent you, or open the list.";
+        el.units.innerHTML = ""; el.key.hidden = true; el.bar.hidden = true; return;
+      }
+      const r = snap.data(); view.review = r;
+      el.title.textContent = r.title || id; el.crumb.textContent = r.intent || "";
+      el.lede.textContent = "Press a number to give a Unit your estimate. To keep an AI suggestion, press its number: it becomes your estimate. Picks save as you go; press Done when you are finished.";
+      const done = r.status === "done";
+      el.meta.innerHTML = `${r.file ? `<span class="file">${esc(r.file)}</span>` : ""}<span class="pill ${done ? "done" : "open"}">${done ? "done" : "open"}</span>`;
+      for (const [u, p] of Object.entries(r.picks || {})) if (!(u in view.pending)) view.picks[u] = p;
+      el.done.disabled = view.readOnly; el.done.classList.toggle("is-done", done);
+      el.done.textContent = done ? "Done ✓" : "Done";
+      if (!view.inflight && !Object.keys(view.pending).length) {
+        setStatus(done ? `Done ${fmt(r.savedAt)}. Tell Claude in chat: form is done.` : "Picks save as you go.", done ? "ok" : "");
+      }
+      render();
+    }, () => setStatus("Couldn’t load the review. Reload the page.", "warn")));
+    view.unsub.push(ref.collection("units").orderBy("n").onSnapshot((snap) => {
+      view.units = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); view.loaded = true; render();
+    }, () => setStatus("Couldn’t load the Units. Reload the page.", "warn")));
+  }
+
+  const scale = () => (view.review?.scale || [1, 2, 3, 5, 8]).map(Number).filter((n) => isFinite(n));
+  const pickOf = (u) => { const p = view.picks[u]; return p && num(p.points) !== null ? num(p.points) : null; };
+
+  function render() {
+    if (!view.review) return;
+    if (!view.loaded) return;
+    const units = [...view.units.values()].sort((a, b) => (a.n ?? 0) - (b.n ?? 0));
+    if (!units.length) { el.units.innerHTML = '<p class="lede">No Units in this review yet. Claude adds them as rows; they appear here as soon as they are written.</p>'; tally(units); return; }
+    el.units.querySelectorAll(":scope > p").forEach((n) => n.remove());
+    const seen = new Set();
+    units.forEach((u, i) => {
+      seen.add(u.id);
+      let node = document.getElementById("u-" + u.id);
+      const fresh = renderUnit(u);
+      if (node) node.replaceWith(fresh); else el.units.appendChild(fresh);
+      node = fresh;
+      const want = el.units.children[i]; if (want !== node) el.units.insertBefore(node, want || null);
+    });
+    el.units.querySelectorAll("[data-unit]").forEach((n) => { if (!seen.has(n.dataset.unit)) n.remove(); });
+    tally(units);
+  }
+
+  function renderUnit(u) {
+    const cur = num(u.points); const src = cur === null ? null : (u.source === "human" ? "human" : "ai");
+    const pick = pickOf(u.id);
+    const values = scale(); const off = cur !== null && !values.includes(cur);
+    if (off) values.push(cur);
+    values.sort((a, b) => a - b);
+    const hand = values.map((v) => {
+      const isCur = v === cur; const isPick = v === pick;
+      const cls = ["pt", isCur ? (src === "human" ? "is-human" : "is-ai") : "", isPick ? "picked" : "", isCur && off ? "off" : ""].filter(Boolean).join(" ");
+      const badge = isPick ? mark("human") : isCur ? mark(src) : "";
+      const label = `${v} points${isCur ? (src === "ai" ? ", AI suggestion" : ", developer estimate") : ""}${isCur && off ? ", off the scale" : ""}${isPick ? ", your pick" : ""}`;
+      return `<button type="button" class="${cls}" data-v="${v}" aria-pressed="${isPick}" aria-label="${esc(label)}" ${view.readOnly ? "disabled" : ""}>${v}${badge}</button>`;
+    }).join("");
+    let foot;
+    if (pick !== null) {
+      const was = cur === null ? "no estimate before" : pick === cur ? (src === "ai" ? "confirms the AI suggestion" : "same as the estimate in the file") : `was ${cur}, ${src === "ai" ? "AI suggestion" : "developer estimate"}`;
+      foot = `<span>Your estimate: <b>${pick}</b> · ${was}</span><button type="button" class="clear" data-clear>Clear</button>`;
+    } else if (cur === null) {
+      foot = "<span>No estimate yet.</span>";
+    } else if (off) {
+      foot = `<span>${src === "ai" ? "AI suggests" : "Developer estimate"} <b>${cur}</b>, off the scale. Pick a number from the scale${cur > Math.max(...scale()) ? ", or split the Unit" : ""}.</span>`;
+    } else if (src === "ai") {
+      foot = `<span>AI suggests <b>${cur}</b>. Press ${cur} to keep it as your estimate, or pick another number.</span>`;
+    } else {
+      foot = `<span>Developer estimate <b>${cur}</b>. Pick another number to change it.</span>`;
+    }
+    if (pick !== null && pick > Math.max(...scale())) foot += '<span class="warnline">Above the top of the scale: split the Unit instead.</span>';
+    const state = pick !== null ? ["set", "picked"] : src === "human" ? ["", "estimated"] : ["need", "needs a look"];
+    const deps = (u.dependsOn || []).filter(Boolean);
+    const card = document.createElement("article");
+    card.className = "unit"; card.id = "u-" + u.id; card.dataset.unit = u.id;
+    card.innerHTML = `<div class="uhead"><span class="uid">${esc(u.unit || u.id)}</span>${u.name ? `<span class="uname">${esc(u.name)}</span>` : ""}<span class="pill state ${state[0]}">${state[1]}</span></div>
+      <h2>${inline(u.title || u.name || u.id)}</h2>
+      ${u.ctx ? `<div class="ctx">${md(u.ctx)}</div>` : ""}
+      ${deps.length ? `<p class="deps">Depends on ${deps.map(esc).join(", ")}</p>` : ""}
+      <div class="hand" role="group" aria-label="Story points for ${esc(u.unit || u.id)}">${hand}</div>
+      <div class="ufoot">${foot}</div>`;
+    card.querySelectorAll(".pt").forEach((b) => b.addEventListener("click", () => choose(u.id, Number(b.dataset.v))));
+    card.querySelector("[data-clear]")?.addEventListener("click", () => choose(u.id, null));
+    return card;
+  }
+
+  function tally(units) {
+    const mine = units.filter((u) => pickOf(u.id) !== null || (num(u.points) !== null && u.source === "human")).length;
+    el.tally.textContent = units.length ? `${mine} of ${units.length} Units with a developer estimate` : "";
+  }
+
+  /* A press on the picked number clears it; any other press picks. */
+  function choose(unit, v) {
+    if (view.readOnly) return;
+    const next = v === null || pickOf(unit) === v ? null : { points: v, at: new Date().toISOString() };
+    view.picks[unit] = next; view.pending[unit] = next;
+    const keep = document.activeElement?.dataset?.v; render();
+    if (keep) document.querySelector(`#u-${CSS.escape(unit)} .pt[data-v="${keep}"]`)?.focus();
+    setStatus("Saving…"); flush();
+  }
+
+  async function flush() {
+    if (view.inflight || !db || !view.id || !Object.keys(view.pending).length) return;
+    const batch = view.pending; view.pending = {}; view.inflight = true;
+    const id = view.id;
+    try {
+      const patch = { picks: batch };
+      if (view.review?.status === "done") patch.status = "open";
+      await db.doc("reviews/" + id).update(patch);
+      if (view.id === id && !Object.keys(view.pending).length) setStatus(`Saved ${fmt(new Date().toISOString())}`, "ok");
+    } catch (e) {
+      for (const [u, p] of Object.entries(batch)) if (!(u in view.pending)) view.pending[u] = p;
+      if (e && e.code === "invalid_argument") { view.readOnly = true; view.pending = {}; el.done.disabled = true; render(); setStatus("You can view this review but not save to it. Ask the owner for Contributor access.", "warn"); }
+      else setStatus("Couldn’t save. Check your connection; your next pick retries.", "warn");
+    } finally { view.inflight = false; if (!view.readOnly && Object.keys(view.pending).length) setTimeout(flush, 600); }
+  }
+
+  el.done.addEventListener("click", async () => {
+    if (!db || !view.id || view.readOnly) return;
+    el.done.disabled = true;
+    try {
+      for (let i = 0; i < 100 && (view.inflight || Object.keys(view.pending).length); i++) {
+        if (!view.inflight) await flush(); else await new Promise((r) => setTimeout(r, 100));
+      }
+      if (view.inflight || Object.keys(view.pending).length) throw new Error("unsaved");
+      await db.doc("reviews/" + view.id).update({ status: "done", savedAt: new Date().toISOString() });
+    } catch { setStatus("Couldn’t mark the review as done. Try again.", "warn"); }
+    finally { el.done.disabled = view.readOnly; }
+  });
+
+  /* ---------- boot ---------- */
+  function route() { const id = reviewId(); if (id) showReview(id); else showIndex(); }
+  window.addEventListener("hashchange", route);
+  route();
+  (async () => {
+    db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null;
+    if (!db) { el.lede.textContent = "Sign in to claude.ai to see your story points."; el.list.innerHTML = ""; el.units.innerHTML = ""; el.bar.hidden = true; el.key.hidden = true; return; }
+    route();
+  })();
+})();
+</script>
