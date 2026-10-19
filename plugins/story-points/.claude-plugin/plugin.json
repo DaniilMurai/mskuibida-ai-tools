@@ -1,0 +1,9 @@
+{
+  "name": "story-points",
+  "displayName": "Story points",
+  "version": "2.0.0",
+  "description": "Keeps an AI-DLC intent's unit-points.csv in step with the developers' story-point estimates: typed with /story-points:set, or, when Jira is configured, synced from it with /story-points:sync. Checks a Unit before it is claimed, and refuses any Jira write that lets an assistant set the story-point field.",
+  "author": {
+    "name": "Maksym Skuibida"
+  }
+}

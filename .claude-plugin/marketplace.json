@@ -40,6 +40,12 @@
       "source": "./plugins/question-forms",
       "description": "Every AI-DLC questions file becomes a form in one private artifact: the agent writes the questions as rows, you answer in the page, and the agent copies your answers word for word into the file's [Answer]: tags. Also renders text-only questions and board forms that sort cards into boxes.",
       "version": "1.3.2"
+    },
+    {
+      "name": "story-points",
+      "source": "./plugins/story-points",
+      "description": "For AI-DLC projects: keeps each intent's unit-points.csv (read by project-panel) with the developers' story-point estimates, typed with /story-points:set or synced from Jira when the project's .story-points.json names a tracker; checks a Unit is estimated before it is claimed.",
+      "version": "2.0.0"
     }
   ]
 }

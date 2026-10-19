@@ -60,6 +60,7 @@ user-facing change — users only receive a plugin when its version changes. CI 
 | [`project-panel`](plugins/project-panel) | A side pane for any repo with a plan — sections, items, progress rings and the gates that block the next item. Providers: AI-DLC v2 (which intent this session works on, every phase and stage) and a task ledger read against its PRs; each open PR's review state, and the `pr-review` command it asks of you. Opens with `/panel`. |
 | [`ask-guard`](plugins/ask-guard) | A mod. The question dialog draws its text plain, so a question longer than 250 characters (configurable) is sent back to the model: context in a markdown message first, then a one-line question. Other plugins' dialogs pass untouched. |
 | [`question-forms`](plugins/question-forms) | Every AI-DLC questions file as a form in one private artifact, **AI-DLC question forms**: the agent writes the questions as rows, you answer in the page, and the agent copies your answers word for word into the file. Also text-only questions and board forms (cards sorted into boxes). |
+| [`story-points`](plugins/story-points) | For AI-DLC projects. Keeps each intent's `unit-points.csv`, which `project-panel` reads, with the developers' estimates: typed with `/story-points:set`, or synced from Jira when `.story-points.json` names a tracker. Checks a Unit is estimated before it is claimed. |
 
 ## Adding another plugin
 
