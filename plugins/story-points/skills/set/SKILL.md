@@ -9,7 +9,8 @@ description: Use to record a developer's story-point estimate for a Unit in an i
 source `human` is the developers' estimate; a row with source `ai` is an assistant's suggestion. When
 the project has a Jira tracker in `.story-points.json`, the estimates live in Jira and
 `/story-points:sync` copies them in; this skill is for projects without one, and for a developer
-who wants to type an estimate straight into the file. The exact work is
+who wants to type an estimate straight into the file. To go through every Unit at once in a form,
+use `/story-points:review`. The exact work is
 `${CLAUDE_PLUGIN_ROOT}/scripts/points.py`. Run it from the project root. Below, `POINTS` stands
 for `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/points.py"`.
 

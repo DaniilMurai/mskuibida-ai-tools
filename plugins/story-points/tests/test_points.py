@@ -545,6 +545,37 @@ class SetTest(unittest.TestCase):
         finally:
             ws.close()
 
+    def test_show_lists_the_counting_rows_the_scale_and_the_unit_docs(self):
+        docs = os.path.join(self.ws.record, "inception", "units-generation")
+        os.makedirs(docs)
+        with open(os.path.join(docs, "unit-of-work.md"), "w") as f:
+            f.write("# Units\n")
+        with open(self.ws.path, "a") as f:
+            f.write("U1,3,human\n")  # a later row for U1 is the one that counts
+        code, out, _ = self.ws.run("show")
+        self.assertEqual(code, 0)
+        shown = json.loads(out)
+        self.assertEqual(shown["intent"], "261006-demo-mvp-restart")
+        self.assertEqual(shown["scale"], [1, 2, 3, 5, 8])
+        self.assertIsNone(shown["tracker"])
+        self.assertEqual(shown["unitDocs"], [os.path.join("aidlc", "spaces", "default", "intents",
+                                                          "261006-demo-mvp-restart", "inception",
+                                                          "units-generation", "unit-of-work.md")])
+        self.assertEqual(shown["rows"][0], {"unit": "U1", "points": "3", "source": "human"})
+        self.assertEqual([r["unit"] for r in shown["rows"]], ["U1", "U2", "U3", "U5"])
+
+    def test_show_without_a_file_has_no_rows(self):
+        ws = Workspace(text=None, config=CONFIG)
+        try:
+            code, out, _ = ws.run("show")
+            self.assertEqual(code, 0)
+            shown = json.loads(out)
+            self.assertEqual(shown["rows"], [])
+            self.assertEqual(shown["tracker"], "jira")
+            self.assertFalse(os.path.exists(ws.path))
+        finally:
+            ws.close()
+
     def test_claim_needs_a_human_row_on_the_ref(self):
         self.ws.publish()
         code, out, _ = self.ws.run("claim", "U3")  # --issues is not needed
