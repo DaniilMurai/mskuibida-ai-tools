@@ -378,7 +378,39 @@ export async function readUnitList(fsx: Fsx, intentDir: string): Promise<Unit[] 
   const dag = parseUnitDag(await readIfThere(fsx, join(dir, 'unit-of-work-dependency.md')))
   if (!dag) return null
   const index = parseUnitIndex(await readIfThere(fsx, join(dir, 'unit-of-work.md')), dag.map(unit => unit.name))
-  return dag.map(edge => ({ ...edge, id: index.get(edge.name)?.id ?? '', jira: index.get(edge.name)?.jira ?? '' }))
+  return buildOrder(dag.map(edge => ({ ...edge, id: index.get(edge.name)?.id ?? '', jira: index.get(edge.name)?.jira ?? '' })))
+}
+
+/** A Unit's number: its index ID's (`U31`), else its directory's (`u31-thin-slice`); none sorts last. */
+function numberOf(unit: Unit): number {
+  const found = /^U(\d+)$/i.exec(unit.id) ?? /^u(\d+)(?:-|$)/i.exec(unit.name)
+  return found ? Number(found[1]) : Number.POSITIVE_INFINITY
+}
+
+/**
+ * The Units in build order: by the step of the dependency graph each can be built at (a Unit with no dependency first,
+ * then each one after the longest chain of Units it waits on), and Units ready at the same step by their number (U5
+ * before U12). A dependency that names no Unit of the list is ignored; Units in a cycle, and those waiting on one, come
+ * last, by number.
+ */
+export function buildOrder(units: readonly Unit[]): Unit[] {
+  const byName = new Map(units.map(unit => [unit.name, unit]))
+  const step = new Map<string, number>()
+  const visiting = new Set<string>()
+  const stepOf = (name: string): number => {
+    const known = step.get(name)
+    if (known !== undefined) return known
+    if (visiting.has(name)) return Number.POSITIVE_INFINITY
+    visiting.add(name)
+    const deps = (byName.get(name)?.dependsOn ?? []).filter(dep => byName.has(dep))
+    const at = deps.length === 0 ? 0 : Math.max(...deps.map(stepOf)) + 1
+    visiting.delete(name)
+    step.set(name, at)
+    return at
+  }
+  const placed = units.map((unit, at) => ({ unit, at, step: stepOf(unit.name), number: numberOf(unit) }))
+  placed.sort((a, b) => a.step - b.step || a.number - b.number || a.at - b.at)
+  return placed.map(one => one.unit)
 }
 
 /** The audit rows and the construction/ tree the progress is derived from. */

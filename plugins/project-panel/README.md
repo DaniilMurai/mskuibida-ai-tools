@@ -397,7 +397,10 @@ is listed with its stages but carries no count or ring (its row says `not includ
 Once Units Generation has cut the intent into Units, Construction is not seven stages. Five of them
 (functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation) run once **per Unit**, and the
 engine ticks their checkbox only after every Unit; build-and-test and ci-pipeline run once. So Construction is drawn as
-**one row per Unit**, in the dependency block's order, with its story points, followed by the run-once stages:
+**one row per Unit**, in build order, with its story points, followed by the run-once stages. Build order (0.22.0) is
+the dependency graph's: a Unit with no dependency first, then each Unit after the longest chain of Units it waits on
+(the step it can be built at), and Units ready at the same step by their number (`U5` before `U12`), so the thin slice
+`U31` that most Units wait on sits right after `U1`, not at the end:
 
 ```
 ▾ Construction                       ◔  1/4 units  8/29 pt
@@ -877,6 +880,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.22.0** — Units are listed in build order (the step of the dependency graph each can be built at, then by number), not in the dependency block's order.
 - **0.21.2** — a Unit stage re-opened after its approval (its latest receipt a start) is in progress, even while the engine's table still says `[x]`.
 - **0.21.1** — a session on a side branch the stage pattern reads but that names no stage (`ms/BM-218/sprint-rules`) no longer filters PRs by its ticket, so the plan's stage and phase PRs (`ms/BM-5/delivery-planning`) map there too.
 - **0.21.0** — buttons keep one press handle per key across redraws, so the first press lands on a drawing the surface has not replaced yet (Put in prompt and folds no longer take a second click); a Unit stage its kind does not owe is skipped, not done, so an unstarted packaging Unit reads not started.
