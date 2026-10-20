@@ -235,7 +235,7 @@ class TestTheQuestion(Case):
         self.assertEqual(code, 2)
         self.assertIn("Publish them first", err)
         newer = self.publish(f"{INTENT}-user-stories-20260102T1000")
-        self.assertEqual(self.ask(f"Read {URL}#{newer}")[0], 0)
+        self.assertEqual(self.ask("Stage complete. How would you like to proceed?")[0], 0)
 
     def test_without_an_open_gate_the_current_stage_decides(self):
         code, _out, err = self.ask("Anything to add?")
