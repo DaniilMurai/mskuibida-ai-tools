@@ -272,7 +272,8 @@ describe('3c. Haiku inputs are bounded', () => {
     }
   })
 
-  test('a failed batch fails the whole assignment: nothing is stored, the old result stays', async () => {
+  // Three loads of a 250-task world: on a CI runner it takes about the default 5 s, so it gets room to finish.
+  test('a failed batch fails the whole assignment: nothing is stored, the old result stays', { timeoutMs: 20_000 }, async () => {
     const stored = new Map<string, unknown>()
     await loadAt(bigWorld(250, true), replies, stored)
     await press(bigWorld(250, true), replies, stored, 'ledger.pin')
