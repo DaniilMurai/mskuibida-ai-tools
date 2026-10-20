@@ -1,7 +1,7 @@
 {
   "name": "approval-gates",
   "displayName": "Approval gates",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "At every AI-DLC approval gate, the stage's documents become one readable page in a private artifact, and a hook makes sure the Approval question is not asked before the page exists.",
   "author": {
     "name": "Maksym Skuibida"

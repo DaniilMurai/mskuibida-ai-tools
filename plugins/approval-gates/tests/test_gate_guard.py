@@ -5,6 +5,7 @@ The hook runs as a subprocess, as the harness runs it, with APPROVAL_GATES_DIR a
 pointing into a temporary folder (a copy of the fixture project). No `aidlc` binary is needed: the hook
 only reads the commands the assistant ran."""
 
+import datetime
 import importlib.util
 import json
 import os
@@ -86,11 +87,16 @@ class Case(unittest.TestCase):
 
     def said(self, text, kind="assistant", block="text", sidechain=False):
         """Append one transcript line, shaped as Claude Code writes them: one content block per line."""
-        content = [{"type": block, "text": text}] if block == "text" else [{"type": block, "name": "X", "input": {"q": text}}]
+        if block == "text":
+            content = [{"type": "text", "text": text}]
+        elif block == "thinking":
+            content = [{"type": "thinking", "thinking": text}]
+        else:
+            content = [{"type": block, "name": "X", "input": {"q": text}}]
+        stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         with open(self.transcript, "a", encoding="utf-8") as f:
             f.write(json.dumps({"type": kind, "isSidechain": sidechain, "uuid": "u%d" % self.counter,
-                                "timestamp": "2026-01-01T09:00:00.000Z",
-                                "message": {"role": kind, "content": content}}) + "\n")
+                                "timestamp": stamp, "message": {"role": kind, "content": content}}) + "\n")
         self.counter += 1
 
     def context(self, out):
@@ -246,10 +252,14 @@ class TestTheQuestion(Case):
         self.open_gate()
         gate_id = self.publish(link=False)
         self.assertIn(f"Send the developer the link `{URL}#{gate_id}`", self.context(self.last_publish))
+        self.said("I will write the Read line now", block="thinking")
+        self.said("x", block="tool_use")
         code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
         self.assertEqual(code, 2)
         self.assertIn("no message of yours carries it yet", err)
-        self.assertIn(f"`{URL}#{gate_id}`", err)
+        self.assertIn("holds 1 thinking, 1 tool-call and 0 text block(s), none with the link", err)
+        self.assertIn("Thinking is not output", err)
+        self.assertIn(f"**Read:** {URL}#{gate_id}", err)
         self.said(f"Ready to review.\n\n**Read:** {URL}#{gate_id}")
         code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
         self.assertEqual((code, err), (0, ""))
@@ -277,7 +287,7 @@ class TestTheQuestion(Case):
         newer = self.publish(f"{INTENT}-user-stories-20260102T1000", link=False)
         code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
         self.assertEqual(code, 2)
-        self.assertIn(f"`{URL}#{newer}`", err)
+        self.assertIn(f"**Read:** {URL}#{newer}`", err)
 
     def test_without_a_transcript_the_question_cannot_be_checked(self):
         self.open_gate()
