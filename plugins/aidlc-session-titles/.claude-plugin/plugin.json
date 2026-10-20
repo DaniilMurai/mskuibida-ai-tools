@@ -1,0 +1,9 @@
+{
+  "name": "aidlc-session-titles",
+  "displayName": "AI-DLC session titles",
+  "version": "0.1.0",
+  "description": "Keeps every AI-DLC session titled by what it is working on — `<unit> — <stage>` on a Construction Unit, else `<phase> — <stage>` — read from the project's state, renamed at each stage or Unit change.",
+  "author": {
+    "name": "Maksym Skuibida"
+  }
+}
