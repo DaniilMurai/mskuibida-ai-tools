@@ -45,6 +45,22 @@ Each document kind has its own view, with a Text switch back to the document as 
 - **contract-summary.md**: a section per contract; an OpenAPI block becomes an operations table, a type
   sheet a table per type. **traceability.json**: coverage by status.
 
+- **Ideation and Inception documents**: **requirements.md** reads the table, the `- **FR1.1**` bullet
+  and the titled `- **NFR1 Title:**` bullet (sub-bullets and source tags kept) as one table per group;
+  **feasibility-assessment.md** shows the verdict as a banner and each area's rating as a chip;
+  **raid-log.md**, **constraint-register.md**, **stakeholder-map.md** and the risk register of
+  **risk-and-sequencing-rationale.md** are grids with the id linked, likelihood, impact and severity as
+  chips, and a tally strip over the sections; **team-practices.md** and **team-allocation.md** fold each
+  labelled practice under its label; **discovered-rules.md** marks ALWAYS and NEVER lines;
+  **user-stories-assessment.md** shows the decision as a banner; **wireframes.md**, **mockups.md** and
+  the other screen documents frame every ASCII screen with its heading as caption and add an "All
+  screens" section that shows them side by side. **intent-statement.md**, **scope-document.md**,
+  **intent-backlog.md**, **evidence.md**, **user-flow.md** (Mermaid flows drawn),
+  **interaction-spec.md**, **design-system-mapping.md** and **accessibility-checklist.md** get a facts
+  row from their bold-label lines, tables as grids (a filter bar over 8 rows), numbered lists as
+  steppers and every H2 as a collapsible section. Source tags such as `[Q3]` or `[assumption]` are
+  quiet tags, and a `Q` id links to its question.
+
 Every id that names something in the gate (FR1.2, BR3.5, US1.1, AC1.1.2, ADR-003, U3, C4, R-02, an
 entity or component name) is a link: hover for the text, click to jump. A document whose shape is not
 recognised is Markdown with every H2 a collapsible section.

@@ -204,6 +204,13 @@ details[open] > summary .caret { transform: rotate(90deg); }
 .md tr:last-child td, table.grid tr:last-child td { border-bottom: 0; }
 table.grid th { font: 500 11px/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: transparent; }
 table.grid td.id { font: 500 12px var(--mono); white-space: nowrap; color: var(--ink); }
+.verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; margin: 4px 0 10px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--surface); }
+.verdict > b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+table.grid td.tn .chip { white-space: nowrap; overflow-wrap: normal; }
+span.dim { color: var(--muted); font-size: 12.5px; }
+.srct { display: inline-block; font: 400 11px/1.4 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 1px 2px 1px 0; overflow-wrap: anywhere; }
+ul.rsubs { margin: .35em 0 0; padding-left: 1.1em; }
+ul.rsubs li { margin: .15em 0; }
 table.grid td.dim, tr.dim td { color: var(--muted); font-size: 12.5px; }
 .md img { max-width: 100%; }
 .diagram { overflow-x: auto; margin: 0 0 .8em; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
@@ -235,6 +242,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
 .facts dt { font: 500 10.5px/1.9 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); overflow-wrap: anywhere; }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 .facts dd ul { margin: 0; padding-left: 18px; }
+.facts .facts .facts { grid-template-columns: minmax(0, 1fr); gap: 0; padding-left: 10px; border-left: 2px solid var(--line-soft); }
+.facts .facts .facts dt { padding-top: 4px; }
 .desc { margin: 0 0 6px; }
 .gwt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 6px 12px; font-size: 13px; }
 .gwt > div > b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); display: block; }
@@ -273,7 +282,8 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
 .vw-lead > details.sub { margin: 2px 0 6px; }
 .smart { min-width: 0; }
 .smart > :first-child { margin-top: 0; }
-.smart table.grid td, .smart table.grid th { overflow-wrap: anywhere; }
+.smart table.grid td, .smart table.grid th { overflow-wrap: break-word; }
+.smart table.grid td code { overflow-wrap: normal; }
 .smart table.grid td.id { overflow-wrap: normal; }
 .smart table.grid td:last-child .chip { white-space: nowrap; }
 .tablewrap.tall { max-height: 68vh; overflow: auto; }
@@ -778,18 +788,18 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
   /* markdown as sections (H2) inside a view; n0 numbers them apart from the view's own sections */
   const mdBlocks = (d, text, open, n0) => {
     const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(text) || ""; decorate(tmp);
-    if (!tmp.querySelector("h2") && text.length > 700) { const det = node('<details class="sub"><summary>About this document</summary></details>'); const inner = document.createElement("div"); inner.className = "md"; while (tmp.firstChild) inner.appendChild(tmp.firstChild); det.appendChild(inner); tmp.appendChild(det); tmp.className = "md"; registerMdRefs(tmp); return tmp; }
+    if (!tmp.querySelector("h2") && text.length > 700) { const det = node('<details class="sub"><summary>About this document</summary></details>'); const inner = document.createElement("div"); inner.className = "md"; while (tmp.firstChild) inner.appendChild(tmp.firstChild); upgradeIn(inner, { noFilter: true }); det.appendChild(inner); tmp.appendChild(det); tmp.className = "md"; registerMdRefs(tmp); return tmp; }
     if (tmp.querySelector("h2")) {
       const kids = [...tmp.childNodes]; const out = document.createDocumentFragment(); let cur = null, n = n0 || 100, lead = null;
       kids.forEach((node) => { if (node.nodeType === 1 && node.tagName === "H2") { n++; cur = section(d, n, node, open); out.appendChild(cur); } else if (cur) cur.secbody.appendChild(node); else { if (!lead) { lead = document.createElement("div"); lead.className = "md lead"; out.appendChild(lead); } lead.appendChild(node); } });
-      tmp.innerHTML = ""; tmp.appendChild(out);
-    }
+      tmp.innerHTML = ""; tmp.appendChild(out); tmp.querySelectorAll(".secbody, .lead").forEach((b) => upgradeIn(b, { noFilter: true }));
+    } else upgradeIn(tmp, { noFilter: true });
     tmp.className = "md"; registerMdRefs(tmp); return tmp;
   };
   const wrap = (...nodes) => { const root = document.createElement("div"); root.className = "vw"; nodes.forEach((n) => { if (typeof n === "string") root.insertAdjacentHTML("beforeend", n); else if (n) root.appendChild(n); }); return root; };
   const keyOf = (d) => String(d.key || "").replace(/-p\d+$/, "");
   const node = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
-  const mdDiv = (text) => { const div = document.createElement("div"); div.className = "md"; div.innerHTML = mdHtml(text) || esc(text); decorate(div); registerMdRefs(div); return div; };
+  const mdDiv = (text) => { const div = document.createElement("div"); div.className = "md smart"; div.innerHTML = mdHtml(foldFallbacks(text)) || esc(text); decorate(div); upgradeIn(div, { noFilter: true }); registerMdRefs(div); return div; };
 
   /* a filter bar: chips over rows' dataset.f, and a search over dataset.q (or text) */
   function filterBar(rows, label) {
@@ -1026,19 +1036,38 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
   }
 
   /* --- requirements: tables by group --- */
+  /* source tags at the end of a requirement: `[Q5 C] [assumption: …] (earlier Q6)` → quiet tags, the Q ids stay links */
+  const srcCell = (src) => {
+    const tags = []; const rest = String(src || "").replace(/\[([^\]]+)\]/g, (_, t) => { tags.push(t.trim()); return " "; }).replace(/\s+/g, " ").trim();
+    return tags.map((t) => `<span class="srct">${esc(t)}</span>`).join(" ") + (rest ? (tags.length ? " " : "") + inline(rest) : "");
+  };
   function viewRequirements(d) {
     const top = splitHeadings(d.text, "##"); const groups = []; let found = 0;
-    const ID = "((?:FR|NFR|TC|SC|RAID|C|A|R)-?\\d[\\w.]*)";
+    const ID = "((?:FR|NFR|RA|TC|SC|RAID|C|A|R)-?\\d[\\w.]*)";
+    const tagsOnly = /^\s*(?:\[[^\]]+\]\s*)+$/;
     const reqLine = (l) => {
       let m = l.match(new RegExp("^\\|\\s*" + ID + "\\s*\\|(.*)\\|?\\s*$"));
-      if (m) { const cells = m[2].split("|").map((c) => c.trim()).filter((c, i, arr) => !(i === arr.length - 1 && c === "")); return { id: m[1], text: cells[0] || "", source: cells.slice(1).join(" · ") }; }
-      m = l.match(new RegExp("^\\s*[-*]\\s+\\*\\*" + ID + "(?:\\s*[—–:-]\\s*([^*]*?))?[.:]?\\*\\*\\s*[:.]?\\s*(.*)$"));
-      if (m) { const text = (m[2] ? "**" + m[2].trim() + ".** " : "") + m[3]; const s = text.match(/^([\s\S]*?)\s*(\((?:[^()]*)\)|(?:\s*\[[^\]]+\])+)\s*$/); return { id: m[1], text: s ? s[1] : text, source: s ? s[2].replace(/^\(|\)$/g, "") : "" }; }
+      if (m) { const cells = m[2].split("|").map((c) => c.trim()).filter((c, i, arr) => !(i === arr.length - 1 && c === "")); return { id: m[1], text: cells[0] || "", source: cells.slice(1).join(" · "), subs: [] }; }
+      m = l.match(new RegExp("^\\s{0,1}[-*]\\s+\\*\\*" + ID + "(?:\\s*[—–:-]\\s*|\\s+)?([^*]*?)[.:]?\\*\\*\\s*[:.]?\\s*(.*)$"));
+      if (m) { const title = (m[2] || "").trim(); const text = (title ? "**" + title + (/^[a-z(`]/.test(m[3]) ? ":" : ".") + "** " : "") + m[3]; const s = text.match(/^([\s\S]*?)\s*(\((?:[^()]*)\)|(?:\s*\[[^\]]+\])+)\s*$/); return { id: m[1], text: s ? s[1] : text, source: s ? s[2].replace(/^\(|\)$/g, "") : "", subs: [] }; }
       return null;
     };
     top.forEach((sec) => {
       const subs = splitHeadings(sec.body, "###"); const parts = subs.length > 1 ? subs.slice(1) : [{ title: sec.title, body: sec.body }];
-      parts.forEach((p) => { const rows = []; let last = null; mdLines(p.body).forEach((l) => { const r = reqLine(l); if (r) { rows.push(r); last = r; return; } const sub = l.match(/^\s{2,}[-*]\s+(.*)$/); if (sub && last) last.text += " · " + sub[1]; }); if (rows.length) { found += rows.length; groups.push({ title: p.title || sec.title, section: sec.title, rows }); } });
+      parts.forEach((p) => {
+        const rows = []; let last = null;
+        mdLines(p.body).forEach((l) => {
+          const r = reqLine(l); if (r) { rows.push(r); last = r; return; }
+          if (!last) return;
+          const sub = l.match(/^\s{2,}[-*]\s+(.*)$/);
+          if (sub) { last.subs.push(sub[1]); return; }
+          if (tagsOnly.test(l)) { last.source = (last.source + " " + l.trim()).trim(); return; }
+          if (l.trim() && !/^\s/.test(l)) last = null;
+          else if (l.trim() && last.subs.length) last.subs[last.subs.length - 1] += " " + l.trim();
+          else if (l.trim()) last.text += " " + l.trim();
+        });
+        if (rows.length) { found += rows.length; groups.push({ title: p.title || sec.title, section: sec.title, rows }); }
+      });
     });
     if (found < 3) return null;
     const root = wrap(); const lead = stripH1(top[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
@@ -1046,7 +1075,7 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     groups.forEach((g) => {
       const sec = section(d, n++, g.title, true, `${g.rows.length}`);
       const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>ID</th><th>Requirement</th><th>Source</th></tr></thead><tbody></tbody></table></div>`);
-      g.rows.forEach((r) => { const w = /^(withdrawn|removed|dropped)/i.test(r.text); const tr = node(`<tr data-f="${esc(g.section)}"${w ? ' class="dim"' : ""}><td class="id">${esc(r.id)}</td><td>${inline(r.text)}</td><td class="dim">${inline(r.source)}</td></tr>`); tr.dataset.q = r.id + " " + r.text; regRef(r.id, tr, r.text); table.querySelector("tbody").appendChild(tr); all.push(tr); });
+      g.rows.forEach((r) => { const w = /^(withdrawn|removed|dropped)/i.test(r.text); const tr = node(`<tr data-f="${esc(g.section)}"${w ? ' class="dim"' : ""}><td class="id">${esc(r.id)}</td><td>${inline(r.text)}${r.subs.length ? `<ul class="rsubs">${r.subs.map((x) => `<li>${inline(x)}</li>`).join("")}</ul>` : ""}</td><td class="dim">${srcCell(r.source)}</td></tr>`); tr.dataset.q = r.id + " " + r.text + " " + r.subs.join(" "); regRef(r.id, tr, r.text); table.querySelector("tbody").appendChild(tr); all.push(tr); });
       sec.secbody.appendChild(table); secs.push(sec);
     });
     root.appendChild(filterBar(all, `${found} requirements`)); secs.forEach((s) => root.appendChild(s));
@@ -1166,7 +1195,7 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
   const ANYID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)$/;
   const LEADID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)\s+\S/;
   const TONE_COL = /^(likelihood|impact|severity|priority|moscow|status|result|verdict|confidence|outcome)$/i;
-  const FACET_COL = /^(kind|category|type|layer|phase|owner|area|group|scope|class|tier)$/i;
+  const FACET_COL = /^(kind|category|type|layer|phase|owner|area|group|scope|class|tier|track|stream|milestone|bolt|stakeholder type|dependency type|source type)$/i;
   const tone = (s) => {
     s = String(s || "").trim().toLowerCase().replace(/[*_`]/g, "");
     if (/^(critical|major|high|must|blocked|fail|failed|failing|unresolved|missing|gap|breaking|rejected|uncovered)/.test(s)) return "warn";
@@ -1207,12 +1236,14 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     let facet = -1;
     heads.forEach((h, i) => {
       const isTone = TONE_COL.test(h); if (!isTone && !FACET_COL.test(h)) return;
-      const vals = rows.map((tr) => tr.cells[i] ? tr.cells[i].textContent.trim() : "");
+      /* a tone cell may carry a qualifier after its word: "High: breaks SC-01", "Low, if it ships" → chip, then the rest as text */
+      const split = (td) => { const t = td.textContent.trim(); if (!isTone) return [t, ""]; const m = td.innerHTML.trim().match(/^([A-Za-z][A-Za-z -]{0,18}?)\s*(?::|—|–|;|,)\s+([\s\S]+)$/); return m && tone(m[1]) !== "muted" ? [m[1].trim(), m[2].trim()] : [t, ""]; };
+      const parts = rows.map((tr) => tr.cells[i] ? split(tr.cells[i]) : ["", ""]); const vals = parts.map((p) => p[0]);
       const set = new Set(vals.filter(Boolean)); if (!set.size || set.size > 8 || vals.some((v) => v.length > 28)) return;
-      rows.forEach((tr, k) => { const td = tr.cells[i]; if (td && vals[k]) td.innerHTML = `<span class="chip ${isTone ? tone(vals[k]) : "muted"}">${esc(vals[k])}</span>`; });
+      rows.forEach((tr, k) => { const td = tr.cells[i]; if (td && vals[k]) td.classList.add("tn"), td.innerHTML = `<span class="chip ${isTone ? tone(vals[k]) : "muted"}">${esc(vals[k])}</span>${parts[k][1] ? ` <span class="dim">${parts[k][1]}</span>` : ""}`; });
       if (facet < 0 && set.size >= 2) facet = i;
     });
-    rows.forEach((tr) => { if (facet >= 0 && tr.cells[facet]) tr.dataset.f = tr.cells[facet].textContent.trim(); });
+    rows.forEach((tr) => { if (facet >= 0 && tr.cells[facet]) { const c = tr.cells[facet].querySelector(".chip"); tr.dataset.f = (c || tr.cells[facet]).textContent.trim(); } });
     heads.forEach((h, i) => { if (/^steps?$/i.test(h)) rows.forEach((tr) => { const td = tr.cells[i]; if (td) td.innerHTML = td.innerHTML.replace(/\b(\d+)\b/g, (_, n) => `<a class="xref" data-ref="Step ${n}">${n}</a>`); }); });
     return { rows, heads, facet };
   }
@@ -1253,6 +1284,7 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
   /* JSON anywhere: an object as facts, a list of objects as cards, a list of text as bullets */
   function jsonTree(v, depth) {
     depth = depth || 0;
+    if (depth >= 3 && v && typeof v === "object") { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = JSON.stringify(v, null, 2); return pre; }
     const scalar = (x) => { const s = str(x); if (/^sha\d*:|^[0-9a-f]{24,}$/i.test(s)) return `<code title="${esc(s)}">${esc(s.length > 24 ? s.slice(0, 20) + "…" : s)}</code>`; if (s.length > 160 || s.includes("\n")) return `<div class="md">${mdHtml(s) || esc(s)}</div>`; return typeof x === "boolean" || x === null ? `<span class="chip muted">${esc(s)}</span>` : inline(s); };
     if (Array.isArray(v)) {
       if (!v.length) return node('<span class="hint">none</span>');
@@ -1309,14 +1341,23 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     });
     root.innerHTML = ""; root.appendChild(frag);
   }
-  /* markdown with every upgrade a structured document gets */
-  function smartMd(d, text, o) {
-    o = o || {};
-    const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(foldFallbacks(text)) || `<pre class="plain">${esc(text)}</pre>`;
-    decorate(tmp);
+  /* source tags the documents end their sentences with: `[Q3]`, `[desc]`, `[assumption: …]`, `[inv:I5]` → quiet tags */
+  const TAG_RE = /\s*\[((?:desc|scope|assumptions?|inv|dir|practices?|PROMPT|wireframes?|rough mockups?|earlier Q|Q\d)[^\[\]]{0,120})\]/g;
+  function srcTags(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => { const p = n.parentElement; if (!p || p.closest("pre, code, a, .srct, .chip, textarea, h1, h2, h3, h4")) return NodeFilter.FILTER_REJECT; TAG_RE.lastIndex = 0; return TAG_RE.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((n) => {
+      const text = n.nodeValue; TAG_RE.lastIndex = 0; const frag = document.createDocumentFragment(); let last = 0, m;
+      while ((m = TAG_RE.exec(text))) { frag.appendChild(document.createTextNode(text.slice(last, m.index) + " ")); const sp = document.createElement("span"); sp.className = "srct"; sp.textContent = m[1]; frag.appendChild(sp); last = m.index + m[0].length; }
+      frag.appendChild(document.createTextNode(text.slice(last))); n.replaceWith(frag);
+    });
+  }
+  /* every upgrade a structured document's markdown gets, applied in place */
+  function upgradeIn(tmp, o) {
+    o = o || {}; srcTags(tmp);
     kvTables(tmp); kvLists(tmp);
     tmp.querySelectorAll(".tablewrap").forEach((w) => {
-      const t = w.querySelector("table"); if (!t || t.classList.contains("grid")) return;
+      const t = w.querySelector("table"); if (!t || t.classList.contains("grid") || t.classList.contains("ftable")) return;
       const info = upgradeTable(t); if (!info.rows.length) return;
       if (info.rows.length > 12) w.classList.add("tall");
       if (info.rows.length > 8 && !o.noFilter) w.before(filterBar(info.rows, `${info.rows.length} rows`));
@@ -1326,6 +1367,12 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
       const start = parseInt(ol.getAttribute("start") || "1", 10); if (start > 1) ol.style.counterReset = "st " + (start - 1);
     });
     taskMarks(tmp); jsonFences(tmp); foldCode(tmp, o.foldCode); foldH3(tmp);
+    return tmp;
+  }
+  /* markdown with every upgrade a structured document gets */
+  function smartMd(d, text, o) {
+    const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(foldFallbacks(text)) || `<pre class="plain">${esc(text)}</pre>`;
+    decorate(tmp); upgradeIn(tmp, o);
     tmp.className = "md smart"; registerMdRefs(tmp);
     return tmp;
   }
@@ -1358,6 +1405,14 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     });
     return out;
   }
+  /* the bold-label lines a section opens with (`**Who:** … **Trigger:** …`) as facts, and the section without them */
+  function leadFacts(body) {
+    const lines = mdLines(body); let i = 0; const got = [];
+    while (i < lines.length && (lines[i].trim() === "" || (FACT_LINE(lines[i]) && !/^```/.test(lines[i])))) { if (lines[i].trim()) got.push(lines[i]); i++; }
+    if (!got.length) return { facts: [], rest: body };
+    const facts = factsOf(got.join("\n")); if (!facts.length) return { facts: [], rest: body };
+    return { facts, rest: lines.slice(i).join("\n") };
+  }
   const QUIET = /derived|^sources?\b|^assumptions|^references|^open questions|^appendix/i;
   /* the generic view: a facts row, then every H2 as a collapsible section with its tables as grids, its numbered lists as steppers */
   function viewStructured(d, o) {
@@ -1365,18 +1420,82 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     const parts = o.pick ? flatSections(d.text, o.pick) : splitHeadings(d.text, "##");
     const secs = parts.slice(1).filter((s) => s.title);
     if (!secs.length && !/\n\s*\|.*\|\s*\n\s*\|[-: |]+\|/.test(d.text) && (d.text.match(/\n\d+\.\s/g) || []).length < 3) return null;
-    const root = wrap(); const ln = leadNode(d, parts[0].body); if (ln) root.appendChild(ln);
-    let n = 10;
+    const root = wrap(); const ln = (o.lead && o.lead(d, parts[0].body)) || leadNode(d, parts[0].body); if (ln) root.appendChild(ln);
+    let n = 10; const made = [];
     secs.forEach((s, i) => {
       const quiet = QUIET.test(s.title);
       const open = o.open ? o.open(s, i, quiet) : (!quiet && (i === 0 || s.body.length <= 2200));
-      const body = (o.custom && o.custom(s, d)) || smartMd(d, s.body, o);
+      let body = o.custom && o.custom(s, d);
+      if (!body) { const lf = leadFacts(s.body); body = smartMd(d, lf.rest, o); if (lf.facts.length) body.insertBefore(factRow(lf.facts), body.firstChild); }
       const sec = section(d, n++, s.title, open, countOf(body));
       if (s.group) sec.querySelector("summary").insertBefore(node(`<span class="chip muted">${esc(s.group)}</span>`), sec.querySelector(".cnt"));
       const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
-      sec.secbody.appendChild(body); root.appendChild(sec);
+      sec.secbody.appendChild(body); root.appendChild(sec); made.push(sec);
+      if (o.after) o.after(sec, s);
     });
     if (!secs.length) root.appendChild(smartMd(d, stripH1(d.text), o));
+    if (o.tally) { const t = tallyBar(made, o.tally); if (t) root.insertBefore(t, made[0]); }
+    return root;
+  }
+  /* a strip over a register's sections: how many entries each table holds, how many are high on impact or severity, by level when asked */
+  function tallyBar(secs, o) {
+    const chips = []; let high = 0; const levels = new Map();
+    secs.forEach((sec) => {
+      const tb = sec.secbody.querySelector("table.grid"); if (!tb) return;
+      const rows = tb.querySelectorAll("tbody tr"); if (!rows.length) return;
+      const heads = [...tb.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+      chips.push(`<span class="chip muted">${esc(sec.dataset.title.replace(/^\d+\.\s*/, ""))} ${rows.length}</span>`);
+      const ic = heads.findIndex((h) => /^(impact|severity)$/i.test(h));
+      if (ic >= 0) rows.forEach((tr) => { const c = tr.cells[ic] && tr.cells[ic].querySelector(".chip"); if (c) { const k = c.textContent.trim(); levels.set(k, (levels.get(k) || 0) + 1); if (c.classList.contains("warn")) high++; } });
+    });
+    if (!chips.length) return null;
+    const lv = [...levels].map(([k, v]) => `<span class="chip ${tone(k)}">${v} ${esc(k.toLowerCase())} impact</span>`);
+    return node(`<div class="vtools">${chips.join("")}${lv.length > 1 || high ? lv.join("") : ""}</div>`);
+  }
+  /* --- discovered rules: ALWAYS and NEVER lines get their chip --- */
+  function viewDiscoveredRules(d) {
+    const root = viewStructured(d); if (!root) return root;
+    root.querySelectorAll("li").forEach((li) => { const m = li.innerHTML.match(/^\s*(ALWAYS|NEVER)\b[:,]?\s*/); if (m) li.innerHTML = `<span class="chip ${m[1] === "ALWAYS" ? "ok" : "warn"}">${m[1]}</span> ` + li.innerHTML.slice(m[0].length); });
+    return root;
+  }
+  /* --- user-stories assessment: the decision as a banner, the factors as a grid --- */
+  function viewAssessment(d) {
+    const decisionBanner = (word) => node(`<div class="verdict"><b>Decision</b><span class="chip ${/^(skip|no|not|defer)/i.test(word) ? "muted" : "ok"}">${esc(word.replace(/\.$/, ""))}</span></div>`);
+    const root = viewStructured(d, { lead: (doc, body) => {
+      const t = stripH1(body).trim(); const m = t.match(/^\*\*Decision:?\s*([A-Za-z][^*]{1,28}?)[.;,]?\*\*\s*([\s\S]*)$/) || t.match(/^\*\*Decision:?\*\*:?\s*([A-Za-z][A-Za-z -]{1,28}?)[.;,]\s*([\s\S]*)$/); if (!m) return null;
+      const box = document.createElement("div"); box.className = "vw-lead"; box.appendChild(decisionBanner(m[1])); if (m[2].trim()) box.appendChild(smartMd(doc, m[2])); return box;
+    } }); if (!root) return root;
+    const sec = [...root.querySelectorAll("details.sec")].find((x) => /^decision$/i.test(x.dataset.title));
+    const word = sec && sec.secbody.textContent.trim();
+    if (sec && word && word.length <= 40) {
+      const banner = decisionBanner(word);
+      sec.replaceWith(banner); root.insertBefore(banner, root.firstChild);
+    }
+    return root;
+  }
+  /* --- feasibility: the verdict as a banner, each area's rating as a chip --- */
+  const RATING = /\s+[—–-]\s+(Viable|Conditional|At risk|Not viable|Blocked)\b[,;:]?\s*(.*)$/i;
+  function viewFeasibility(d) {
+    const root = viewStructured(d, {
+      lead: (doc, body) => {
+        const m = stripH1(body).trim().match(/^\*\*Verdict:?\s*([^*]*?)\.?\*\*\s*:?\s*([\s\S]*)$/);
+        if (!m) return null;
+        const v = m[1].trim(); const t = /not feasible|infeasible|no-go|at risk/i.test(v) ? "warn" : /condition|partly|caveat/i.test(v) ? "accent" : "ok";
+        const box = document.createElement("div"); box.className = "vw-lead";
+        box.appendChild(node(`<div class="verdict"><b>Verdict</b><span class="chip ${t}">${esc(v.replace(/,.*$/, "") || v)}</span>${/,/.test(v) ? `<span>${inline(v.replace(/^[^,]*,\s*/, ""))}</span>` : ""}</div>`));
+        if (m[2].trim()) box.appendChild(smartMd(doc, m[2])); return box;
+      },
+      after: (sec, s) => {
+        const m = s.title.match(RATING); if (!m) return;
+        const base = s.title.replace(RATING, "").trim(); sec.querySelector("summary h3").textContent = base; sec.dataset.title = base;
+        const cnt = sec.querySelector(".cnt"); cnt.before(node(`<span class="chip ${/viable$/i.test(m[1]) && !/^not/i.test(m[1]) ? "ok" : /^conditional/i.test(m[1]) ? "accent" : "warn"}">${esc(m[1])}</span>`));
+        if (m[2].trim()) cnt.before(node(`<span class="hint">${esc(m[2].trim())}</span>`));
+      },
+    });
+    if (!root) return root;
+    const tally = new Map(); root.querySelectorAll("details.sec > summary > .chip").forEach((c) => { const k = c.textContent.trim(); if (/^(Viable|Conditional|At risk|Not viable|Blocked)$/i.test(k)) tally.set(k, { n: ((tally.get(k) || {}).n || 0) + 1, cls: c.className.replace("chip", "").trim() }); });
+    const first = root.querySelector("details.sec");
+    if (tally.size && first) root.insertBefore(node(`<div class="vtools"><span>${[...tally.values()].reduce((a, b) => a + b.n, 0)} areas rated</span>${[...tally].map(([k, v]) => `<span class="chip ${v.cls}">${v.n} ${esc(k.toLowerCase())}</span>`).join("")}</div>`), first);
     return root;
   }
 
@@ -1446,6 +1565,8 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     if (rows.length > 8) box.appendChild(filterBar(rows, `${rows.length} entries`));
     box.appendChild(list); return box;
   }
+  /* documents of labelled practices: each bullet folds under its label, the first words beside it */
+  const viewLabeled = (d, o) => viewStructured(d, Object.assign({ custom: (s, doc) => labelBullets(doc, s), open: (s, i, quiet) => !quiet && i < 2 }, o || {}));
   const viewCodeSummary = (d) => viewStructured(d, { custom: (s, doc) => labelBullets(doc, s), open: (s, i, quiet) => !quiet && i < 2 });
 
   /* --- the code generation plan: summary as facts, the testing contract as a card, the steps as a numbered plan --- */
@@ -1654,6 +1775,11 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     const built = secs.slice(1).filter((s) => s.title).map((s) => { const r = screensBody(d, s.title, foldFallbacksKeep(s.body)); screens += r.count; return [s, r]; });
     if (!screens && !/```mermaid/.test(d.text)) return viewStructured(d, {});
     if (screens) root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${screens} screens in ${built.filter(([, r]) => r.count).length} sections</span></div>`);
+    if (screens >= 3) { /* every screen of the document side by side, for comparing; each caption jumps to its section */
+      const gal = section(d, 2, "All screens", false, `${screens} screens`); const grid = node('<div class="screens"></div>');
+      built.forEach(([, r]) => r.box.querySelectorAll("figure.screen").forEach((f) => { const c = f.cloneNode(true); c.querySelectorAll("details").forEach((x) => x.remove()); grid.appendChild(c); }));
+      gal.secbody.appendChild(grid); root.appendChild(gal);
+    }
     built.forEach(([s, r]) => {
       const sec = section(d, n++, s.title, r.count > 0 || !QUIET.test(s.title) && s.body.length < 1800, r.count ? r.count + (r.count === 1 ? " screen" : " screens") : countOf(r.box));
       const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
@@ -1720,7 +1846,12 @@ figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px 
     { key: /^code-summary$/, render: viewCodeSummary },
     { key: /^personas$/, render: viewPersonas },
     { key: /^(mockups|wireframes|rough-mockups|refined-mockups)$/, render: viewScreens },
-    { key: /^((performance|security|scalability|reliability|observability)-requirements|infrastructure-specification|monitoring-design|cicd-pipeline|[a-z]+-test-instructions|build-instructions|build-and-test-summary|test-results|ci-config|quality-gates|user-stories-assessment|feasibility-assessment|scope-document|intent-statement|stakeholder-map|intent-backlog|constraint-register|raid-log|team-practices|discovered-rules|evidence|team-allocation|risk-and-sequencing-rationale|external-dependency-map|user-flow|interaction-spec|design-system-mapping|accessibility-checklist)$/, render: (d) => viewStructured(d) },
+    { key: /^feasibility-assessment$/, render: viewFeasibility },
+    { key: /^user-stories-assessment$/, render: viewAssessment },
+    { key: /^discovered-rules$/, render: viewDiscoveredRules },
+    { key: /^(team-practices|team-allocation)$/, render: (d) => viewLabeled(d) },
+    { key: /^(raid-log|constraint-register|stakeholder-map|risk-and-sequencing-rationale)$/, render: (d) => viewStructured(d, { tally: true }) },
+    { key: /^((performance|security|scalability|reliability|observability)-requirements|infrastructure-specification|monitoring-design|cicd-pipeline|[a-z]+-test-instructions|build-instructions|build-and-test-summary|test-results|ci-config|quality-gates|scope-document|intent-statement|intent-backlog|evidence|external-dependency-map|user-flow|interaction-spec|design-system-mapping|accessibility-checklist)$/, render: (d) => viewStructured(d) },
   ];
   function viewFor(d) {
     const k = keyOf(d);
