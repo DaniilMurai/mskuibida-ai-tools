@@ -1,0 +1,33 @@
+name: tag-main
+
+# Every commit on main gets the tag v<version>, from the top-level version in
+# .claude-plugin/marketplace.json, so consumers can pin the marketplace with "ref": "v<version>"
+# and move the pin in a reviewed change of their own. A tag is never moved: if v<version> already
+# sits on another commit and plugins changed since, the job fails (scripts/tag-main.py). The PR
+# guard in regression.yml (scripts/check-versions.py) is what keeps that from happening.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialise runs, so two quick merges cannot race for the same tag.
+concurrency:
+  group: tag-main
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The "nothing changed since the tag" check diffs against the tagged commit.
+          fetch-depth: 0
+
+      - name: Tag the pushed commit
+        run: python3 scripts/tag-main.py

@@ -2,10 +2,14 @@
 """Keep plugin versions honest: consistent everywhere, and bumped when users would get a change.
 
 Claude Code delivers a plugin update only when its version string changes, so a user-facing
-change merged without a bump never reaches anyone.
+change merged without a bump never reaches anyone. The marketplace's own top-level version names
+the git tag CI puts on main (v<version>, scripts/tag-main.py), which consumers pin, so it too
+must move whenever what the marketplace delivers moves.
 
-  check-versions.py                 plugin.json and marketplace.json agree, for every plugin
-  check-versions.py --base <ref>    ...and every plugin changed since <ref> has a higher version
+  check-versions.py                 plugin.json and marketplace.json agree, for every plugin, and
+                                    the marketplace has a valid semver version
+  check-versions.py --base <ref>    ...and every plugin changed since <ref> has a higher version,
+                                    and so does the marketplace if marketplace.json changed
 
 Exits 1 and prints one line per failure; prints a short OK summary otherwise.
 """
@@ -24,6 +28,7 @@ EXEMPT_DIRS = {"tests", "evals"}
 EXEMPT_FILES = {"README.md", "CHANGELOG.md"}
 
 PLUGIN_JSON = ".claude-plugin/plugin.json"
+MARKETPLACE_JSON = ".claude-plugin/marketplace.json"
 SEMVER = re.compile(
     r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$"
 )
@@ -54,7 +59,12 @@ def read_json(path):
 def check_consistency(root):
     """Return (failures, plugin names)."""
     failures = []
-    entries = {e["name"]: e for e in read_json(root / ".claude-plugin/marketplace.json")["plugins"]}
+    market = read_json(root / MARKETPLACE_JSON)
+    if parse_semver(market.get("version")) is None:
+        failures.append(
+            f"marketplace: top-level version {market.get('version')!r} in {MARKETPLACE_JSON} is not "
+            f"valid semver -- set it, e.g. \"version\": \"1.0.0\"")
+    entries = {e["name"]: e for e in market["plugins"]}
     on_disk = sorted(p.parent.parent.name for p in root.glob(f"plugins/*/{PLUGIN_JSON}"))
     for name, entry in sorted(entries.items()):
         if not str(entry.get("source", "")).startswith("./plugins/"):
@@ -69,7 +79,7 @@ def check_consistency(root):
                 f"and the marketplace entry")
     for name in on_disk:
         if name not in entries:
-            failures.append(f"{name}: plugins/{name} has no entry in .claude-plugin/marketplace.json")
+            failures.append(f"{name}: plugins/{name} has no entry in {MARKETPLACE_JSON}")
     return failures, on_disk
 
 
@@ -103,7 +113,34 @@ def check_bumps(root, base, plugins):
             failures.append(f"{name}: version {new!r} (was {old}) is not valid semver -- {fix}")
         elif parse_semver(old) is not None and parse_semver(new) <= parse_semver(old):
             failures.append(f"{name}: version went {old} -> {new}, which is not higher -- {fix}")
+    failures += check_marketplace_bump(root, base, fork)
     return failures
+
+
+def check_marketplace_bump(root, base, fork):
+    """marketplace.json changed since the fork (a plugin bumped, added, removed, re-described)
+    -> its top-level version is higher, so the commit gets a tag of its own."""
+    rc, old_json = git(root, "show", f"{fork}:{MARKETPLACE_JSON}")
+    if rc:
+        return []  # no marketplace at the base: nothing to bump from
+    old_market = json.loads(old_json)
+    new_market = read_json(root / MARKETPLACE_JSON)
+    old, new = old_market.pop("version", None), new_market.pop("version", None)
+    if old_market == new_market or old is None:
+        return []  # nothing users receive changed, or the base predates the marketplace version
+    old_entries = {e.get("name"): e.get("version") for e in old_market.get("plugins", [])}
+    new_entries = {e.get("name"): e.get("version") for e in new_market.get("plugins", [])}
+    moved = sorted(n for n in old_entries.keys() | new_entries.keys()
+                   if old_entries.get(n) != new_entries.get(n))
+    what = f"plugin versions changed: {', '.join(moved)}" if moved else "its entries changed"
+    fix = f"bump the top-level version in {MARKETPLACE_JSON}"
+    if new == old:
+        return [f"marketplace: {MARKETPLACE_JSON} changed since {base} ({what}) but its version "
+                f"is still {old} -- {fix}"]
+    if parse_semver(new) is not None and parse_semver(old) is not None \
+            and parse_semver(new) <= parse_semver(old):
+        return [f"marketplace: version went {old} -> {new}, which is not higher -- {fix}"]
+    return []  # an invalid new version is reported by check_consistency
 
 
 def main():
@@ -121,7 +158,8 @@ def main():
     if failures:
         return 1
     guard = f"; bump guard vs {args.base} passed" if args.base else ""
-    print(f"OK {len(plugins)} plugins consistent{guard}")
+    version = read_json(args.root / MARKETPLACE_JSON)["version"]
+    print(f"OK marketplace {version}, {len(plugins)} plugins consistent{guard}")
     return 0
 
 
