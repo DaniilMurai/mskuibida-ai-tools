@@ -231,8 +231,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
 .chead { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; margin-bottom: 4px; }
 .chead h3, .chead h4 { margin: 0; font: 600 14.5px/1.3 var(--display); min-width: 0; }
 .chead .end { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; font-size: 13px; margin: 6px 0; }
-.facts dt { font: 500 10.5px/1.9 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.facts { display: grid; grid-template-columns: fit-content(190px) minmax(0, 1fr); gap: 3px 14px; font-size: 13px; margin: 6px 0; }
+.facts dt { font: 500 10.5px/1.9 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); overflow-wrap: anywhere; }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 .facts dd ul { margin: 0; padding-left: 18px; }
 .desc { margin: 0 0 6px; }
@@ -263,6 +263,71 @@ tr.rdet td { background: var(--bg); padding: 8px 14px 10px 28px; }
 .cov { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
 .wrap { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 4px 0; }
+
+/* structured views */
+.factrow { display: flex; flex-wrap: wrap; gap: 8px 26px; padding: 6px 0 10px; }
+.factrow > div { min-width: 0; display: grid; gap: 0; }
+.factrow b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.factrow span { overflow-wrap: anywhere; }
+.vw-lead { margin: 0 0 6px; }
+.vw-lead > details.sub { margin: 2px 0 6px; }
+.smart { min-width: 0; }
+.smart > :first-child { margin-top: 0; }
+.smart table.grid td, .smart table.grid th { overflow-wrap: anywhere; }
+.smart table.grid td.id { overflow-wrap: normal; }
+.smart table.grid td:last-child .chip { white-space: nowrap; }
+.tablewrap.tall { max-height: 68vh; overflow: auto; }
+.tablewrap.tall thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+.smart table.grid tbody tr:hover td { background: color-mix(in srgb, var(--ink-soft) 55%, transparent); }
+td.dirc { white-space: nowrap; vertical-align: top; color: var(--muted); }
+code.fchipc { display: inline-block; margin: 1px 2px 1px 0; }
+tr.dirrow td { background: var(--bg); padding-top: 4px; padding-bottom: 4px; font-size: 12px; }
+details.sub { margin: 4px 0 8px; }
+details.sub.h { border-top: 1px solid var(--line-soft); margin: 6px 0 0; padding-top: 2px; }
+details.sub.h > summary { display: list-item; color: var(--fg); padding: 5px 0; }
+details.sub.h > summary h3 { display: inline; margin: 0; font: 600 14.5px/1.3 var(--display); }
+details.sub.h > :not(summary) { margin-left: 18px; }
+ol.steps { list-style: none; counter-reset: st; padding: 0; margin: 0 0 .8em; display: grid; gap: 6px; }
+ol.steps > li { counter-increment: st; position: relative; padding: 6px 10px 6px 42px; border: 1px solid var(--line-soft); border-radius: 8px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+ol.steps > li::before { content: counter(st); position: absolute; left: 9px; top: 7px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink-soft); color: var(--ink); font: 600 12px/22px var(--mono); text-align: center; }
+ol.steps > li > :first-child { margin-top: 0; } ol.steps > li > :last-child { margin-bottom: 0; }
+ol.steps > li > p { margin: 0 0 .3em; }
+.md li.task { list-style: none; margin-left: -20px; padding-left: 24px; position: relative; overflow-wrap: anywhere; }
+.md li.task > p { margin: 0; }
+.tick { position: absolute; left: 0; top: .28em; width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line); text-align: center; font: 700 11px/12px var(--body); color: #fff; }
+li.task.done > .tick { background: var(--ok); border-color: var(--ok); }
+li.task.done { color: var(--muted); }
+details.step { border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: var(--surface); margin: 0; }
+details.step > summary { display: flex; align-items: center; gap: 10px; color: var(--fg); padding: 8px 0; }
+details.step > summary .end { margin-left: auto; display: flex; gap: 6px; }
+details.step[open] > summary { border-bottom: 1px solid var(--line-soft); margin-bottom: 6px; }
+.stepno { flex: none; min-width: 26px; height: 22px; border-radius: 11px; background: var(--ink-soft); color: var(--ink); font: 600 12px/22px var(--mono); text-align: center; padding: 0 6px; }
+details.step > summary .lead { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+details.step.lb > summary .stitle { flex: none; max-width: 55%; }
+.stitle { font: 600 14px/1.3 var(--display); min-width: 0; overflow-wrap: anywhere; }
+.steps-list { gap: 8px; }
+.progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 6px; }
+.pbar { flex: 1 1 160px; max-width: 360px; height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--ok); }
+.cards.cols { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.card .facts { margin: 6px 0 0; }
+.desc.role { font-size: 14px; }
+ol.opts { list-style: none; padding: 0; margin: 6px 0 10px; display: grid; gap: 6px; }
+ol.opts > li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 7px 10px; border: 1px solid var(--line-soft); border-radius: 8px; align-items: baseline; margin: 0; }
+ol.opts > li > b { font: 600 12px/22px var(--mono); text-align: center; border-radius: 50%; background: var(--line-soft); color: var(--muted); height: 22px; width: 22px; }
+ol.opts > li.chosen { border-color: var(--ok); background: var(--ok-soft); }
+ol.opts > li.chosen > b { background: var(--ok); color: #fff; }
+ol.opts > li > div { min-width: 0; overflow-wrap: anywhere; }
+.answer { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; border-left: 3px solid var(--ok); background: var(--ok-soft); border-radius: 0 6px 6px 0; margin: 6px 0 2px; }
+.answer b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.answer span { min-width: 0; overflow-wrap: anywhere; }
+.qafter { color: var(--muted); font-size: 13px; }
+.screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 12px; margin: 0 0 .8em; align-items: start; }
+figure.screen { margin: 0; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; min-width: 0; }
+figure.screen > figcaption { font: 500 11px/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 6px 12px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+figure.screen > pre { margin: 0; padding: 10px 12px; overflow-x: auto; font: 400 12px/1.3 var(--mono); white-space: pre; max-width: 100%; }
+figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px solid var(--line-soft); }
+.filelist { display: grid; }
 
 /* index */
 #list { display: grid; gap: 6px; max-width: 900px; }
@@ -526,18 +591,8 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
     if (!b) { body.className = "body md"; renderMarkdown(body, g.brief, true); return; }
     const h = b.head;
     let html = `<p class="outcome">${h["Review outcome"] ? `<b>${esc(h["Review outcome"])}</b>` : ""}${h["Why now"] ? `<span>${esc(h["Why now"])}</span>` : ""}${h["Review artifact"] ? `<span class="mono">${esc(h["Review artifact"])}</span>` : ""}</p>`;
-    if (b.rows.length) {
-      html += `<div class="tablewrap"><table class="ftable"><thead><tr><th>ID</th><th>Severity</th><th>Where</th><th>Status</th></tr></thead><tbody>` + b.rows.map((r, i) => {
-        const open = isOpenStatus(r.status); const det = r.Finding || r.Where || r["Required action"];
-        return `<tr class="frow${open ? "" : " closed"}" data-i="${i}" data-ref="${esc(r.id)}" aria-expanded="${open && i < 3 ? "true" : "false"}"><td>${esc(r.id)}</td><td><span class="sev${isHi(r.severity) ? " hi" : ""}">${esc(r.severity)}</span></td><td class="where">${esc(r.where)}</td><td>${esc(r.status)}</td></tr>` +
-          (det ? `<tr class="fdet" data-for="${i}"${open && i < 3 ? "" : " hidden"}><td colspan="4"><dl>${r.Finding ? `<dt>Finding</dt><dd>${esc(r.Finding)}</dd>` : ""}${r.Where ? `<dt>Where</dt><dd>${esc(r.Where)}</dd>` : ""}${r["Required action"] ? `<dt>Required action</dt><dd>${esc(r["Required action"])}</dd>` : ""}</dl></td></tr>` : "");
-      }).join("") + `</tbody></table></div>`;
-    }
     body.innerHTML = html;
-    body.querySelectorAll("tr.frow").forEach((tr) => { regRef(tr.dataset.ref, tr, tr.textContent.trim().replace(/\s+/g, " ")); tr.addEventListener("click", () => {
-      const det = body.querySelector(`tr.fdet[data-for="${tr.dataset.i}"]`); if (!det) return;
-      det.hidden = !det.hidden; tr.setAttribute("aria-expanded", String(!det.hidden));
-    }); });
+    if (b.rows.length) body.appendChild(findingsTable(b.rows));
   }
 
   /* ---------- a document block ---------- */
@@ -625,13 +680,14 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
   }
 
   /* ---------- cross-references: an id that names something in this gate becomes a link ---------- */
-  const ID_RE = /\b((?:ADR|RAID|NFR|TC|SC|BR|FR|US|AC|WF|R|U|C|D|E|P|Q)-?\d+(?:\.\d+)*[a-z]?(?:-\d+)?)\b/g;
-  const HEAD_ID = /^((?:ADR|BR|FR|NFR|US|AC|WF|U|C|R|TC|SC|E|D)-?\d+(?:\.\d+)*[a-z]?)\b/;
+  const ID_RE = /\b((?:ADR|RAID|NFR|SCD|SM|SD|RD|PD|OD|IB|CT|CO|CR|CB|OC|RC|TC|SC|BR|FR|US|AC|WF|RA|R|U|C|D|E|P|Q|A|I|S|M|T)-?\d+(?:\.\d+)*[a-z]?(?:-\d+)?|Step \d+|Bolt \d+)\b/g;
+  const HEAD_ID = /^((?:[A-Z]{1,5}-?\d+(?:\.\d+)*[a-z]?|Step \d+|Bolt \d+))\b/;
+  const BULLET_ID = /^((?:ADR|BR|FR|NFR|US|AC|WF|U|C|R|TC|SC|E|D)-?\d+(?:\.\d+)*[a-z]?)\b/;
   function regRef(id, element, title) { if (!id || !element) return; const k = String(id).toUpperCase(); if (!view.refs.has(k)) { element.dataset.ref = id; view.refs.set(k, { element, title: title || "" }); } }
   function registerMdRefs(root) {
-    root.querySelectorAll("h1, h2, h3, h4").forEach((h) => { const m = h.textContent.trim().match(HEAD_ID); if (m) regRef(m[1], h.closest("details.sec") || h, h.textContent.trim()); });
-    root.querySelectorAll("tr").forEach((tr) => { const td = tr.querySelector("td"); if (!td) return; const m = td.textContent.trim().match(/^((?:ADR|BR|FR|NFR|US|AC|WF|U|C|R|TC|SC|E|D)-?\d+(?:\.\d+)*[a-z]?)$/); if (m) regRef(m[1], tr, tr.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
-    root.querySelectorAll("li").forEach((li) => { const m = li.textContent.trim().match(HEAD_ID); if (m) regRef(m[1], li, li.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
+    root.querySelectorAll("h1, h2, h3, h4").forEach((h) => { const m = h.textContent.trim().match(HEAD_ID); if (m) regRef(m[1], h.closest("details.sec, details.sub") || h, h.textContent.trim()); });
+    root.querySelectorAll("tr").forEach((tr) => { const td = tr.querySelector("td"); if (!td) return; const t = td.textContent.trim().replace(/[`*]/g, ""); const m = t.match(/^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)$/) || t.match(/^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)\s+\S/); if (m) regRef(m[1], tr, tr.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
+    root.querySelectorAll("li").forEach((li) => { const m = li.textContent.trim().match(BULLET_ID); if (m) regRef(m[1], li, li.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
   }
   function linkRefs(root) {
     if (!view.refs.size) return;
@@ -738,7 +794,7 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
   /* a filter bar: chips over rows' dataset.f, and a search over dataset.q (or text) */
   function filterBar(rows, label) {
     const counts = new Map(); rows.forEach((r) => { const v = r.dataset.f || ""; counts.set(v, (counts.get(v) || 0) + 1); });
-    const bar = node(`<div class="vtools"><span>${esc(label || "")}</span>${[...counts].map(([v, c]) => `<button type="button" class="fchip" data-v="${esc(v)}" aria-pressed="false">${esc(v || "other")} <span class="hint">${c}</span></button>`).join("")}<input type="search" placeholder="Find…" aria-label="Find"></div>`);
+    const bar = node(`<div class="vtools"><span>${esc(label || "")}</span>${(counts.size === 1 && counts.has("") ? [] : [...counts]).map(([v, c]) => `<button type="button" class="fchip" data-v="${esc(v)}" aria-pressed="false">${esc(v || "other")} <span class="hint">${c}</span></button>`).join("")}<input type="search" placeholder="Find…" aria-label="Find"></div>`);
     const state = { f: null, q: "" };
     const apply = () => rows.forEach((r) => { const ok = (!state.f || r.dataset.f === state.f) && (!state.q || (r.dataset.q || r.textContent).toLowerCase().includes(state.q)); r.hidden = !ok; if (ok && state.q) { let p = r.closest("details"); while (p) { p.open = true; p = p.parentElement && p.parentElement.closest("details"); } } });
     bar.querySelectorAll(".fchip").forEach((b) => b.addEventListener("click", () => { state.f = state.f === b.dataset.v ? null : b.dataset.v; bar.querySelectorAll(".fchip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === state.f))); apply(); }));
@@ -870,15 +926,20 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
   /* --- traceability.json: coverage by status --- */
   function viewTraceability(d) {
     let j; try { j = JSON.parse(d.text); } catch { return null; }
-    const cov = Array.isArray(j.coverage) ? j.coverage : null; if (!cov) return null;
+    const cov = Array.isArray(j.coverage) ? j.coverage : null; const rev = Array.isArray(j.reverse) ? j.reverse : []; if (!cov || (!cov.length && !rev.length)) return null;
     const counts = new Map(); cov.forEach((c) => { const s = str(c.status || "").toUpperCase() || "?"; counts.set(s, (counts.get(s) || 0) + 1); });
     const tone = (s) => /^(ok|covered|done|full)$/i.test(s) ? "ok" : /^(partial|part)/i.test(s) ? "accent" : /^(missing|gap|none|uncovered)/i.test(s) ? "warn" : "muted";
     const root = wrap(`<div class="cov">${[...counts].map(([s, c]) => `<span class="chip ${tone(s)}">${esc(s)} ${c}</span>`).join("")}<span class="chip muted">${cov.length} of ${list(j.upstream_ids).length || cov.length} upstream ids</span>${j.stage ? `<span class="chip muted">${esc(str(j.stage))}${j.unit ? " · " + esc(str(j.unit)) : ""}</span>` : ""}</div>`);
     const rows = [];
     const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Upstream</th><th>Status</th><th>Covered by</th><th>Note</th></tr></thead><tbody></tbody></table></div>`);
     cov.forEach((c) => { const tr = node(`<tr data-f="${esc(str(c.status || ""))}"><td class="id">${esc(str(c.id))}</td><td><span class="chip ${tone(str(c.status || ""))}">${esc(str(c.status || ""))}</span></td><td>${inline(str(c.target || c.targets || c.covered_by || ""))}</td><td class="dim">${inline(str(c.note || c.notes || c.gap || c.reason || ""))}</td></tr>`); rows.push(tr); table.querySelector("tbody").appendChild(tr); });
-    root.appendChild(filterBar(rows, "Coverage")); root.appendChild(table);
-    const other = Object.keys(j).filter((k) => !["coverage", "upstream_ids", "stage", "unit"].includes(k));
+    if (cov.length) { root.appendChild(filterBar(rows, "Coverage")); root.appendChild(table); }
+    if (rev.length) {
+      const rrows = []; const rt = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Id</th><th>Status</th><th>Reason or target</th></tr></thead><tbody></tbody></table></div>`);
+      rev.forEach((c) => { const tr = node(`<tr data-f="${esc(str(c.status || ""))}"><td class="id">${esc(str(c.id))}</td><td><span class="chip ${tone(str(c.status || ""))}">${esc(str(c.status || ""))}</span></td><td class="dim">${inline(str(c.target || c.note || ""))}</td></tr>`); rrows.push(tr); rt.querySelector("tbody").appendChild(tr); });
+      const rsec = section(d, 3, "Reverse trace", true, `${rev.length} entries`); rsec.secbody.appendChild(filterBar(rrows, "Not mapped to a story")); rsec.secbody.appendChild(rt); root.appendChild(rsec);
+    }
+    const other = Object.keys(j).filter((k) => !["coverage", "reverse", "upstream_ids", "stage", "unit"].includes(k));
     if (other.length) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = JSON.stringify(Object.fromEntries(other.map((k) => [k, j[k]])), null, 2); const sec = section(d, 2, "Other fields", false, other.join(", ")); sec.secbody.appendChild(pre); root.appendChild(sec); }
     return root;
   }
@@ -908,7 +969,7 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
   }
   const acHtml = (acs) => acs.map((ac) => `<div class="ac" data-ac="${esc(ac.id)}"><span class="acid">${esc(ac.id)}${ac.tags.length ? `<span class="tags">${ac.tags.map((t) => `<span class="chip muted">${esc(t)}</span>`).join("")}</span>` : ""}</span>${ac.gwt ? `<div class="gwt"><div><b>Given</b>${inline(ac.gwt[0])}</div><div><b>When</b>${inline(ac.gwt[1])}</div><div><b>Then</b>${inline(ac.gwt[2])}</div></div>` : `<div>${inline(ac.text)}</div>`}</div>`).join("");
   /* bold-label facts: `**Priority:** Must. **Requirements:** FR1…` and `Priority: Must · Repo: api · Traces: …` lines */
-  const FACT_LINE = (l) => (/\*\*[^*]+:\*\*/.test(l) && !/^\s*[-*|#]/.test(l)) || (/^[A-Z][A-Za-z ]{1,20}:\s*\S/.test(l) && /\s·\s/.test(l));
+  const FACT_LINE = (l) => (/\*\*[^*]+:\*\*/.test(l) && !/^\s*(?:[-*]\s|[|#])/.test(l)) || (/^[A-Z][A-Za-z ]{1,20}:\s*\S/.test(l) && /\s·\s/.test(l));
   function factsOf(body) {
     const facts = []; const seen = new Set();
     const add = (k, v) => { k = k.trim(); v = v.trim().replace(/\.$/, ""); if (!k || !v || seen.has(k.toLowerCase())) return; seen.add(k.toLowerCase()); facts.push([k, v]); };
@@ -1084,39 +1145,6 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
     return root;
   }
 
-  /* --- contracts: every `## C1 · …` section; an OpenAPI-shaped YAML block becomes an operations table, a type sheet a table per type --- */
-  function viewContracts(d) {
-    const secs = splitHeadings(d.text, "##"); if (!secs.some((s) => /^C\d+\b/.test(s.title))) return null;
-    const root = wrap(); const lead = stripH1(secs[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
-    let n = 10;
-    secs.slice(1).forEach((s) => {
-      if (!s.title) return;
-      const isC = /^C\d+\b/.test(s.title); const sec = section(d, n++, s.title, isC);
-      if (isC) regRef(s.title.match(/^(C\d+)/)[1], sec, s.title);
-      const parts = []; let last = 0; const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m; const body = s.body;
-      while ((m = re.exec(body))) { if (m.index > last) parts.push({ md: body.slice(last, m.index) }); let y = null; if (typeof jsyaml !== "undefined") { try { y = jsyaml.load(m[1]); } catch { try { y = jsyaml.load(yamlSafe(m[1])); } catch { y = null; } } } parts.push({ yaml: m[1], data: y }); last = m.index + m[0].length; }
-      if (last < body.length) parts.push({ md: body.slice(last) });
-      parts.forEach((p) => {
-        if (p.md !== undefined) { if (p.md.trim()) sec.secbody.appendChild(mdDiv(p.md)); return; }
-        const y = p.data; let done = false;
-        if (y && y.paths && typeof y.paths === "object") {
-          const ops = []; Object.entries(y.paths).forEach(([path, methods]) => { if (!methods || typeof methods !== "object") return; Object.entries(methods).forEach(([method, op]) => { if (!/^(get|post|put|patch|delete|head|options)$/i.test(method) || !op || typeof op !== "object") return; ops.push({ method: method.toUpperCase(), path, id: str(op.operationId || ""), summary: str(op.summary || ""), codes: op.responses ? Object.keys(op.responses) : [] }); }); });
-          if (ops.length) { sec.secbody.insertAdjacentHTML("beforeend", `<p class="hint">${ops.length} operations${y.info && y.info.title ? " · " + esc(str(y.info.title)) : ""}</p><div class="tablewrap"><table class="grid"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Summary</th><th>Responses</th></tr></thead><tbody>${ops.map((o) => `<tr data-op="${esc(o.id)}"><td><span class="chip ${/GET/.test(o.method) ? "ok" : /DELETE/.test(o.method) ? "warn" : "accent"}">${esc(o.method)}</span></td><td class="mono">${esc(o.path)}</td><td class="id">${esc(o.id)}</td><td>${inline(o.summary)}</td><td class="dim">${esc(o.codes.join(" "))}</td></tr>`).join("")}</tbody></table></div>`); sec.secbody.querySelectorAll("tr[data-op]").forEach((tr) => regRef(tr.dataset.op, tr, tr.textContent.trim().replace(/\s+/g, " "))); done = true; }
-        }
-        const schemas = y && y.components && y.components.schemas;
-        if (schemas && typeof schemas === "object" && Object.keys(schemas).length) { sec.secbody.appendChild(schemaCards(schemas)); done = true; }
-        if (!done && y && typeof y === "object" && !Array.isArray(y) && Object.keys(y).length && Object.values(y).every((v) => v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every((f) => typeof f !== "object" || f === null || Array.isArray(f)))) {
-          const notes = {}; let type = ""; p.yaml.split("\n").forEach((l) => { const t = l.match(/^([A-Za-z_][\w]*)\s*:/); if (t) { type = t[1]; return; } const mm = l.match(/^\s+([A-Za-z_][\w]*)\s*:\s*(.*?)\s*#\s*(.*)$/); if (mm) notes[type + "." + mm[1]] = mm[3]; });
-          sec.secbody.insertAdjacentHTML("beforeend", Object.entries(y).map(([type, fields]) => `<div class="card flat" style="margin:6px 0 10px" data-type="${esc(type)}"><div class="chead"><h4>${esc(type)}</h4></div><div class="tablewrap"><table class="grid"><tbody>${Object.entries(fields).map(([f, t]) => `<tr><td class="id">${esc(f)}</td><td class="ty">${esc(str(t))}</td><td class="dim">${inline(notes[type + "." + f] || "")}</td></tr>`).join("")}</tbody></table></div></div>`).join(""));
-          sec.secbody.querySelectorAll("[data-type]").forEach((c) => regRef(c.dataset.type, c, "")); done = true;
-        }
-        if (!done) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = p.yaml; sec.secbody.appendChild(pre); }
-      });
-      root.appendChild(sec);
-    });
-    return root;
-  }
-
   /* OpenAPI component schemas as folded cards: name, type, properties (type, format or enum or $ref, required, description) */
   function schemaCards(schemas) {
     const tyOf = (p) => { if (!p || typeof p !== "object") return ""; if (p.$ref) return str(p.$ref).split("/").pop(); if (p.enum) return list(p.enum).join(" | "); if (p.type === "array") return "array of " + (tyOf(p.items) || "?"); return [p.type, p.format].filter(Boolean).join(" ") + (p.pattern ? " /" + p.pattern + "/" : "") + (p.maxLength !== undefined ? " ≤" + p.maxLength : ""); };
@@ -1133,21 +1161,575 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
     return root;
   }
 
+  /* ---------- structured documents: the building blocks every table-first and list-first view shares ---------- */
+  const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s; };
+  const ANYID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)$/;
+  const LEADID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)\s+\S/;
+  const TONE_COL = /^(likelihood|impact|severity|priority|moscow|status|result|verdict|confidence|outcome)$/i;
+  const FACET_COL = /^(kind|category|type|layer|phase|owner|area|group|scope|class|tier)$/i;
+  const tone = (s) => {
+    s = String(s || "").trim().toLowerCase().replace(/[*_`]/g, "");
+    if (/^(critical|major|high|must|blocked|fail|failed|failing|unresolved|missing|gap|breaking|rejected|uncovered)/.test(s)) return "warn";
+    if (/^(medium|moderate|should|partial|pending|proposed|open|new|planned|todo|maybe|not run|in progress|minor)/.test(s)) return "accent";
+    if (/^(low|could|done|ok\b|pass|resolved|accepted|covered|ready|feasible|yes|complete|met\b|green|closed)/.test(s)) return "ok";
+    return "muted";
+  };
+  const factRow = (facts) => node(`<div class="factrow">${facts.map(([k, v]) => `<div><b>${esc(k)}</b><span>${inline(v)}</span></div>`).join("")}</div>`);
+  /* a table's cells split at unescaped pipes */
+  const cellsOf = (line) => line.trim().replace(/^\|/, "").replace(/\|\s*$/, "").split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+  /* the first table in a markdown text: {head, rows} or null */
+  function mdTable(text) {
+    const lines = mdLines(text); let head = null; const rows = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!/^\s*\|/.test(l)) { if (head && rows.length) break; if (head && !rows.length && l.trim() === "") continue; head = null; continue; }
+      const cells = cellsOf(l);
+      if (!head) { if (/^\s*\|[-: |]+\|\s*$/.test(lines[i + 1] || "")) { head = cells; i++; } continue; }
+      rows.push(cells);
+    }
+    return head ? { head, rows } : null;
+  }
+  /* the <!-- Text fallback: … --> comments under diagrams and wireframes become a folded description */
+  const foldFallbacks = (text) => String(text || "").replace(/<!--\s*Text fallback:\s*([\s\S]*?)-->/g, (_, t) => `\n\n<details class="sub"><summary>Describe in words</summary>\n\n${t.trim()}\n\n</details>\n\n`);
+
+  /* a table → upgraded grid: ids linked and registered, categorical columns as chips, step numbers as links */
+  function upgradeTable(tbl) {
+    const heads = [...tbl.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+    const rows = [...tbl.querySelectorAll("tbody tr")];
+    if (!heads.length || !rows.length) return { rows: [], heads, facet: -1 };
+    tbl.classList.add("grid");
+    rows.forEach((tr) => {
+      const td = tr.cells[0]; if (!td) return;
+      const raw = td.textContent.trim().replace(/[`*]/g, "");
+      const whole = raw.match(ANYID); const lead = whole || raw.match(LEADID);
+      if (lead) { regRef(lead[1], tr, tr.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); if (whole) td.classList.add("id"); }
+    });
+    let facet = -1;
+    heads.forEach((h, i) => {
+      const isTone = TONE_COL.test(h); if (!isTone && !FACET_COL.test(h)) return;
+      const vals = rows.map((tr) => tr.cells[i] ? tr.cells[i].textContent.trim() : "");
+      const set = new Set(vals.filter(Boolean)); if (!set.size || set.size > 8 || vals.some((v) => v.length > 28)) return;
+      rows.forEach((tr, k) => { const td = tr.cells[i]; if (td && vals[k]) td.innerHTML = `<span class="chip ${isTone ? tone(vals[k]) : "muted"}">${esc(vals[k])}</span>`; });
+      if (facet < 0 && set.size >= 2) facet = i;
+    });
+    rows.forEach((tr) => { if (facet >= 0 && tr.cells[facet]) tr.dataset.f = tr.cells[facet].textContent.trim(); });
+    heads.forEach((h, i) => { if (/^steps?$/i.test(h)) rows.forEach((tr) => { const td = tr.cells[i]; if (td) td.innerHTML = td.innerHTML.replace(/\b(\d+)\b/g, (_, n) => `<a class="xref" data-ref="Step ${n}">${n}</a>`); }); });
+    return { rows, heads, facet };
+  }
+  /* a two-column Field | Value table is a list of facts; a list whose every item is `Label: text` is one too */
+  function kvTables(root) {
+    root.querySelectorAll("table").forEach((tbl) => {
+      const heads = [...tbl.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+      if (heads.length !== 2 || !/^(field|key|property|attribute|item|name)$/i.test(heads[0]) || !/^(value|description|detail|details)$/i.test(heads[1])) return;
+      const rows = [...tbl.querySelectorAll("tbody tr")]; if (!rows.length) return;
+      const dl = node(`<dl class="facts">${rows.map((tr) => `<dt>${esc(tr.cells[0].textContent.trim())}</dt><dd>${tr.cells[1] ? tr.cells[1].innerHTML : ""}</dd>`).join("")}</dl>`);
+      (tbl.closest(".tablewrap") || tbl).replaceWith(dl);
+    });
+  }
+  function kvLists(root) {
+    root.querySelectorAll("ul").forEach((ul) => {
+      if (ul.closest("li, dd")) return;
+      const lis = [...ul.children].filter((x) => x.tagName === "LI"); if (lis.length < 2) return;
+      const parsed = lis.map((li) => {
+        const h = li.innerHTML;
+        let m = h.match(/^\s*<strong>([^<]{1,40}?):\s*<\/strong>\s*([\s\S]*)$/) || h.match(/^\s*<strong>([^<]{1,40}?)<\/strong>:\s*([\s\S]*)$/) || h.match(/^\s*([A-Z][\w ’'\/&()-]{1,48}):\s+([\s\S]*)$/);
+        if (m) return [m[1].trim(), m[2].trim()];
+        m = h.match(/^\s*<strong>([^<]{1,40})<\/strong>\s*((?:\((?:[^()]|<[^>]+>)*\))?)\s*:\s*([\s\S]*)$/);
+        return m ? [m[1].trim(), ((m[2] ? m[2] + " " : "") + m[3]).trim()] : null;
+      });
+      if (parsed.some((p) => !p || !p[1])) return;
+      ul.replaceWith(node(`<dl class="facts">${parsed.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>`));
+    });
+  }
+  /* `- [x]` items become done / open marks */
+  function taskMarks(root) {
+    root.querySelectorAll("li input[type=checkbox]").forEach((inp) => {
+      const li = inp.closest("li"); const done = inp.checked || inp.hasAttribute("checked");
+      li.classList.add("task", done ? "done" : "todo");
+      const tick = document.createElement("span"); tick.className = "tick"; tick.setAttribute("aria-label", done ? "done" : "not done"); tick.textContent = done ? "✓" : "";
+      inp.replaceWith(tick);
+    });
+  }
+  /* JSON anywhere: an object as facts, a list of objects as cards, a list of text as bullets */
+  function jsonTree(v, depth) {
+    depth = depth || 0;
+    const scalar = (x) => { const s = str(x); if (/^sha\d*:|^[0-9a-f]{24,}$/i.test(s)) return `<code title="${esc(s)}">${esc(s.length > 24 ? s.slice(0, 20) + "…" : s)}</code>`; if (s.length > 160 || s.includes("\n")) return `<div class="md">${mdHtml(s) || esc(s)}</div>`; return typeof x === "boolean" || x === null ? `<span class="chip muted">${esc(s)}</span>` : inline(s); };
+    if (Array.isArray(v)) {
+      if (!v.length) return node('<span class="hint">none</span>');
+      if (v.every((x) => x === null || typeof x !== "object")) return node(`<ul>${v.map((x) => `<li>${scalar(x)}</li>`).join("")}</ul>`);
+      const box = node('<div class="cards"></div>');
+      v.forEach((x, i) => {
+        const label = x && typeof x === "object" && !Array.isArray(x) ? str(x.id || x.name || x.layer || x.path || x.title || x.key || "") : "";
+        const inner = (x && typeof x === "object" && !Array.isArray(x) && label) ? Object.fromEntries(Object.entries(x).filter(([k]) => !["id", "name", "layer", "path", "title", "key"].includes(k) || str(x[k]) !== label)) : x;
+        const head = label ? `<span class="chip">${esc(clip(label, 60))}</span>` : `<span class="chip muted">${i + 1}</span>`;
+        if (depth >= 1) { const first = Object.values(inner || {}).find((y) => typeof y === "string"); const det = node(`<details class="sub">${`<summary>${head} <span class="hint">${esc(clip(first || "", 110))}</span></summary>`}</details>`); det.appendChild(jsonTree(inner, depth + 1)); box.appendChild(det); return; }
+        const card = node(`<div class="card"><div class="chead">${head}</div></div>`);
+        card.appendChild(jsonTree(inner, depth + 1)); box.appendChild(card);
+      });
+      return box;
+    }
+    if (v && typeof v === "object") {
+      const dl = node('<dl class="facts"></dl>');
+      Object.entries(v).forEach(([k, val]) => {
+        const dt = document.createElement("dt"); dt.textContent = k.replace(/_/g, " "); const dd = document.createElement("dd");
+        if (val && typeof val === "object") dd.appendChild(jsonTree(val, depth + 1)); else dd.innerHTML = scalar(val);
+        dl.appendChild(dt); dl.appendChild(dd);
+      });
+      return dl;
+    }
+    return node(`<span>${scalar(v)}</span>`);
+  }
+  /* a JSON fence inside a document: the tree, the raw text folded under it */
+  function jsonFences(root) {
+    root.querySelectorAll("pre > code.language-json").forEach((code) => {
+      const pre = code.parentElement; const raw = code.textContent; if (raw.split("\n").length < 6 || pre.closest(".screen")) return;
+      let v; try { v = JSON.parse(raw); } catch { return; }
+      if (!v || typeof v !== "object") return;
+      const card = node('<div class="card"></div>'); card.appendChild(jsonTree(v));
+      const det = node(`<details class="sub"><summary>Raw JSON · ${raw.split("\n").length} lines</summary></details>`); const src = document.createElement("pre"); src.className = "src"; src.textContent = raw; det.appendChild(src);
+      pre.replaceWith(card); card.after(det);
+    });
+  }
+  /* long code is folded under a line that names it */
+  function foldCode(root, limit) {
+    root.querySelectorAll("pre").forEach((pre) => {
+      if (pre.classList.contains("src") || pre.closest(".screen, details.sub")) return;
+      const n = pre.textContent.replace(/\n$/, "").split("\n").length; if (n <= (limit || 40)) return;
+      const lang = ((pre.firstElementChild && pre.firstElementChild.className.match(/language-([\w-]+)/)) || [])[1] || "Code";
+      const det = node(`<details class="sub"><summary>${esc(lang)} · ${n} lines</summary></details>`); pre.replaceWith(det); det.appendChild(pre);
+    });
+  }
+  /* H3 headings inside a section fold their content */
+  function foldH3(root) {
+    const hs = [...root.children].filter((e) => e.tagName === "H3"); if (hs.length < 2) return;
+    const frag = document.createDocumentFragment(); let cur = null; let n = 0;
+    [...root.childNodes].forEach((k) => {
+      if (k.nodeType === 1 && k.tagName === "H3") { n++; cur = node(`<details class="sub h"${hs.length <= 6 || n <= 2 ? " open" : ""}><summary></summary></details>`); cur.firstChild.appendChild(k); frag.appendChild(cur); }
+      else if (cur) cur.appendChild(k); else frag.appendChild(k);
+    });
+    root.innerHTML = ""; root.appendChild(frag);
+  }
+  /* markdown with every upgrade a structured document gets */
+  function smartMd(d, text, o) {
+    o = o || {};
+    const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(foldFallbacks(text)) || `<pre class="plain">${esc(text)}</pre>`;
+    decorate(tmp);
+    kvTables(tmp); kvLists(tmp);
+    tmp.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || t.classList.contains("grid")) return;
+      const info = upgradeTable(t); if (!info.rows.length) return;
+      if (info.rows.length > 12) w.classList.add("tall");
+      if (info.rows.length > 8 && !o.noFilter) w.before(filterBar(info.rows, `${info.rows.length} rows`));
+    });
+    tmp.querySelectorAll("ol").forEach((ol) => {
+      if (ol.closest("li") || ol.children.length < 2) return; ol.classList.add("steps");
+      const start = parseInt(ol.getAttribute("start") || "1", 10); if (start > 1) ol.style.counterReset = "st " + (start - 1);
+    });
+    taskMarks(tmp); jsonFences(tmp); foldCode(tmp, o.foldCode); foldH3(tmp);
+    tmp.className = "md smart"; registerMdRefs(tmp);
+    return tmp;
+  }
+  const countOf = (body) => {
+    const sp = body.querySelectorAll("details.step").length; if (sp) return sp + (body.querySelector("details.step .stepno") ? " steps" : " entries");
+    const rows = body.querySelectorAll("tbody tr").length; if (rows) return rows + (rows === 1 ? " row" : " rows");
+    const steps = body.querySelectorAll("ol.steps > li").length; if (steps) return steps + (steps === 1 ? " step" : " steps");
+    const items = body.querySelectorAll("li, dl.facts dt").length; return items ? items + (items === 1 ? " item" : " items") : "";
+  };
+  /* the lead of a document: facts from its bold labels, the rest folded under its first words when it is long */
+  function leadNode(d, text) {
+    text = stripH1(text).trim(); if (!text) return null;
+    const facts = factsOf(text); const rest = stripFacts(text).trim();
+    const box = document.createElement("div"); box.className = "vw-lead";
+    if (facts.length) box.appendChild(factRow(facts));
+    if (rest) {
+      if (rest.length > 700) { const det = node(`<details class="sub"><summary>${esc(clip(rest.replace(/[`*_#>]|\[([^\]]*)\]\([^)]*\)/g, "$1"), 150))}</summary></details>`); det.appendChild(smartMd(d, rest)); box.appendChild(det); }
+      else box.appendChild(smartMd(d, rest));
+    }
+    return box.childNodes.length ? box : null;
+  }
+  /* H2 sections, the H3 entries under chosen H2s lifted to sections of their own: [{title, body, group?}] with the lead first */
+  function flatSections(text, pick) {
+    const secs = splitHeadings(text, "##"); const out = [secs[0]];
+    secs.slice(1).forEach((s) => {
+      const inner = splitHeadings(s.body, "###"); const hits = inner.slice(1).filter((x) => pick(s.title, x.title));
+      if (!hits.length) { out.push(s); return; }
+      if (inner[0].body.trim()) out.push({ title: s.title, body: inner[0].body });
+      inner.slice(1).forEach((x) => out.push(pick(s.title, x.title) ? Object.assign(x, { group: s.title }) : { title: s.title + " · " + x.title, body: x.body }));
+    });
+    return out;
+  }
+  const QUIET = /derived|^sources?\b|^assumptions|^references|^open questions|^appendix/i;
+  /* the generic view: a facts row, then every H2 as a collapsible section with its tables as grids, its numbered lists as steppers */
+  function viewStructured(d, o) {
+    o = o || {};
+    const parts = o.pick ? flatSections(d.text, o.pick) : splitHeadings(d.text, "##");
+    const secs = parts.slice(1).filter((s) => s.title);
+    if (!secs.length && !/\n\s*\|.*\|\s*\n\s*\|[-: |]+\|/.test(d.text) && (d.text.match(/\n\d+\.\s/g) || []).length < 3) return null;
+    const root = wrap(); const ln = leadNode(d, parts[0].body); if (ln) root.appendChild(ln);
+    let n = 10;
+    secs.forEach((s, i) => {
+      const quiet = QUIET.test(s.title);
+      const open = o.open ? o.open(s, i, quiet) : (!quiet && (i === 0 || s.body.length <= 2200));
+      const body = (o.custom && o.custom(s, d)) || smartMd(d, s.body, o);
+      const sec = section(d, n++, s.title, open, countOf(body));
+      if (s.group) sec.querySelector("summary").insertBefore(node(`<span class="chip muted">${esc(s.group)}</span>`), sec.querySelector(".cnt"));
+      const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
+      sec.secbody.appendChild(body); root.appendChild(sec);
+    });
+    if (!secs.length) root.appendChild(smartMd(d, stripH1(d.text), o));
+    return root;
+  }
+
+  /* --- functional spec: the workflows as steppers, the state machines drawn, the derived views folded --- */
+  const viewFunctionalSpec = (d) => viewStructured(d, { pick: (h2, h3) => /^(workflows?|state machines?)$/i.test(h2) && h3.trim() !== "" });
+
+  /* --- components without YAML: the inventory and failure tables as grids --- */
+  const viewComponentsAny = (d) => viewComponents(d) || viewStructured(d, {});
+
+  /* --- NFR documents: the id column linked, the Meets column linked, decisions as cards --- */
+  function decisionCards(d, s) {
+    const t = mdTable(s.body); if (!t || t.rows.length < 2) return null;
+    const idCol = 0; const titleCol = t.head.findIndex((h, i) => i > 0 && /^(decision|choice|tool|requirement)$/i.test(h)); if (titleCol < 0 || t.head.length < 3) return null;
+    if (t.rows.some((r) => !ANYID.test((r[idCol] || "").replace(/[`*]/g, "")))) return null;
+    const box = document.createElement("div");
+    const before = s.body.split(/\n\s*\|/)[0].trim(); if (before) box.appendChild(smartMd(d, before));
+    const cards = node('<div class="cards"></div>');
+    t.rows.forEach((r) => {
+      const id = r[idCol].replace(/[`*]/g, "");
+      const card = node(`<div class="card"><div class="chead"><span class="chip">${esc(id)}</span></div><p class="desc">${inline(r[titleCol] || "")}</p></div>`);
+      regRef(id, card, clip(r[titleCol], 300));
+      const facts = t.head.map((h, i) => [h, r[i]]).filter(([h, v], i) => i !== idCol && i !== titleCol && v);
+      if (facts.length) card.appendChild(node(`<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${inline(v)}</dd>`).join("")}</dl>`));
+      cards.appendChild(card);
+    });
+    box.appendChild(cards);
+    const after = s.body.slice(s.body.lastIndexOf("|") + 1).trim(); if (after) box.appendChild(smartMd(d, after));
+    return box;
+  }
+  const viewNfrDesign = (d) => viewStructured(d, { custom: (s, doc) => /decision/i.test(s.title) ? decisionCards(doc, s) : null });
+  /* tech-stack-decisions: a card per choice */
+  function techCards(d, s) {
+    const t = mdTable(s.body); if (!t || t.rows.length < 2 || t.head.length < 2) return null;
+    const ti = t.head.findIndex((h) => /^(choice|tool|technology|piece|component)$/i.test(h)); if (ti < 0) return null;
+    const why = t.head.findIndex((h) => /^(why|purpose|reason|rationale)$/i.test(h));
+    const box = document.createElement("div"); const before = s.body.split(/\n\s*\|/)[0].trim(); if (before) box.appendChild(smartMd(d, before));
+    const cards = node('<div class="cards cols"></div>');
+    t.rows.forEach((r) => {
+      const chips = t.head.map((h, i) => [h, r[i]]).filter(([h, v], i) => i !== ti && i !== why && v && v !== "—");
+      const card = node(`<div class="card"><div class="chead"><h3>${inline(r[ti])}</h3><span class="end">${chips.map(([, v]) => `<span class="chip muted">${esc(clip(v.replace(/[`*]/g, ""), 40))}</span>`).join("")}</span></div>${why >= 0 && r[why] ? `<p class="desc">${inline(r[why])}</p>` : ""}</div>`);
+      cards.appendChild(card);
+    });
+    box.appendChild(cards);
+    const after = s.body.slice(s.body.lastIndexOf("|") + 1).trim(); if (after) box.appendChild(smartMd(d, after));
+    return box;
+  }
+  const viewTechStack = (d) => viewStructured(d, { custom: (s, doc) => (/^(runtime|dev|development|tools|stack)/i.test(s.title) && mdTable(s.body) && mdTable(s.body).rows.length >= 3) ? techCards(doc, s) : null });
+
+  /* a section that is a list of `- **Label:** text` bullets: each bullet folds under its label, the first words beside it */
+  function labelBullets(d, s) {
+    const items = []; const pre = []; let cur = null, fence = false;
+    mdLines(s.body).forEach((l) => {
+      if (/^```/.test(l)) fence = !fence;
+      const m = !fence && l.match(/^[-*]\s+(\*\*[^*]+\*\*.*)$/);
+      if (m) { cur = [m[1]]; items.push(cur); } else if (cur) cur.push(l.replace(/^ {2}/, "")); else pre.push(l);
+    });
+    if (items.length < 4 || items.some((it) => !/^\*\*[^*]+\*\*/.test(it[0]))) return null;
+    const box = document.createElement("div"); if (pre.join("").trim()) box.appendChild(smartMd(d, pre.join("\n")));
+    const list = node('<div class="cards steps-list"></div>'); const rows = [];
+    items.forEach((it) => {
+      const label = it[0].match(/^\*\*([^*]+)\*\*/)[1].replace(/:\s*$/, "").trim();
+      const md = [it[0].replace(/^\*\*[^*]+\*\*:?\s*/, ""), ...it.slice(1)].join("\n").trim();
+      const body = smartMd(d, md, { noFilter: true }); const lead = (body.querySelector("p, li") || {}).textContent || "";
+      const det = node(`<details class="sub step lb"><summary><span class="stitle">${esc(label)}</span><span class="hint lead">${esc(clip(lead, 110))}</span></summary></details>`);
+      det.dataset.q = label + " " + body.textContent; det.appendChild(body); list.appendChild(det); rows.push(det);
+    });
+    if (rows.length > 8) box.appendChild(filterBar(rows, `${rows.length} entries`));
+    box.appendChild(list); return box;
+  }
+  const viewCodeSummary = (d) => viewStructured(d, { custom: (s, doc) => labelBullets(doc, s), open: (s, i, quiet) => !quiet && i < 2 });
+
+  /* --- the code generation plan: summary as facts, the testing contract as a card, the steps as a numbered plan --- */
+  function stepsBody(d, s) {
+    const subs = splitHeadings(s.body, "###"); const steps = subs.slice(1).filter((x) => /^Step\s+\d+/i.test(x.title)); if (steps.length < 2) return null;
+    const box = document.createElement("div"); if (subs[0].body.trim()) box.appendChild(smartMd(d, subs[0].body));
+    const list = node('<div class="cards steps-list"></div>'); const nodes = []; let doneAll = 0, totalAll = 0, stepsDone = 0;
+    steps.forEach((x) => {
+      const m = x.title.match(/^Step\s+(\d+)\s*[:.—–-]?\s*(.*)$/i); const num = m[1]; const title = m[2] || x.title;
+      const body = smartMd(d, x.body, { noFilter: true });
+      const total = body.querySelectorAll("li.task").length; const done = body.querySelectorAll("li.task.done").length;
+      doneAll += done; totalAll += total;
+      const state = !total ? "no tasks" : done === total ? "done" : done ? "in progress" : "pending"; if (state === "done") stepsDone++;
+      const det = node(`<details class="sub step" data-f="${state}"${state === "done" ? "" : " open"}><summary><span class="stepno">${esc(num)}</span><span class="stitle">${inline(title)}</span><span class="end">${total ? `<span class="chip ${done === total ? "ok" : done ? "accent" : "muted"}">${done}/${total}</span>` : ""}</span></summary></details>`);
+      det.dataset.q = x.title + " " + body.textContent; det.appendChild(body); regRef("Step " + num, det, title);
+      list.appendChild(det); nodes.push(det);
+    });
+    const pct = totalAll ? Math.round(100 * doneAll / totalAll) : 0;
+    box.appendChild(node(`<div class="progress"><div class="pbar"><i style="width:${pct}%"></i></div><span class="hint">${steps.length} steps · ${stepsDone} done · ${doneAll} of ${totalAll} tasks ticked</span></div>`));
+    box.appendChild(filterBar(nodes, "Steps")); box.appendChild(list);
+    return box;
+  }
+  const viewCodePlan = (d) => viewStructured(d, { custom: (s, doc) => /^steps$/i.test(s.title) ? stepsBody(doc, s) : null, open: (s, i, quiet) => !quiet && (/^(summary|steps|where the code goes)$/i.test(s.title) || s.body.length <= 1500) });
+
+  /* --- file lists: source-manifest.json (or the same JSON as text) --- */
+  function viewManifest(d) {
+    let j; try { j = JSON.parse(d.text); } catch { return null; }
+    if (!j || typeof j !== "object" || Array.isArray(j)) return null;
+    const lists = Object.entries(j).filter(([, v]) => Array.isArray(v) && v.length && v.every((x) => x && typeof x === "object" && (typeof x.path === "string" || typeof x.file === "string")));
+    if (!lists.length) return null;
+    const root = wrap(); const scal = Object.entries(j).filter(([, v]) => v === null || typeof v !== "object").map(([k, v]) => [k.replace(/_/g, " "), str(v)]);
+    if (scal.length) root.appendChild(factRow(scal));
+    let n = 10;
+    lists.forEach(([key, arr]) => {
+      const byRepo = new Map(); arr.forEach((x) => { const r = str(x.repo || ""); if (!byRepo.has(r)) byRepo.set(r, []); byRepo.get(r).push(x); });
+      byRepo.forEach((items, repo) => {
+        const extra = [...new Set(items.flatMap((x) => Object.keys(x)))].filter((k) => !["repo", "path", "file"].includes(k));
+        const sec = section(d, n++, repo || key, true, `${items.length} paths`);
+        if (!extra.length) {
+          const dirOf2 = (p) => { const t = p.replace(/\/$/, ""); const i = t.lastIndexOf("/"); return i < 0 ? "" : t.slice(0, i + 1); };
+          const g2 = new Map(); items.forEach((x) => { const p = str(x.path || x.file); const dir = p.endsWith("/") ? "\u0000" : dirOf2(p); if (!g2.has(dir)) g2.set(dir, []); g2.get(dir).push(p); });
+          const rows2 = []; const tb2 = node('<div class="tablewrap"><table class="grid"><thead><tr><th>Folder</th><th>Files</th></tr></thead><tbody></tbody></table></div>');
+          [...g2].sort((a, b) => (a[0] === "\u0000") - (b[0] === "\u0000")).forEach(([dir, ps]) => {
+            const whole = dir === "\u0000";
+            const tr = node(`<tr><td class="mono dirc">${whole ? "Whole folders" : esc(dir || "/")}</td><td>${ps.map((p) => `<code class="fchipc">${esc(whole ? p : p.slice(dir.length))}</code>`).join(" ")}</td></tr>`);
+            tr.dataset.q = dir + " " + ps.join(" "); tb2.querySelector("tbody").appendChild(tr); rows2.push(tr);
+          });
+          if (rows2.length > 8) sec.secbody.appendChild(filterBar(rows2, `${items.length} paths`));
+          sec.secbody.appendChild(tb2); root.appendChild(sec); return;
+        }
+        const rows = []; const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Path</th>${extra.map((k) => `<th>${esc(k.replace(/_/g, " "))}</th>`).join("")}</tr></thead><tbody></tbody></table></div>`); const tb = table.querySelector("tbody");
+        const dirOf = (p) => { const t = p.replace(/\/$/, ""); const i = t.lastIndexOf("/"); return i < 0 ? "" : t.slice(0, i + 1); };
+        const groups = new Map(); items.forEach((x) => { const p = str(x.path || x.file); const dir = p.endsWith("/") ? "\u0000" : dirOf(p); if (!groups.has(dir)) groups.set(dir, []); groups.get(dir).push(x); });
+        groups.forEach((xs, dir) => {
+          if (groups.size > 1 || dir) tb.appendChild(node(`<tr class="dirrow"><td colspan="${1 + extra.length}">${dir === "\u0000" ? "Whole folders, everything inside" : `<code>${esc(dir || "/")}</code>`} <span class="hint">${xs.length}</span></td></tr>`));
+          xs.forEach((x) => {
+            const p = str(x.path || x.file); const isDir = p.endsWith("/"); const name = isDir ? p : p.slice(dir.length);
+            const tr = node(`<tr><td><span class="mono">${esc(name)}</span></td>${extra.map((k) => { const v = x[k]; const nm = /size|bytes/i.test(k) && typeof v === "number" ? kb(v) : str(v); return /sha|hash|digest/i.test(k) ? `<td><code title="${esc(nm)}">${esc(nm.length > 18 ? nm.slice(0, 14) + "…" : nm)}</code></td>` : `<td class="dim">${esc(nm)}</td>`; }).join("")}</tr>`);
+            tr.dataset.q = p; tb.appendChild(tr); rows.push(tr);
+          });
+        });
+        if (rows.length > 8) sec.secbody.appendChild(filterBar(rows, `${rows.length} paths`));
+        sec.secbody.appendChild(table); root.appendChild(sec);
+      });
+    });
+    const other = Object.fromEntries(Object.entries(j).filter(([k, v]) => v !== null && typeof v === "object" && !lists.some(([lk]) => lk === k)));
+    if (Object.keys(other).length) { const sec = section(d, n++, "Other fields", false, Object.keys(other).join(", ")); sec.secbody.appendChild(jsonTree(other)); root.appendChild(sec); }
+    return root;
+  }
+  /* any other JSON document: its tree */
+  function viewJsonGeneric(d) {
+    if (String(d.text).length > 90000) return null;
+    let j; try { j = JSON.parse(d.text); } catch { return null; }
+    if (!j || typeof j !== "object") return null;
+    const root = wrap(); const sec = section(d, 1, "Contents", true, Array.isArray(j) ? j.length + " entries" : Object.keys(j).length + " fields"); sec.secbody.appendChild(jsonTree(j)); root.appendChild(sec); return root;
+  }
+
+  /* --- personas: a section and a card of facts per persona --- */
+  function viewPersonas(d) {
+    const secs = splitHeadings(d.text, "##"); const people = secs.slice(1).filter((s) => s.title && (/^\|\s*(Field|Attribute|Item)\s*\|/im.test(s.body) || (s.body.match(/^\s*[-*]\s+\*\*[^*]+:\*\*/gm) || []).length >= 3));
+    if (!people.length) return null;
+    const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${people.length} personas</span></div>`);
+    let n = 10;
+    secs.slice(1).filter((s) => s.title).forEach((s) => {
+      const isP = people.includes(s); const m = s.title.match(/^(P\d+)\s*[.:·—–-]\s*(.*)$/);
+      const sec = section(d, n++, m ? `${m[1]} ${m[2]}` : s.title, isP || !QUIET.test(s.title));
+      if (m) regRef(m[1], sec, m[2]);
+      const body = smartMd(d, s.body);
+      if (isP) {
+        const dl = body.querySelector("dl.facts"); const role = dl && [...dl.children].find((x) => x.tagName === "DT" && /^role$/i.test(x.textContent.trim()));
+        if (role) { const dd = role.nextElementSibling; const p = node('<p class="desc role"></p>'); p.innerHTML = dd.innerHTML; role.remove(); dd.remove(); dl.before(p); }
+        const card = node('<div class="card"></div>'); while (body.firstChild) card.appendChild(body.firstChild); body.appendChild(card);
+      }
+      sec.secbody.appendChild(body); root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- questions: each question with its options, the chosen one marked, its context folded --- */
+  const OPT_A = /^\s*(?:[-*]\s+)?([A-HX])[.)]\s+(\S.*)$/; const OPT_B = /^\s*[-*]\s+\*\*([A-HX])\.\s+(\S.*)$/;
+  function parseQuestion(body) {
+    const ctx = [], opts = [], after = []; let ans = null, cur = null, phase = "ctx", fence = false;
+    mdLines(body).forEach((l) => {
+      if (/^```/.test(l)) fence = !fence;
+      let m;
+      if (!fence && (m = l.match(/^\[Answer\]:\s*(.*)$/))) { ans = m[1].trim(); cur = null; phase = "after"; return; }
+      if (!fence && phase !== "after" && ((m = l.match(OPT_B) && ["", l.match(OPT_B)[1], "**" + l.match(OPT_B)[2]]) || (m = l.match(OPT_A)))) { cur = { k: m[1], t: m[2] }; opts.push(cur); phase = "opts"; return; }
+      if (phase === "opts" && cur) { if (l.trim() === "") { cur = null; phase = "gap"; return; } if (/^\s+\S/.test(l) && !/^\s*[-*]\s/.test(l)) { cur.t += " " + l.trim(); return; } }
+      (phase === "ctx" ? ctx : after).push(l);
+    });
+    let letters = [], note = ans;
+    if (ans) { const m = ans.match(/^([A-HX](?:\s*(?:,|and|&)\s*[A-HX])*)(?:\s*[.:—–-]\s*([\s\S]*)|\s*)$/); if (m) { letters = m[1].split(/\s*(?:,|and|&)\s*/); note = (m[2] || "").trim(); } }
+    const pm = after.join("\n").match(/\*\*Proposed:?\*\*:?\s*([A-HX])\b/);
+    return { ctx: ctx.join("\n").trim(), opts, after: after.join("\n").trim(), ans, letters, note, proposed: pm ? pm[1] : "" };
+  }
+  function viewQuestions(d) {
+    if (!/^\[Answer\]:/m.test(d.text)) return null;
+    const secs = splitHeadings(d.text, "##"); const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    const qs = secs.slice(1).filter((s) => s.title && /^\[Answer\]:/m.test(s.body)); if (!qs.length) return null;
+    const answered = qs.filter((s) => parseQuestion(s.body).ans).length;
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${qs.length} questions</span><span class="chip ${answered === qs.length ? "ok" : "accent"}">${answered} answered</span>${answered < qs.length ? `<span class="chip warn">${qs.length - answered} open</span>` : ""}</div>`);
+    let n = 10;
+    secs.slice(1).filter((s) => s.title).forEach((s) => {
+      if (!qs.includes(s)) { const sec = section(d, n++, s.title, false); sec.secbody.appendChild(smartMd(d, s.body)); root.appendChild(sec); return; }
+      const q = parseQuestion(s.body); const mt = s.title.match(/^(?:Question\s+)?Q?(\d+)\s*[:.—–-]\s*(.*)$/i);
+      const sec = section(d, n++, mt ? `Q${mt[1]}: ${mt[2]}` : s.title, !q.ans || !q.letters.length || q.letters.includes("X"));
+      if (mt) regRef("Q" + mt[1], sec, mt[2]);
+      sec.querySelector("summary").insertBefore(node(`<span class="end">${q.ans ? (q.letters.length ? q.letters.map((k) => `<span class="chip ok">${esc(k)}</span>`).join(" ") : `<span class="chip ok">${esc(clip(q.ans, 30))}</span>`) : '<span class="chip warn">unanswered</span>'}</span>`), sec.querySelector(".cnt"));
+      const body = sec.secbody;
+      if (q.ctx) { const det = node('<details class="sub"><summary>Context</summary></details>'); det.appendChild(smartMd(d, q.ctx)); body.appendChild(det); }
+      if (q.opts.length) {
+        const ol = node('<ol class="opts"></ol>');
+        q.opts.forEach((o) => { const chosen = q.letters.includes(o.k); ol.appendChild(node(`<li class="${chosen ? "chosen" : ""}"><b>${esc(o.k)}</b><div>${inline(o.t)}${chosen ? ' <span class="chip ok">chosen</span>' : ""}${q.proposed === o.k ? ' <span class="chip muted">proposed</span>' : ""}</div></li>`)); });
+        body.appendChild(ol);
+      }
+      if (q.after && !(q.opts.length && /^\*\*Proposed:?\*\*/.test(q.after) && q.after.split("\n").length < 2 && false)) { const a = smartMd(d, q.after); a.classList.add("qafter"); body.appendChild(a); }
+      if (q.ans) body.appendChild(node(`<div class="answer"><b>Answer</b><span>${q.letters.length ? esc(q.letters.join(", ")) : ""}${q.letters.includes("X") || !q.letters.length ? ` ${inline(q.letters.length ? q.note : q.ans)}` : (q.note ? ` · ${inline(q.note)}` : "")}</span></div>`));
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- review copies: the findings table, the validation results as a grid, the summary as prose --- */
+  function findingsTable(rows) {
+    const wrapEl = node(`<div class="tablewrap"><table class="ftable"><thead><tr><th>ID</th><th>Severity</th><th>Where</th><th>Status</th></tr></thead><tbody>` + rows.map((r, i) => {
+      const open = isOpenStatus(r.status); const det = r.Finding || r.Where || r["Required action"] || r.Recheck;
+      return `<tr class="frow${open ? "" : " closed"}" data-i="${i}" data-ref="${esc(r.id)}" aria-expanded="${open && i < 3 ? "true" : "false"}"><td>${esc(r.id)}</td><td><span class="sev${isHi(r.severity) ? " hi" : ""}">${esc(r.severity)}</span></td><td class="where">${inline(r.where)}</td><td>${esc(r.status)}</td></tr>` +
+        (det ? `<tr class="fdet" data-for="${i}"${open && i < 3 ? "" : " hidden"}><td colspan="4"><dl>${r.Finding ? `<dt>Finding</dt><dd>${inline(r.Finding)}</dd>` : ""}${r.Where ? `<dt>Where</dt><dd>${inline(r.Where)}</dd>` : ""}${r["Required action"] ? `<dt>Required action</dt><dd>${inline(r["Required action"])}</dd>` : ""}${r.Recheck ? `<dt>Re-check</dt><dd>${inline(r.Recheck)}</dd>` : ""}</dl></td></tr>` : "");
+    }).join("") + `</tbody></table></div>`);
+    wrapEl.querySelectorAll("tr.frow").forEach((tr) => { regRef(tr.dataset.ref, tr, tr.textContent.trim().replace(/\s+/g, " ")); tr.addEventListener("click", () => {
+      const det = wrapEl.querySelector(`tr.fdet[data-for="${tr.dataset.i}"]`); if (!det) return;
+      det.hidden = !det.hidden; tr.setAttribute("aria-expanded", String(!det.hidden));
+    }); });
+    return wrapEl;
+  }
+  function viewReview(d) {
+    const subs = splitHeadings(d.text, "###"); const facts = factsOf(subs[0].body);
+    const fnd = subs.find((s) => /^findings?$/i.test(s.title)); if (!fnd && !facts.length) return null;
+    const root = wrap(); const get = (k) => (facts.find(([x]) => x.toLowerCase() === k) || [])[1] || "";
+    const verdict = get("verdict"); const t = fnd && mdTable(fnd.body);
+    const rows = t ? t.rows.map((r) => { const o = Object.fromEntries(t.head.map((h, i) => [h.toLowerCase(), r[i] || ""])); return { id: o.id || r[0], severity: o.severity || "", where: o.location || o.where || "", status: o.status || "", Finding: o.finding || "", Where: "", "Required action": o["required action"] || "" }; }) : [];
+    const quotes = {}; if (fnd) mdLines(fnd.body).forEach((l) => { const m = l.match(/^>\s*([A-Z]+-?\d+[\w.]*)\s+(.*)$/); if (m) quotes[m[1]] = m[2]; });
+    rows.forEach((r) => { if (quotes[r.id]) r.Recheck = quotes[r.id]; });
+    const open = rows.filter((r) => isOpenStatus(r.status)); const hi = open.filter((r) => isHi(r.severity)).length;
+    root.insertAdjacentHTML("beforeend", `<div class="vtools">${verdict ? `<span class="pill ${/^ready$/i.test(verdict) ? "ok" : "warn"}">${esc(verdict)}</span>` : ""}${get("reviewer") ? `<span class="pill quiet">${esc(get("reviewer"))}</span>` : ""}${get("iteration") ? `<span class="pill quiet">iteration ${esc(get("iteration"))}</span>` : ""}${get("date") ? `<span class="hint mono">${esc(get("date"))}</span>` : ""}${rows.length ? `<span class="pill ${open.length ? (hi ? "warn" : "accent") : "ok"}">${open.length ? open.length + " open" + (hi ? " · " + hi + " blocking" : "") : "no open findings"}</span><span class="hint">${rows.length} finding${rows.length === 1 ? "" : "s"}</span>` : ""}</div>`);
+    const extra = facts.filter(([k]) => !/^(verdict|reviewer|iteration|date)$/i.test(k)); if (extra.length) root.appendChild(factRow(extra));
+    let n = 10;
+    subs.slice(1).filter((s) => s.title).forEach((s) => {
+      const isF = s === fnd; const sec = section(d, n++, s.title, isF || !QUIET.test(s.title));
+      if (isF && rows.length) { sec.querySelector(".cnt").textContent = rows.length + (rows.length === 1 ? " finding" : " findings"); sec.secbody.appendChild(findingsTable(rows)); const rest = fnd.body.split("\n").filter((l) => !/^\s*\||^>/.test(l)).join("\n").trim(); if (rest) sec.secbody.appendChild(smartMd(d, rest)); }
+      else { const b = smartMd(d, s.body); sec.querySelector(".cnt").textContent = countOf(b); sec.secbody.appendChild(b); }
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- wireframes and mockups: ASCII screens framed, side by side when several fit; diagrams drawn --- */
+  const SCREEN_LANG = (l) => !/^(mermaid|ya?ml|json|swift|ts|tsx|typescript|javascript|js|bash|sh|shell|python|py|css|html|sql|toml|diff)$/i.test(String(l).trim());
+  function screensBody(d, title, text) {
+    const re = /```([^\n]*)\n([\s\S]*?)```[ \t]*(?:\n\s*<!--\s*Text fallback:\s*([\s\S]*?)-->)?/g;
+    const box = document.createElement("div"); let last = 0, m; let group = null; let md = "";
+    const flushMd = () => { if (md.trim()) box.appendChild(smartMd(d, md)); md = ""; };
+    const caption = () => { const lines = md.replace(/\s+$/, "").split("\n"); const lastLine = (lines[lines.length - 1] || "").trim(); const c = lastLine.match(/^(?:#{3,5}\s+|\*\*)(.{2,90}?)(?:\*\*)?:?$/); if (c) { lines.pop(); md = lines.join("\n"); return c[1].replace(/\*\*/g, ""); } return ""; };
+    let count = 0; let total = 0; { const r2 = new RegExp(re.source, "g"); let q; while ((q = r2.exec(text))) if (SCREEN_LANG(q[1]) && !/^mermaid$/i.test(q[1].trim())) total++; }
+    while ((m = re.exec(text))) {
+      md += text.slice(last, m.index); last = m.index + m[0].length;
+      if (/^mermaid$/i.test(m[1].trim())) { flushMd(); group = null; box.appendChild(diagramBox(m[2])); continue; }
+      if (!SCREEN_LANG(m[1])) { md += m[0]; continue; }
+      const cap = caption(); if (md.trim()) { flushMd(); group = null; }
+      if (!group) { group = node('<div class="screens"></div>'); box.appendChild(group); }
+      count++;
+      const fig = node('<figure class="screen"><figcaption></figcaption><pre></pre></figure>');
+      fig.querySelector("figcaption").textContent = cap || (total > 1 ? "Screen " + count : title);
+      fig.querySelector("pre").textContent = m[2].replace(/\s+$/, "");
+      if (m[3]) { const det = node('<details class="sub"><summary>Describe in words</summary></details>'); det.appendChild(mdDiv(m[3].trim())); fig.appendChild(det); }
+      group.appendChild(fig);
+    }
+    md += text.slice(last); flushMd();
+    return { box, count };
+  }
+  function viewScreens(d) {
+    if (!/```/.test(d.text)) return viewStructured(d, {});
+    const secs = splitHeadings(d.text, "##"); const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    let n = 10, screens = 0;
+    const built = secs.slice(1).filter((s) => s.title).map((s) => { const r = screensBody(d, s.title, foldFallbacksKeep(s.body)); screens += r.count; return [s, r]; });
+    if (!screens && !/```mermaid/.test(d.text)) return viewStructured(d, {});
+    if (screens) root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${screens} screens in ${built.filter(([, r]) => r.count).length} sections</span></div>`);
+    built.forEach(([s, r]) => {
+      const sec = section(d, n++, s.title, r.count > 0 || !QUIET.test(s.title) && s.body.length < 1800, r.count ? r.count + (r.count === 1 ? " screen" : " screens") : countOf(r.box));
+      const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
+      sec.secbody.appendChild(r.box); root.appendChild(sec);
+    });
+    return root;
+  }
+  const foldFallbacksKeep = (t) => t; /* fallbacks stay as comments here: screensBody reads them next to their screen */
+
+  /* --- contracts: every `## C1 · …` / `### C1 — …` entry; a YAML block becomes an operations table, a type sheet a table per type, code stays code --- */
+  function viewContracts(d) {
+    const isEntry = (t) => /^[CE]\d+\b/.test(t);
+    const secs = flatSections(d.text, (h2, h3) => isEntry(h3)); if (!secs.some((s) => isEntry(s.title))) return null;
+    const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    let n = 10;
+    secs.slice(1).forEach((s) => {
+      if (!s.title) return;
+      const isC = isEntry(s.title); const sec = section(d, n++, s.title, isC);
+      if (s.group) sec.querySelector("summary").insertBefore(node(`<span class="chip muted">${esc(s.group)}</span>`), sec.querySelector(".cnt"));
+      if (isC) regRef(s.title.match(/^([CE]\d+)/)[1], sec, s.title);
+      const parts = []; let last = 0; const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m; const body = s.body;
+      while ((m = re.exec(body))) { if (m.index > last) parts.push({ md: body.slice(last, m.index) }); let y = null; if (typeof jsyaml !== "undefined") { try { y = jsyaml.load(m[1]); } catch { try { y = jsyaml.load(yamlSafe(m[1])); } catch { y = null; } } } parts.push({ yaml: m[1], data: y }); last = m.index + m[0].length; }
+      if (last < body.length) parts.push({ md: body.slice(last) });
+      parts.forEach((p) => {
+        if (p.md !== undefined) { if (p.md.trim()) sec.secbody.appendChild(smartMd(d, p.md, { foldCode: 60 })); return; }
+        const y = p.data; let done = false;
+        if (y && y.paths && typeof y.paths === "object") {
+          const ops = []; Object.entries(y.paths).forEach(([path, methods]) => { if (!methods || typeof methods !== "object") return; Object.entries(methods).forEach(([method, op]) => { if (!/^(get|post|put|patch|delete|head|options)$/i.test(method) || !op || typeof op !== "object") return; ops.push({ method: method.toUpperCase(), path, id: str(op.operationId || ""), summary: str(op.summary || ""), codes: op.responses ? Object.keys(op.responses) : [] }); }); });
+          if (ops.length) { sec.secbody.insertAdjacentHTML("beforeend", `<p class="hint">${ops.length} operations${y.info && y.info.title ? " · " + esc(str(y.info.title)) : ""}</p><div class="tablewrap"><table class="grid"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Summary</th><th>Responses</th></tr></thead><tbody>${ops.map((o) => `<tr data-op="${esc(o.id)}"><td><span class="chip ${/GET/.test(o.method) ? "ok" : /DELETE/.test(o.method) ? "warn" : "accent"}">${esc(o.method)}</span></td><td class="mono">${esc(o.path)}</td><td class="id">${esc(o.id)}</td><td>${inline(o.summary)}</td><td class="dim">${esc(o.codes.join(" "))}</td></tr>`).join("")}</tbody></table></div>`); sec.secbody.querySelectorAll("tr[data-op]").forEach((tr) => regRef(tr.dataset.op, tr, tr.textContent.trim().replace(/\s+/g, " "))); done = true; }
+        }
+        const schemas = y && y.components && y.components.schemas;
+        if (schemas && typeof schemas === "object" && Object.keys(schemas).length) { sec.secbody.appendChild(schemaCards(schemas)); done = true; }
+        if (!done && y && typeof y === "object" && !Array.isArray(y) && Object.keys(y).length && Object.values(y).every((v) => v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every((f) => typeof f !== "object" || f === null || Array.isArray(f)))) {
+          const notes = {}; let type = ""; p.yaml.split("\n").forEach((l) => { const t = l.match(/^([A-Za-z_][\w]*)\s*:/); if (t) { type = t[1]; return; } const mm = l.match(/^\s+([A-Za-z_][\w]*)\s*:\s*(.*?)\s*#\s*(.*)$/); if (mm) notes[type + "." + mm[1]] = mm[3]; });
+          sec.secbody.insertAdjacentHTML("beforeend", Object.entries(y).map(([type, fields]) => `<div class="card flat" style="margin:6px 0 10px" data-type="${esc(type)}"><div class="chead"><h4>${esc(type)}</h4></div><div class="tablewrap"><table class="grid"><tbody>${Object.entries(fields).map(([f, t]) => `<tr><td class="id">${esc(f)}</td><td class="ty">${esc(str(t))}</td><td class="dim">${inline(notes[type + "." + f] || "")}</td></tr>`).join("")}</tbody></table></div></div>`).join(""));
+          sec.secbody.querySelectorAll("[data-type]").forEach((c) => regRef(c.dataset.type, c, "")); done = true;
+        }
+        if (!done && y && typeof y === "object") { sec.secbody.appendChild(jsonTree(y)); done = true; }
+        if (!done) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = p.yaml; sec.secbody.appendChild(pre); }
+      });
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
   const VIEWS = [
     { key: /^entities$/, render: viewEntities },
     { key: /^rules$/, render: viewRules },
-    { key: /^(components|logical-components)$/, render: viewComponents },
+    { key: /^(components|logical-components|frontend-components)$/, render: viewComponentsAny },
     { key: /^unit-of-work-dependency$/, render: viewUnitDeps },
     { key: /^unit-of-work-story-map$/, render: viewStoryMap },
     { key: /^unit-of-work$/, render: viewUnits },
     { key: /^(stories|user-stories)$/, render: viewStories },
-    { key: /^(requirements|[a-z]+-requirements)$/, render: viewRequirements },
+    { key: /^requirements$/, render: viewRequirements },
     { key: /^decisions$/, render: viewDecisions },
     { key: /^bolt-plan$/, render: viewBolts },
     { key: /^contract-summary$/, render: viewContracts },
     { key: /^(traceability|cross-unit-traceability)$/, render: viewTraceability },
+    { key: /^functional-spec$/, render: viewFunctionalSpec },
+    { key: /^(performance|security|scalability|reliability|observability)-design$/, render: viewNfrDesign },
+    { key: /^tech-stack-decisions$/, render: viewTechStack },
+    { key: /^code-generation-plan$/, render: viewCodePlan },
+    { key: /^source-manifest$/, render: viewManifest },
+    { key: /^code-summary$/, render: viewCodeSummary },
+    { key: /^personas$/, render: viewPersonas },
+    { key: /^(mockups|wireframes|rough-mockups|refined-mockups)$/, render: viewScreens },
+    { key: /^((performance|security|scalability|reliability|observability)-requirements|infrastructure-specification|monitoring-design|cicd-pipeline|[a-z]+-test-instructions|build-instructions|build-and-test-summary|test-results|ci-config|quality-gates|user-stories-assessment|feasibility-assessment|scope-document|intent-statement|stakeholder-map|intent-backlog|constraint-register|raid-log|team-practices|discovered-rules|evidence|team-allocation|risk-and-sequencing-rationale|external-dependency-map|user-flow|interaction-spec|design-system-mapping|accessibility-checklist)$/, render: (d) => viewStructured(d) },
   ];
-  function viewFor(d) { if (d.kind === "questions" || d.kind === "review") return null; const k = keyOf(d); return VIEWS.find((v) => v.key.test(k)) || null; }
+  function viewFor(d) {
+    const k = keyOf(d);
+    if (d.kind === "questions" || /-questions$/.test(k)) return { render: viewQuestions };
+    if (d.kind === "review" || /^review-\d+$/.test(k)) return { render: viewReview };
+    const hit = VIEWS.find((v) => v.key.test(k)); if (hit) return hit;
+    if (d.kind === "json") return { render: viewJsonGeneric };
+    return null;
+  }
 
   /* ---------- the outline ---------- */
   function paintRail(docs) {
