@@ -2,7 +2,8 @@ name: regression
 
 # Gates for the plugins. worktree-cleanup: its regression suite. model-fit, project-panel and ask-guard:
 # the Claude Code CLI validates the manifests and the mods, then runs each mod's own tests. Every plugin: versions
-# are consistent, and bumped on PRs that change what users receive (scripts/check-versions.py).
+# are consistent, and bumped on PRs that change what users receive (scripts/check-versions.py); so is the
+# marketplace's own version, which names the tag tag-main.yml puts on main.
 #
 # The worktree-cleanup suite is the only gate on that code. The plugin's own history is the argument
 # for running it here: two of the three defects in its second commit silently disabled

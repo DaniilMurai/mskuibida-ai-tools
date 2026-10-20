@@ -22,7 +22,7 @@ class Repo:
         self.git("config", "user.email", "t@example.com")
         self.git("config", "user.name", "T")
         self.git("config", "commit.gpgsign", "false")
-        self.write(".claude-plugin/marketplace.json", {"name": "m", "plugins": []})
+        self.write(".claude-plugin/marketplace.json", {"name": "m", "version": "1.0.0", "plugins": []})
 
     def git(self, *args):
         subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True)
@@ -48,6 +48,17 @@ class Repo:
     def set_version(self, name, version):
         self.write(f"plugins/{name}/.claude-plugin/plugin.json", {"name": name, "version": version})
         self.set_market(name, version)
+
+    def market(self):
+        return json.loads((self.root / ".claude-plugin/marketplace.json").read_text())
+
+    def set_market_version(self, version):
+        """Set the marketplace's top-level version; None removes it."""
+        market = self.market()
+        market.pop("version", None)
+        if version is not None:
+            market["version"] = version
+        self.write(".claude-plugin/marketplace.json", market)
 
     def commit(self, message="c"):
         self.git("add", "-A")
@@ -94,12 +105,20 @@ class CheckVersionsTest(unittest.TestCase):
 
     def test_plugin_dir_without_marketplace_entry_fails(self):
         self.repo.add_plugin("orphan")
-        self.repo.write(".claude-plugin/marketplace.json", {"name": "m", "plugins": []})
+        self.repo.write(".claude-plugin/marketplace.json", {"name": "m", "version": "1.0.0", "plugins": []})
         self.assertFails(["orphan", "no entry"])
 
     def test_marketplace_entry_without_plugin_json_fails(self):
         self.repo.set_market("ghost", "1.0.0")
         self.assertFails(["ghost", "no plugins/ghost"])
+
+    def test_marketplace_without_version_fails(self):
+        self.repo.set_market_version(None)
+        self.assertFails(["marketplace", "top-level version", "not valid semver"])
+
+    def test_marketplace_with_invalid_version_fails(self):
+        self.repo.set_market_version("v1")
+        self.assertFails(["marketplace", "'v1'", "not valid semver"])
 
     # bump guard
 
@@ -115,6 +134,7 @@ class CheckVersionsTest(unittest.TestCase):
     def test_code_change_with_bump_is_ok(self):
         self.edit_code()
         self.repo.set_version("alpha", "1.0.1")
+        self.repo.set_market_version("1.0.1")
         self.repo.commit("bump")
         self.assertOk("--base", "main")
 
@@ -163,7 +183,64 @@ class CheckVersionsTest(unittest.TestCase):
 
     def test_new_plugin_is_ok(self):
         self.repo.add_plugin("beta")
+        self.repo.set_market_version("1.1.0")
         self.repo.commit("new")
+        self.assertOk("--base", "main")
+
+    # marketplace bump guard
+
+    def test_plugin_bump_without_marketplace_bump_fails(self):
+        self.edit_code()
+        self.repo.set_version("alpha", "1.0.1")
+        self.repo.commit("bump plugin only")
+        self.assertFails(["marketplace", "plugin versions changed: alpha", "still 1.0.0",
+                          "bump the top-level version in .claude-plugin/marketplace.json"],
+                         "--base", "main")
+
+    def test_new_plugin_without_marketplace_bump_fails(self):
+        self.repo.add_plugin("beta")
+        self.repo.commit("new")
+        self.assertFails(["marketplace", "plugin versions changed: beta"], "--base", "main")
+
+    def test_removed_plugin_without_marketplace_bump_fails(self):
+        self.repo.write(".claude-plugin/marketplace.json", {"name": "m", "version": "1.0.0", "plugins": []})
+        self.repo.git("rm", "-rq", "plugins/alpha")
+        self.repo.commit("remove")
+        self.assertFails(["marketplace", "plugin versions changed: alpha"], "--base", "main")
+
+    def test_description_change_without_marketplace_bump_fails(self):
+        market = self.repo.market()
+        market["description"] = "new words"
+        self.repo.write(".claude-plugin/marketplace.json", market)
+        self.repo.commit("describe")
+        self.assertFails(["marketplace", "its entries changed", "still 1.0.0"], "--base", "main")
+
+    def test_lowered_marketplace_version_fails(self):
+        self.edit_code()
+        self.repo.set_version("alpha", "1.0.1")
+        self.repo.set_market_version("0.9.0")
+        self.repo.commit("lower")
+        self.assertFails(["marketplace", "1.0.0 -> 0.9.0", "not higher"], "--base", "main")
+
+    def test_marketplace_bump_alone_is_ok(self):
+        self.repo.set_market_version("1.0.1")
+        self.repo.commit("bump marketplace only")
+        self.assertOk("--base", "main")
+
+    def test_change_outside_plugins_needs_no_marketplace_bump(self):
+        self.repo.write("README.md", "docs\n")
+        self.repo.write("scripts/x.py", "pass\n")
+        self.repo.commit("repo docs and scripts")
+        self.assertOk("--base", "main")
+
+    def test_base_without_marketplace_version_needs_only_a_valid_one(self):
+        # The PR that introduces the marketplace version has nothing to bump from.
+        self.repo.git("checkout", "-q", "main")
+        self.repo.set_market_version(None)
+        self.repo.commit("no version")
+        self.repo.git("checkout", "-q", "-B", "intro")
+        self.repo.set_market_version("1.0.0")
+        self.repo.commit("introduce")
         self.assertOk("--base", "main")
 
     def test_unrelated_plugin_change_is_not_blamed_on_others(self):
