@@ -10,8 +10,9 @@ The order, for the session that opens a gate:
  2. This hook notices the write of a `gates` row for the stage (PostToolUse ArtifactData).
  3. Until that has happened, the Approval question (header `Approval`, options such as Approve) and the
     approved or rejected report are refused (PreToolUse). The page's link `<artifact url>#<gate id>` goes
-    to the developer in a message of its own before the question; a question that carries it is refused,
-    so the dialog stays readable.
+    to the developer in a message of its own before the question: the question is refused until a message
+    of the assistant in the session's transcript (the `transcript_path` of the hook input) carries that
+    link, and a question that carries the link itself is refused, so the dialog stays readable.
  4. A write that sets `status: "decided"`, or carries `decision` or `notes`, on a `gates` row is refused: those
     belong to the developer, who writes them in the page.
  5. When the developer answers Request Changes, the assistant is told to read the notes they left in the page.
@@ -423,7 +424,43 @@ def check_gate_rows(tool_input):
                           "developer in the page. Never write them, and never update a row you wrote.")
 
 
-def guard_question(state, project, questions):
+def link_of(pub):
+    """The link the developer gets: `<artifact url>#<gate id>`, the `#<gate id>` alone when the url is unknown."""
+    url = str(pub.get("url", "")).strip()
+    return f"{url}#{pub.get('id', '')}"
+
+
+def link_sent(event, pub):
+    """True when a message of the assistant in this session's transcript carries the page's link. Tool results,
+    the developer's prompts and subagent transcripts do not count. A transcript that cannot be read refuses."""
+    gate_id, needle = str(pub.get("id", "")), link_of(pub)
+    path = event.get("transcript_path")
+    if not path or not gate_id:
+        raise Refusal("the session transcript is not given, so whether the developer got the page's link cannot "
+                      "be checked.")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if gate_id not in line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(entry, dict) or entry.get("type") != "assistant" or entry.get("isSidechain"):
+                    continue
+                content = (entry.get("message") or {}).get("content") if isinstance(entry.get("message"), dict) else None
+                blocks = content if isinstance(content, list) else [{"type": "text", "text": content}]
+                for block in blocks:
+                    if isinstance(block, dict) and block.get("type") == "text" and needle in str(block.get("text", "")):
+                        return True
+    except OSError as exc:
+        raise Refusal(f"the session transcript cannot be read ({exc}), so whether the developer got the page's "
+                      "link cannot be checked.") from None
+    return False
+
+
+def guard_question(event, state, project, questions):
     for q in questions:
         stage, unit, opened = target_of(state, project)
         if not stage:
@@ -434,7 +471,11 @@ def guard_question(state, project, questions):
         if (url and url in text) or re.search(r"claude\.ai/artifact/|#[0-9]{6}-[a-z0-9.-]+-\d{8}T\d{4}\b", text, re.I):
             raise Refusal("The page's link goes to the developer in a message of its own, before the question; the "
                           "question text carries no link. Send the link "
-                          f"{url}#{pub.get('id', '')} as a message, then ask the engine's question as it is.")
+                          f"{link_of(pub)} as a message, then ask the engine's question as it is.")
+        if not link_sent(event, pub):
+            raise Refusal("The developer gets the page's link before the question, and no message of yours carries "
+                          f"it yet. Send `{link_of(pub)}` in a message of its own (the `**Read:**` line of the "
+                          "completion message), then ask the engine's question as it is, with no link in it.")
 
 
 def guard_report(state, project, call):
@@ -452,7 +493,7 @@ def pre(event, project):
     if tool == "AskUserQuestion":
         gates = [q for q in questions_of(ti) if is_gate(q)]
         if gates:
-            guard_question(load(event), project, gates)
+            guard_question(event, load(event), project, gates)
         return
     if tool == "Bash":
         closing = [c for c in engine_calls(ti.get("command", "")) if c["kind"] == "report" and c["result"] in CLOSING]
@@ -535,7 +576,13 @@ def record_artifact(project, state, tool_input, response):
             continue
         for stage, unit in candidates:
             if id_matches(doc_id, intent, stage, unit):
-                state["published"][make_key(stage, unit)] = {"id": doc_id, "url": str(url or "").rstrip("/"), "at": time.time()}
+                pub = {"id": doc_id, "url": str(url or "").rstrip("/"), "at": time.time()}
+                state["published"][make_key(stage, unit)] = pub
+                if not changed:
+                    say("PostToolUse", f"gates/{doc_id} is published. Send the developer the link `{link_of(pub)}` in "
+                                       "a message of its own (the `**Read:**` line of the completion message), then "
+                                       "ask the engine's Approval question with no link in it; the question is "
+                                       "refused until that message was sent.")
                 changed = True
                 break
     return changed
