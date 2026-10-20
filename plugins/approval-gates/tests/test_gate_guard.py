@@ -58,9 +58,11 @@ class Case(unittest.TestCase):
     def record(self):
         return os.path.join(self.project, "aidlc", "spaces", "default", "intents", INTENT)
 
-    def run_hook(self, event, project=None, session="s1", raw=None):
+    def run_hook(self, event, project=None, session="s1", raw=None, cwd=None):
         env = dict(os.environ, APPROVAL_GATES_DIR=self.state, CLAUDE_PROJECT_DIR=project or self.project)
         event = dict({"transcript_path": self.transcript}, **event, session_id=session)
+        if cwd:
+            event["cwd"] = cwd
         done = subprocess.run([sys.executable, HOOK], input=raw if raw is not None else json.dumps(event),
                               capture_output=True, text=True, env=env, timeout=30)
         return done.returncode, done.stdout, done.stderr
@@ -566,6 +568,57 @@ class TestRelease(Case):
         self.assertIsNotNone(self.state_of())
 
 
+class TestWorktrees(Case):
+    """In a git worktree session CLAUDE_PROJECT_DIR is the main checkout, whose per-clone pointers are missing."""
+
+    def main_checkout(self):
+        main = os.path.join(self.tmp, "main")
+        shutil.copytree(FIXTURE, main)
+        os.remove(os.path.join(main, "aidlc", "active-space"))
+        os.remove(os.path.join(main, "aidlc", "spaces", "default", "intents", "active-intent"))
+        shutil.rmtree(os.path.join(main, "aidlc", "spaces", "default", "intents", INTENT, ".aidlc-engine"))
+        return main
+
+    def whole_gate(self, **kw):
+        self.open_gate(**kw)
+        self.publish(**kw)
+        self.assertEqual(self.ask("User Stories complete. How would you like to proceed?", **kw)[0], 0)
+        cmd = report("approved", extra=' --user-input "Approve"')
+        self.assertEqual(self.pre("Bash", {"command": cmd}, **kw)[0], 0)
+        self.assertEqual(self.post("Bash", {"command": cmd}, {"stdout": "ok"}, **kw)[0], 0)
+        state = self.state_of()
+        self.assertIsNone(state["pending"])
+        self.assertIn("user-stories", state["published"])
+
+    def test_the_working_directory_wins_over_the_main_checkout(self):
+        self.whole_gate(project=self.main_checkout(), cwd=self.project)
+
+    def test_a_working_directory_below_the_project_walks_up(self):
+        self.whole_gate(project=self.main_checkout(), cwd=os.path.join(self.project, "aidlc", "spaces"))
+
+    def test_a_working_directory_outside_any_project_falls_back(self):
+        self.whole_gate(cwd=self.tmp)
+
+    def test_a_publish_with_no_known_stage_is_kept_by_its_id(self):
+        main = self.main_checkout()
+        gate_id = self.publish(f"{INTENT}-user-stories-20260101T0900", project=main, cwd=main)
+        self.assertEqual(list(self.state_of()["published"]), ["id:" + gate_id])
+        self.assertIn(f"Send the developer the link `{URL}#{gate_id}`", self.context(self.last_publish))
+        cmd = report("approved", extra=' --user-input "Approve"')
+        self.assertEqual(self.pre("Bash", {"command": cmd}, project=main, cwd=main)[0], 0)
+        code, _out, err = self.pre("Bash", {"command": report("approved", stage="delivery-planning")}, project=main, cwd=main)
+        self.assertEqual(code, 2)
+        self.assertIn("Publish them first", err)
+        code, _out, err = self.pre("Bash", {"command": report("approved", unit="u1-core")}, project=main, cwd=main)
+        self.assertEqual(code, 2)
+
+    def test_a_row_with_a_foreign_id_is_not_kept(self):
+        main = self.main_checkout()
+        call = self.batch("random-row")
+        self.post("ArtifactData", call, {"ok": True}, project=main, cwd=main)
+        self.assertIsNone(self.state_of())
+
+
 class TestFailingOpen(Case):
     def test_malformed_stdin(self):
         for raw in ("", "not json", "[1, 2]", "null", "{"):
@@ -708,7 +761,7 @@ class TestHooksJson(unittest.TestCase):
     def test_every_command_skips_outside_aidlc_and_runs_the_hook(self):
         for event, groups in self.hooks.items():
             command = groups[0]["hooks"][0]["command"]
-            self.assertTrue(command.startswith('[ -d "${CLAUDE_PROJECT_DIR:-.}/aidlc/spaces" ] || exit 0;'), event)
+            self.assertTrue(command.startswith('[ -d "${CLAUDE_PROJECT_DIR:-.}/aidlc/spaces" ] || [ -d ./aidlc/spaces ] || exit 0;'), event)
             self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/hooks/gate_guard.py"', command)
             self.assertIn("command -v python3", command)
 
