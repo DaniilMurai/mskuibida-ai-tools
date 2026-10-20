@@ -39,7 +39,8 @@ stage has a reviewer:
    fit one batch, send the files named in `batches`, in order. If a write is refused because the id exists,
    run the script again a minute later: an id is a time stamp.
 4. Present the gate as the protocol says. The completion message gets the line
-   `**Read:** <artifact url>#<id>` next to the `**Review:**` line; that message is where the link lives.
+   `**Read:** <artifact url>#<id>` next to the `**Review:**` line; that message is where the link lives,
+   and it is sent first: the guard refuses the question until a message of yours carries the link.
    Then ask the engine's question exactly as the protocol words it ("Delivery Planning complete. How
    would you like to proceed?"): no link, no URL and no gate id in the question text, so the dialog stays
    readable. The options stay the engine's. End the turn.
@@ -64,5 +65,6 @@ and never update a row: each presentation is a fresh id.
 ## 5. The guard
 
 `hooks/gate_guard.py` refuses the Approval question and the approved, rejected or accepted report until
-a `gates` row for the stage was written in this session after the gate was opened, and refuses a question
-that carries the page's link: the link goes in a message of its own. The developer clears it with `/approval-gates:release`.
+a `gates` row for the stage was written in this session after the gate was opened and a message of yours
+(in the session's transcript) carries its link `<artifact url>#<id>`, and refuses a question that carries
+the link itself: the link goes in a message of its own. The developer clears it with `/approval-gates:release`.

@@ -50,6 +50,8 @@ class Case(unittest.TestCase):
         self.project = os.path.join(self.tmp, "project")
         shutil.copytree(FIXTURE, self.project)
         self.state = os.path.join(self.tmp, "state")
+        self.transcript = os.path.join(self.tmp, "transcript.jsonl")
+        open(self.transcript, "w", encoding="utf-8").close()  # the session's transcript exists before any hook runs
         self.counter = 0
 
     @property
@@ -58,7 +60,7 @@ class Case(unittest.TestCase):
 
     def run_hook(self, event, project=None, session="s1", raw=None):
         env = dict(os.environ, APPROVAL_GATES_DIR=self.state, CLAUDE_PROJECT_DIR=project or self.project)
-        event = dict(event, session_id=session)
+        event = dict({"transcript_path": self.transcript}, **event, session_id=session)
         done = subprocess.run([sys.executable, HOOK], input=raw if raw is not None else json.dumps(event),
                               capture_output=True, text=True, env=env, timeout=30)
         return done.returncode, done.stdout, done.stderr
@@ -79,6 +81,15 @@ class Case(unittest.TestCase):
             return None
         with open(path, encoding="utf-8") as f:
             return json.load(f)
+
+    def said(self, text, kind="assistant", block="text", sidechain=False):
+        """Append one transcript line, shaped as Claude Code writes them: one content block per line."""
+        content = [{"type": block, "text": text}] if block == "text" else [{"type": block, "name": "X", "input": {"q": text}}]
+        with open(self.transcript, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"type": kind, "isSidechain": sidechain, "uuid": "u%d" % self.counter,
+                                "timestamp": "2026-01-01T09:00:00.000Z",
+                                "message": {"role": kind, "content": content}}) + "\n")
+        self.counter += 1
 
     def context(self, out):
         self.assertTrue(out.strip(), "the hook printed nothing")
@@ -108,13 +119,17 @@ class Case(unittest.TestCase):
                            "file_path": path})
         return {"action": "batch", "url": URL, "writes": writes}
 
-    def publish(self, gate_id=None, **kw):
+    def publish(self, gate_id=None, link=True, **kw):
+        """Publish the gate's rows and, unless link=False, send the developer the link as the skill does."""
         gate_id = gate_id or f"{INTENT}-user-stories-20260101T0900"
         call = self.batch(gate_id)
         code, _out, err = self.pre("ArtifactData", call, **kw)
         self.assertEqual(code, 0, err)
-        code, _out, err = self.post("ArtifactData", call, {"ok": True}, **kw)
+        code, out, err = self.post("ArtifactData", call, {"ok": True}, **kw)
         self.assertEqual(code, 0, err)
+        self.last_publish = out
+        if link:
+            self.said(f"**Review:** approved (iteration 1)\n**Read:** {URL}#{gate_id}")
         return gate_id
 
     def ask(self, text, **kw):
@@ -225,6 +240,54 @@ class TestTheQuestion(Case):
             self.assertEqual(code, 2, text)
             self.assertIn("in a message of its own", err)
 
+    def test_the_question_waits_for_the_link_message(self):
+        self.open_gate()
+        gate_id = self.publish(link=False)
+        self.assertIn(f"Send the developer the link `{URL}#{gate_id}`", self.context(self.last_publish))
+        code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
+        self.assertEqual(code, 2)
+        self.assertIn("no message of yours carries it yet", err)
+        self.assertIn(f"`{URL}#{gate_id}`", err)
+        self.said(f"Ready to review.\n\n**Read:** {URL}#{gate_id}")
+        code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
+        self.assertEqual((code, err), (0, ""))
+
+    def test_the_link_counts_only_in_a_message_of_the_assistant(self):
+        self.open_gate()
+        gate_id = self.publish(link=False)
+        link = f"{URL}#{gate_id}"
+        self.said(link, kind="user")                       # the developer typed it
+        self.said(link, kind="assistant", block="tool_use")  # inside a tool call
+        self.said(link, sidechain=True)                    # a subagent said it
+        self.said(f"{URL}#{INTENT}-user-stories-20250101T0000")  # an older gate's link
+        self.said("not json", kind="assistant")
+        with open(self.transcript, "a", encoding="utf-8") as f:
+            f.write("{broken\n")
+        self.assertEqual(self.ask("User Stories complete. How would you like to proceed?")[0], 2)
+        self.said(f"[Read the documents]({link})")
+        self.assertEqual(self.ask("User Stories complete. How would you like to proceed?")[0], 0)
+
+    def test_a_fresh_gate_needs_its_own_link(self):
+        self.open_gate()
+        self.publish()
+        self.post("Bash", {"command": report("rejected", extra=' --user-input "Request Changes" --reason "fix"')})
+        self.open_gate(result="revised")
+        newer = self.publish(f"{INTENT}-user-stories-20260102T1000", link=False)
+        code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
+        self.assertEqual(code, 2)
+        self.assertIn(f"`{URL}#{newer}`", err)
+
+    def test_without_a_transcript_the_question_cannot_be_checked(self):
+        self.open_gate()
+        self.publish()
+        event = {"hook_event_name": "PreToolUse", "tool_name": "AskUserQuestion",
+                 "tool_input": gate_question("Stage complete. How would you like to proceed?")}
+        for path in (None, os.path.join(self.tmp, "missing.jsonl")):
+            code, _out, err = self.run_hook(dict(event, transcript_path=path))
+            self.assertEqual(code, 2, path)
+            self.assertIn("cannot be checked", err)
+            self.assertIn("/approval-gates:release", err)
+
     def test_documents_published_before_the_gate_opened_do_not_count(self):
         self.open_gate()
         gate_id = self.publish()
@@ -234,8 +297,8 @@ class TestTheQuestion(Case):
         code, _out, err = self.ask(f"Read {URL}#{gate_id}")
         self.assertEqual(code, 2)
         self.assertIn("Publish them first", err)
-        newer = self.publish(f"{INTENT}-user-stories-20260102T1000")
-        self.assertEqual(self.ask(f"Read {URL}#{newer}")[0], 0)
+        self.publish(f"{INTENT}-user-stories-20260102T1000")
+        self.assertEqual(self.ask("Stage complete. How would you like to proceed?")[0], 0)
 
     def test_without_an_open_gate_the_current_stage_decides(self):
         code, _out, err = self.ask("Anything to add?")

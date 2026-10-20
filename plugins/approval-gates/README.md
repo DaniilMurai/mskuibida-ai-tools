@@ -52,14 +52,16 @@ recognised is Markdown with every H2 a collapsible section.
 ## What the agent does
 
 After `aidlc engine orchestrate report --result awaiting-approval` (or `revised`), it runs
-`gate_bundle.py`, writes the rows with one `ArtifactData` batch, and asks the Approval question with
-`<artifact url>#<gate id>` in it. After Request Changes it reads `gates/<id>` and quotes your notes in
+`gate_bundle.py`, writes the rows with one `ArtifactData` batch, sends you `<artifact url>#<gate id>` in a
+message of its own, and then asks the Approval question. After Request Changes it reads `gates/<id>` and quotes your notes in
 the `--reason` of the rejected report. It never writes your notes, and never updates a row.
 
 ## What the hook refuses
 
 - The Approval question (header `Approval`, an option such as Approve, Approve Plan or Accept as-is, no
   pull request named) until a `gates` row for the stage was written after the gate opened.
+- The same question until a message of the agent in the session's transcript carries the page's link
+  `<artifact url>#<gate id>`: you get the link before the question, every time.
 - The same question with the page's link in its text: the link goes in a message of its own, so the dialog stays readable.
 - `aidlc engine orchestrate report … --result approved|rejected|accepted` before that row exists.
 - A write to `gates/<id>` that carries `notes` (or a decision field: the page records none).

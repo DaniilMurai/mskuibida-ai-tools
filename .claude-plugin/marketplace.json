@@ -51,7 +51,7 @@
       "name": "approval-gates",
       "source": "./plugins/approval-gates",
       "description": "For AI-DLC projects: at every approval gate the stage's documents, the review brief and the completion summary become one page in the developer's private artifact, linked from the gate question, with a purpose-built view per document kind (entities, rules, components, units, stories, requirements, decisions, contracts, bolts, traceability) and ids linked across documents; a hook refuses the Approval question and the approved or rejected report until the page exists. Notes left in the page come back to the agent.",
-      "version": "1.2.1"
+      "version": "1.2.2"
     },
     {
       "name": "review-findings",
