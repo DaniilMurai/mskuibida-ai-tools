@@ -393,22 +393,20 @@ describe('links', () => {
     for (const [name, columns] of WIDTHS) {
       test(`a gate with an href links its title in the card and in Attention at ${name} on ${surface}`, async ($, on) => {
         const { ui } = await draw($, on, scenarioModel(), surface, columns)
-        const links = (await (ui as Probe).findAll({ type: 'Link' })).filter(link => link.props.label === 'PR #33 not merged')
-        // The plan's gate card and the Attention row.
-        expect(links.length).toBe(2)
-        for (const link of links) expect(link.props.href).toBe(PR33)
-
-        const root = await tree(ui)
-        const trails = chains(root, node => node.type === 'Link' && node.props.label === 'PR #33 not merged')
-        expect(trails.length).toBe(2)
-        // The Attention row comes first, the plan's gate after it. The terminal's both bold in the tone; the desktop's
-        // Attention title is in the text colour (the card is tinted), its plan gate a quiet line in the tone.
+        // The Attention row comes first, the plan's gate after it. The terminal's both carry the title, bold in the tone;
+        // the desktop's Attention line names the PR alone (`PR #33`, in the text colour on its tinted card), its plan
+        // gate the title in a quiet line in the tone.
+        const labels = surface === 'terminal' ? ['PR #33 not merged', 'PR #33 not merged'] : ['PR #33', 'PR #33 not merged']
         const looks = surface === 'terminal' ? [{ color: 'warning', bold: true }, { color: 'warning', bold: true }] : [{ color: undefined, bold: true }, { color: 'warning', bold: undefined }]
+        const root = await tree(ui)
+        const trails = chains(root, node => node.type === 'Link' && labels.includes(String(node.props.label)))
+        expect(trails.map(trail => trail.at(-1)!.props.label)).toEqual(labels)
         trails.forEach((trail, at) => {
+          expect(trail.at(-1)!.props.href).toBe(PR33)
           const text = chains(trail.at(-1)!, node => node.type === 'Text')[0]!.at(-1)!
           expect(text.props.color).toBe(looks[at]!.color)
           expect(text.props.bold).toBe(looks[at]!.bold)
-          expect(textOf(text)).toBe('PR #33 not merged')
+          expect(textOf(text)).toBe(labels[at])
         })
         // The gate with no href stays plain text.
         expect((await (ui as Probe).findAll({ type: 'Link' })).some(link => link.props.label === 'Parked at domain-design')).toBe(false)

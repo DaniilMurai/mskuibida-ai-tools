@@ -407,10 +407,10 @@ describe('gates', () => {
     expect([link.props.href, link.props.label]).toEqual(['https://example.com/pull/31', 'PR #31 not merged'])
     const title = chains(link, node => node.type === 'Text')[0]!.at(-1)!
     expect([title.props.color, title.props.bold]).toEqual(['error', undefined])
-    // It sits right after its item, and the caption is drawn once: in Needs attention, not in the plan.
+    // It sits right after its item. Its caption is drawn nowhere: the plan's line is one line, and Needs attention says
+    // its PR in a word or two.
     const all = await shown(ui)
-    expect(all.filter(text => text === GATE.caption)).toHaveLength(1)
-    expect(all.indexOf(GATE.caption!)).toBeLessThan(all.indexOf('Plan'))
+    expect(all.filter(text => text === GATE.caption)).toHaveLength(0)
     expect(all.lastIndexOf('PR #31 not merged')).toBeGreaterThan(all.lastIndexOf('domain-design'))
     expect(all[all.lastIndexOf('PR #31 not merged') + 1]).toBe('units-generation')
     await ui.unmount()
@@ -467,28 +467,48 @@ describe('Needs attention', () => {
     await ui.unmount()
   })
 
-  test('desktop: two or more rows about pull requests are one card, where the first stood, in the worst tone', async ($, on) => {
+  test('desktop: the rows about pull requests are one card, a line per PR, where the first stood, in the worst tone', async ($, on) => {
     const url = (n: number) => `https://github.com/acme/shop/pull/${n}`
     const gates: Gate[] = [
-      { id: 'changes-requested:60', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #60', sectionId: '', isAttentionOnly: true, href: url(60), command: '/pr-review:address-review 60' },
+      { id: 'changes-requested:60', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #60', caption: 'Answer the review before it can merge.', sectionId: '', isAttentionOnly: true, href: url(60), command: '/pr-review:address-review 60' },
       { id: 'parked', kind: 'parked', tone: 'warning', title: 'Parked at contract-design', sectionId: '' },
-      { id: 'pr:66', kind: 'pr-not-merged', tone: 'warning', title: 'PR #66 not merged', sectionId: '', href: url(66) },
+      { id: 'pr:66', kind: 'pr-not-merged', tone: 'warning', title: 'PR #66 not merged', caption: "functional-design can't start on main until it lands.", sectionId: '', href: url(66) },
+      { id: 'changes-requested:66', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #66', sectionId: '', href: url(66), command: '/pr-review:address-review 66' },
       { id: 'conflicts:66', kind: 'conflicts', tone: 'error', title: 'PR #66 has conflicts with main', sectionId: '', href: url(66) },
     ]
     const ui = await draw($, on, stageModel({ gates }), 'desktop', MEDIUM)
     const root = await tree(ui)
     const column = chains(root, node => node.type === 'Box' && node.props.gap === 1 && textOf(kids(node)[0] ?? '').startsWith('Needs attention'))[0]!.at(-1)!
     // Every row still counts.
-    expect(textOf(kids(column)[0]!)).toBe(`Needs attention${padded('4')}`)
+    expect(textOf(kids(column)[0]!)).toBe(`Needs attention${padded('5')}`)
     const [prs, parked] = kids(kids(column)[1]!)
     expect(kids(kids(column)[1]!).length).toBe(2)
     expect([prs!.props.borderColor, prs!.props.backgroundColor]).toEqual([tint('error', '66'), tint('error', '17')])
-    expect(textOf(prs!)).toContain('Pull requests (3)')
-    for (const title of ['Changes requested on your PR #60', 'PR #66 not merged', 'PR #66 has conflicts with main']) expect(textOf(prs!)).toContain(title)
+    // The heading counts the PRs; then one line each: the worst glyph, the PR as a link, its words worst first, its command.
+    const inner = kids(prs!)[0]!
+    expect(textOf(kids(inner)[0]!)).toBe('Pull requests (2)')
+    const lines = kids(inner).slice(1)
+    expect(lines.map(line => textOf(line))).toEqual(['‖PR #60changes requestedaddress-review', '⊘PR #66conflicts · not merged · changes requestedaddress-review'])
+    const link = chains(lines[1]!, node => node.type === 'Link')[0]!.at(-1)!
+    expect([link.props.href, link.props.label]).toEqual([url(66), 'PR #66'])
+    const glyph = chains(lines[1]!, node => node.type === 'Text' && textOf(node) === '⊘')[0]!.at(-1)!
+    expect(glyph.props.color).toBe('error')
+    // No captions, no where: the line says it all.
+    expect(textOf(prs!)).not.toContain("can't start")
+    expect(textOf(prs!)).not.toContain('Answer the review')
     expect(textOf(parked!)).toContain('Parked at contract-design')
-    expect(textOf(parked!)).not.toContain('PR #66')
-    // A PR row's command is still a button under it, and still presses.
-    expect(chains(prs!, node => node.type === 'Button')[0]?.at(-1)?.props.key).toBe('attention:fill:gate:changes-requested:60')
+    // The button presses the row's command it came from.
+    expect(chains(lines[1]!, node => node.type === 'Button')[0]?.at(-1)?.props.key).toBe('attention:fill:gate:changes-requested:66')
+    await ui.unmount()
+  })
+
+  test('desktop: one PR row is a line in the PR card too', async ($, on) => {
+    const gates: Gate[] = [{ id: 'pr:31', kind: 'pr-not-merged', tone: 'warning', title: 'PR #31 not merged', sectionId: '', href: 'https://gitlab.example.com/acme/shop/-/merge_requests/31' }]
+    const ui = await draw($, on, stageModel({ gates }), 'desktop', MEDIUM)
+    const texts = await shown(ui)
+    expect(texts).toContain('Pull requests (1)')
+    expect(texts).toContain('MR !31')
+    expect(texts).toContain('not merged')
     await ui.unmount()
   })
 

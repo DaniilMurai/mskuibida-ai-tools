@@ -1,14 +1,15 @@
 // Needs attention: what blocks, and what waits on the viewer. The freshness error, then the gates (a provider
 // puts the rows tied to the viewer first: a review asked of them, their approved PR), then the drift flags. A
 // row with a command offers it as a button that puts it in the prompt. On a desktop the rows about pull requests (the
-// ones that link to a PR) are one card together, where the first of them stands; every other row is a card of its own.
+// ones that link to a PR) are one card together, where the first of them stands, one line per PR with everything said
+// about it; every other row is a card of its own.
 import { t } from '../strings/en'
 import type { Gate, PanelModel } from '../../types'
 import { gateColor, gateGlyph, isRich, safely, tint, toneColor, uniqueIds } from './kit'
 import { pill } from './look'
 import type { Ctx, El } from './kit'
 
-type Row = { id: string; glyph: string; color: string | undefined; title: string; where: string; isBold: boolean; href?: string; command?: string; caption?: string }
+type Row = { id: string; glyph: string; color: string | undefined; title: string; where: string; isBold: boolean; kind?: string; about?: string; href?: string; command?: string; caption?: string }
 
 /**
  * The gate's section, or "Section, after item" when it holds after an item of it. A row about the viewer is
@@ -36,6 +37,9 @@ export function rowsOf(model: PanelModel): Row[] {
       title: gate.title,
       where: whereOf(model, gate),
       isBold: true,
+      kind: gate.kind,
+      // Someone else's PR outside the plan is known by its title and author, which a review asked of you says.
+      ...(gate.kind === 'review-requested' && !model.sections.some(one => one.id === gate.sectionId) && (gate.caption ?? '') !== '' ? { about: gate.caption } : {}),
       ...(gate.href !== undefined && gate.href !== '' ? { href: gate.href } : {}),
       ...(gate.command !== undefined && gate.command !== '' ? { command: gate.command } : {}),
       ...(gate.caption !== undefined && gate.caption !== '' && gate.isAttentionOnly !== true ? { caption: gate.caption } : {}),
@@ -162,10 +166,81 @@ const RANK: Record<string, number> = { error: 3, warning: 2, accent: 1, success:
 const worstOf = (rows: readonly Row[]): string | undefined =>
   rows.reduce<string | undefined>((worst, row) => ((RANK[row.color ?? ''] ?? 2) > (RANK[worst ?? ''] ?? -1) ? row.color : worst), undefined)
 
-/** The rows about pull requests as one card: a dim heading, then each PR row under it, a line apart. */
+/** A PR's number and forge from its link: GitHub's `/pull/66`, GitLab's `/merge_requests/66`; null for anything else. */
+function prRefOf(href: string): string {
+  const github = /\/pull\/(\d+)(?:[/?#]|$)/.exec(href)
+  if (github) return t('attention.pr.ref', { number: github[1]! })
+  const gitlab = /\/merge_requests\/(\d+)(?:[/?#]|$)/.exec(href)
+  return gitlab ? t('attention.pr.ref.gitlab', { number: gitlab[1]! }) : ''
+}
+
+/** What a row says about its PR in a word or two (`conflicts`); its own title for a kind with no short word. */
+const wordOf = (row: Row): string => t(`attention.pr.word.${row.kind ?? ''}`) || row.title
+
+/** A command as its name alone, for a button on a PR's line: `/pr-review:address-review 66` is `address-review`. */
+const commandName = (command: string): string => command.replace(/^\//, '').split(/\s/)[0]!.split(':').pop() ?? command
+
+type PrLine = { href: string; ref: string; rows: { row: Row; key: string }[] }
+
+/** The PR rows by the PR they link to, in the order each PR first comes; the rows in theirs, the worst first. */
+function prLinesOf(rows: readonly { row: Row; key: string }[]): PrLine[] {
+  const lines: PrLine[] = []
+  for (const one of rows) {
+    const href = one.row.href ?? ''
+    const line = lines.find(each => each.href === href)
+    if (line) line.rows.push(one)
+    else lines.push({ href, ref: prRefOf(href), rows: [one] })
+  }
+  for (const line of lines) line.rows.sort((a, b) => (RANK[b.row.color ?? ''] ?? 2) - (RANK[a.row.color ?? ''] ?? 2))
+  return lines
+}
+
+/**
+ * One PR on one line: the glyph of its worst row, the PR as a link, everything the rows say about it in a word or two
+ * (`conflicts · changes requested · not merged`), with the title and author of a PR outside the plan, and the first
+ * command one of them offers as a small button named by the command.
+ */
+function prLineEl(ctx: Ctx, line: PrLine): El {
+  const { Box, Text, Link, Button } = ctx.kit
+  const worst = line.rows[0]!.row
+  const about = line.rows.find(one => (one.row.about ?? '') !== '')?.row.about ?? ''
+  const words = [...new Set([...line.rows.map(one => wordOf(one.row)), about].filter(word => word !== ''))]
+  const label = line.ref || worst.title
+  const withCommand = line.rows.find(one => (one.row.command ?? '') !== '')
+  const command = withCommand?.row.command ?? ''
+  return (
+    <Box gap={1} flexShrink={1} flexGrow={1} minWidth={0}>
+      <Box width={1} flexShrink={0}>
+        <Text bold color={worst.color}>
+          {worst.glyph}
+        </Text>
+      </Box>
+      <Box flexShrink={0}>
+        <Link href={line.href} label={label}>
+          <Text bold>{label}</Text>
+        </Link>
+      </Box>
+      <Box flexShrink={1} flexGrow={1} minWidth={0}>
+        <Text dimColor wrap="wrap">
+          {words.join(t('attention.pr.separator'))}
+        </Text>
+      </Box>
+      {withCommand !== undefined && (
+        <Box flexShrink={0}>
+          <Button key={'attention:fill:' + withCommand.key} variant="secondary" onPress={safely(() => ctx.handlers.onFillNext(command))}>
+            {commandName(command)}
+          </Button>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/** The rows about pull requests as one card: a dim heading, then one line per PR. */
 function prCard(ctx: Ctx, rows: readonly { row: Row; key: string }[]): El {
   const { Box, Text } = ctx.kit
-  const heading = t('attention.prs', { count: String(rows.length) })
+  const lines = prLinesOf(rows)
+  const heading = t('attention.prs', { count: String(lines.length) })
   return card(
     ctx,
     worstOf(rows.map(one => one.row)),
@@ -175,7 +250,7 @@ function prCard(ctx: Ctx, rows: readonly { row: Row; key: string }[]): El {
           {heading}
         </Text>
       )}
-      {rows.map(one => rowBody(ctx, one.row, one.key))}
+      {lines.map(line => prLineEl(ctx, line))}
     </Box>,
   )
 }
@@ -190,11 +265,11 @@ export function attention(ctx: Ctx, model: PanelModel): El | false {
   const heading = rich ? t('attention.heading') : t('attention.title', { count: String(rows.length) })
   const tone = rows.some(row => row.color === 'error') ? 'error' : 'warning'
   const keyed = rows.map((row, index) => ({ row, key: keys[index]! }))
-  // On a desktop, two or more rows about pull requests are one card, where the first of them stands; the terminal
-  // draws no cards and keeps every row in its place.
+  // On a desktop, the rows about pull requests are one card, where the first of them stands, a line per PR; the
+  // terminal draws no cards and keeps every row in its place.
   const isBoxed = ctx.surface !== 'terminal'
   const prs = keyed.filter(one => one.row.href !== undefined)
-  const isFolded = isBoxed && prs.length >= 2
+  const isFolded = isBoxed && prs.length > 0
   const firstPr = prs[0]?.key
   const cards = keyed.flatMap(one => {
     if (isFolded && one.row.href !== undefined) return one.key === firstPr ? [prCard(ctx, prs)] : []
