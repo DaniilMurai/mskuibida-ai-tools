@@ -3,10 +3,10 @@
 At every AI-DLC approval gate, the stage's documents become one readable page in a private
 artifact, **AI-DLC approval gates**, published once per developer from the template in this plugin.
 The agent writes the documents as rows, puts the page's link in the gate question, and the developer
-reads them there: the summary, the review brief, then every document of the stage with its tables and
-diagrams. A note per document and a draft decision go back to the agent, which reads them when the
-developer chooses Request Changes. The decision itself is still given in chat, and the engine's gate
-question is unchanged.
+reads them there: the summary, the review brief, then every document of the stage in a view made for
+its kind. A note per document goes back to the agent, which quotes it when the developer chooses
+Request Changes. The decision itself is given in chat; the engine's gate question is unchanged and the
+page holds no decision.
 
 ```
 skills/approval-gates/SKILL.md            the procedure the agent follows at every gate
@@ -23,17 +23,38 @@ header with the stage, round and what comes next; an outline on the left (every 
 sections, with Expand all and Collapse all); and a column of collapsible blocks: the agent's summary,
 the review (verdict, open-finding count, a findings table whose rows open to the finding, where and
 required action), then every document, each with its sections collapsible and a Note button for a
-note to Claude. Markdown renders with tables and Mermaid diagrams; JSON, questions and review copies
-start collapsed. A document longer than a database row is split at its headings and joined back on
-the page. At the bottom a thin bar holds a draft decision (Approve or Request changes, with a note);
-it saves as you press, and says to answer in chat.
+note to Claude. JSON, questions and review copies start collapsed. A document longer than a database
+row is split at its headings and joined back on the page.
+
+Each document kind has its own view, with a Text switch back to the document as written:
+
+- **entities.md**: an entity diagram from the `entities:` block's relations, then a section per entity
+  with its attributes (type, required, unique, default, limits, allowed values), constraints and
+  relations.
+- **rules.md**: the `rules:` block as a table per group (BR1, BR2, …), filterable by category and
+  searchable; a row opens to the rule's logic, trigger, violation and source.
+- **components.md**, **logical-components.md**: a dependency graph (calls solid, events dashed) and a
+  card per component with what it does, what it depends on, who uses it and its entities.
+- **unit-of-work-dependency.md**: the `units:` block as build layers, first the Units with no
+  dependencies. **unit-of-work.md**: a section per Unit with its facts. **unit-of-work-story-map.md**:
+  the map grouped by Unit.
+- **stories.md**: cards by epic with priority, traces and every acceptance criterion split into
+  Given, When and Then. **requirements.md** and the NFR files: a table per group, searchable.
+- **decisions.md**: a card per ADR with its status, the Decision open and Context, Consequences and
+  Alternatives folded. **bolt-plan.md**: a strip of Bolts with their points, then each Bolt.
+- **contract-summary.md**: a section per contract; an OpenAPI block becomes an operations table, a type
+  sheet a table per type. **traceability.json**: coverage by status.
+
+Every id that names something in the gate (FR1.2, BR3.5, US1.1, AC1.1.2, ADR-003, U3, C4, R-02, an
+entity or component name) is a link: hover for the text, click to jump. A document whose shape is not
+recognised is Markdown with every H2 a collapsible section.
 
 ## What the agent does
 
 After `aidlc engine orchestrate report --result awaiting-approval` (or `revised`), it runs
 `gate_bundle.py`, writes the rows with one `ArtifactData` batch, and asks the Approval question with
 `<artifact url>#<gate id>` in it. After Request Changes it reads `gates/<id>` and quotes your notes in
-the `--reason` of the rejected report. It never writes your notes or decision, and never updates a row.
+the `--reason` of the rejected report. It never writes your notes, and never updates a row.
 
 ## What the hook refuses
 
@@ -41,7 +62,7 @@ the `--reason` of the rejected report. It never writes your notes or decision, a
   pull request named) until a `gates` row for the stage was written after the gate opened.
 - The same question without the link `<artifact url>#<gate id>` in its text.
 - `aidlc engine orchestrate report … --result approved|rejected|accepted` before that row exists.
-- A write to `gates/<id>` that sets `status: "decided"` or carries `decision` or `notes`.
+- A write to `gates/<id>` that carries `notes` (or a decision field: the page records none).
 
 It does nothing outside an AI-DLC project (no `aidlc/spaces`), on input it cannot read, and in the
 after-call and prompt hooks it never fails. Its state is `~/.claude/approval-gates/<session>.json`
@@ -53,7 +74,7 @@ after-call and prompt hooks it never fails. Its state is `~/.claude/approval-gat
 gates/<id>                  {title, stage, stageName, phase?, intent, project?, unit?, round, why?, status,
                              createdAt, summary?, brief?, review?, nextStage?, options, documents: [index]}
 gates/<id>/documents/<key>  {n, key, title, path, kind, text}
-page writes                 gates/<id>.notes[<key>], gates/<id>.decision {k, note, at}, status "decided"
+page writes                 gates/<id>.notes[<key>]
 ```
 
 `<id>` is `<intent>-<stage>[-<unit>]-<YYYYMMDDTHHMM>`, new for every presentation. The full contract is
