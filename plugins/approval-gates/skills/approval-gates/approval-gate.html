@@ -675,11 +675,40 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
   el.col.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest("a.xref")) el.pop.hidden = true; });
 
   /* ---------- views ---------- */
+  /* The documents are YAML written by hand in prose: a plain value with ": " or " #" inside (a "(Q4: …)" aside)
+     is not strict YAML. Quote such values before parsing; if the block still fails, read it as a list of
+     `- key: value` maps line by line. */
+  const yamlSafe = (raw) => raw.split("\n").map((l) => {
+    const m = l.match(/^(\s*(?:- )?[A-Za-z_][\w-]*:)\s+(.*?)\s*$/); if (!m) return l;
+    const v = m[2]; if (!v || /^["'\[{|>&*!%@`]/.test(v) || /^[\d.-]+$/.test(v) || /^(true|false|null|yes|no|~)$/i.test(v)) return l;
+    if (!/:\s|\s#|^-\s/.test(v)) return l;
+    return m[1] + " \"" + v.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + "\"";
+  }).join("\n");
+  const yamlLoose = (raw, topKey) => {
+    const lines = raw.split("\n"); const items = []; let cur = null, field = null, indent = 0;
+    if (!new RegExp("^" + topKey + "\\s*:", "m").test(raw)) return null;
+    for (const l of lines) {
+      if (/^\s*#/.test(l) || !l.trim() || new RegExp("^" + topKey + "\\s*:").test(l)) { if (!l.trim()) field = null; continue; }
+      let m = l.match(/^(\s*)-\s+([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (m) { cur = {}; items.push(cur); indent = m[1].length; cur[m[2]] = m[3].trim(); field = m[2]; continue; }
+      m = l.match(/^(\s*)([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (m && cur && m[1].length > indent) { const v = m[3].trim(); cur[m[2]] = v; field = m[2]; if (v === "") cur[m[2]] = []; continue; }
+      m = l.match(/^(\s*)-\s+(.*)$/);
+      if (m && cur && field && Array.isArray(cur[field])) { const v = m[2].trim().replace(/^["']|["']$/g, ""); cur[field].push(v); continue; }
+      if (cur && field && typeof cur[field] === "string" && l.trim()) cur[field] = (cur[field] + " " + l.trim()).trim();
+    }
+    return items.length ? { [topKey]: items.map((it) => Object.fromEntries(Object.entries(it).map(([k, v]) => [k, typeof v === "string" ? v.replace(/^["'](.*)["']$/s, "$1") : v]))) } : null;
+  };
   const yamlBlock = (text, topKey) => {
     const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m;
     while ((m = re.exec(text))) {
       if (topKey && !new RegExp("^" + topKey + "\\s*:", "m").test(m[1])) continue;
-      try { const v = typeof jsyaml !== "undefined" ? jsyaml.load(m[1]) : null; if (v && typeof v === "object") return { data: v, raw: m[1], start: m.index, end: m.index + m[0].length }; } catch { /* next */ }
+      const found = (v) => (v && typeof v === "object") ? { data: v, raw: m[1], start: m.index, end: m.index + m[0].length } : null;
+      if (typeof jsyaml !== "undefined") {
+        try { const r = found(jsyaml.load(m[1])); if (r) return r; } catch { /* quote the prose values and try again */ }
+        try { const r = found(jsyaml.load(yamlSafe(m[1]))); if (r) return r; } catch { /* fall through to the loose reader */ }
+      }
+      if (topKey) { const r = found(yamlLoose(m[1], topKey)); if (r) return r; }
     }
     return null;
   };
@@ -1065,7 +1094,7 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
       const isC = /^C\d+\b/.test(s.title); const sec = section(d, n++, s.title, isC);
       if (isC) regRef(s.title.match(/^(C\d+)/)[1], sec, s.title);
       const parts = []; let last = 0; const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m; const body = s.body;
-      while ((m = re.exec(body))) { if (m.index > last) parts.push({ md: body.slice(last, m.index) }); let y = null; try { y = typeof jsyaml !== "undefined" ? jsyaml.load(m[1]) : null; } catch { y = null; } parts.push({ yaml: m[1], data: y }); last = m.index + m[0].length; }
+      while ((m = re.exec(body))) { if (m.index > last) parts.push({ md: body.slice(last, m.index) }); let y = null; if (typeof jsyaml !== "undefined") { try { y = jsyaml.load(m[1]); } catch { try { y = jsyaml.load(yamlSafe(m[1])); } catch { y = null; } } } parts.push({ yaml: m[1], data: y }); last = m.index + m[0].length; }
       if (last < body.length) parts.push({ md: body.slice(last) });
       parts.forEach((p) => {
         if (p.md !== undefined) { if (p.md.trim()) sec.secbody.appendChild(mdDiv(p.md)); return; }
