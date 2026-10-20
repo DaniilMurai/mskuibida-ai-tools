@@ -83,7 +83,9 @@ the `--reason` of the rejected report. It never writes your notes, and never upd
 - A write to `gates/<id>` that carries `notes` (or a decision field: the page records none).
 
 It does nothing outside an AI-DLC project (no `aidlc/spaces`), on input it cannot read, and in the
-after-call and prompt hooks it never fails. Its state is `~/.claude/approval-gates/<session>.json`
+after-call and prompt hooks it never fails. The project is the working directory's (or its nearest parent's)
+when that holds one, before `CLAUDE_PROJECT_DIR`: in a git worktree the latter is the main checkout, whose
+per-clone pointers (`aidlc/active-space`, `active-intent`, `.aidlc-engine/`) are not the worktree's. Its state is `~/.claude/approval-gates/<session>.json`
 (`APPROVAL_GATES_DIR` changes the folder). To clear it, type `/approval-gates:release`.
 
 ## Data contract, in brief

@@ -147,8 +147,38 @@ def drop(event):
 
 # ---------------------------------------------------------------- the project
 
+def has_project(folder):
+    return bool(folder) and os.path.isdir(os.path.join(folder, "aidlc", "spaces"))
+
+
+def up_to_project(folder):
+    """The folder, or the nearest parent, that holds aidlc/spaces; None when none does."""
+    folder = os.path.abspath(folder) if folder else ""
+    while folder:
+        if has_project(folder):
+            return folder
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            break
+        folder = parent
+    return None
+
+
 def project_dir(event):
-    return os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or os.getcwd()
+    """The AI-DLC project the session works in. The working directory wins over CLAUDE_PROJECT_DIR when both hold a
+    project: in a git worktree CLAUDE_PROJECT_DIR is the main checkout, whose per-clone pointers (aidlc/active-space,
+    intents/active-intent, .aidlc-engine/) are not the worktree's. Of the folders that hold a project, the first whose
+    active intent resolves is it; else the first one; else CLAUDE_PROJECT_DIR or the working directory as given."""
+    given = [event.get("cwd"), os.environ.get("CLAUDE_PROJECT_DIR"), os.getcwd()]
+    found = []
+    for folder in given:
+        project = up_to_project(folder)
+        if project and project not in found:
+            found.append(project)
+    for project in found:
+        if intent_root(project)[1]:
+            return project
+    return found[0] if found else (os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or os.getcwd())
 
 
 def first_line(path):
@@ -403,8 +433,11 @@ def target_of(state, project, call_stage=None, call_unit=None):
 
 
 def require_published(state, stage, unit, opened):
-    """The record of this stage's gate page, or a Refusal when it was not published since the gate opened."""
+    """The record of this stage's gate page, or a Refusal when it was not published since the gate opened. A row
+    recorded by its id alone (the stage was unknown when it was written) counts when its id names this stage."""
     pub = state["published"].get(make_key(stage, unit))
+    if not pub:
+        pub = next((p for p in state["published"].values() if id_matches(p.get("id"), None, stage, unit)), None)
     if not pub or (isinstance(opened, (int, float)) and pub.get("at", 0) < opened):
         raise Refusal("The developer reads the stage's documents in the AI-DLC approval gates page before being "
                       f"asked. Publish them first: {publish_instruction(stage, unit)}.")
@@ -574,17 +607,19 @@ def record_artifact(project, state, tool_input, response):
     for op, collection, doc_id, _data, url in writes_of(tool_input):
         if op not in ("set", "update") or collection != "gates":
             continue
-        for stage, unit in candidates:
-            if id_matches(doc_id, intent, stage, unit):
-                pub = {"id": doc_id, "url": str(url or "").rstrip("/"), "at": time.time()}
-                state["published"][make_key(stage, unit)] = pub
-                if not changed:
-                    say("PostToolUse", f"gates/{doc_id} is published. Send the developer the link `{link_of(pub)}` in "
-                                       "a message of its own (the `**Read:**` line of the completion message), then "
-                                       "ask the engine's Approval question with no link in it; the question is "
-                                       "refused until that message was sent.")
-                changed = True
-                break
+        key = next((make_key(stage, unit) for stage, unit in candidates if id_matches(doc_id, intent, stage, unit)), None)
+        if key is None and not candidates and re.fullmatch(r"\d{6}-[a-z0-9-]+-\d{8}[Tt]\d{4}", doc_id or ""):
+            key = "id:" + doc_id  # no stage is known here: the row is kept by its id and matched by it later
+        if key is None:
+            continue
+        pub = {"id": doc_id, "url": str(url or "").rstrip("/"), "at": time.time()}
+        state["published"][key] = pub
+        if not changed:
+            say("PostToolUse", f"gates/{doc_id} is published. Send the developer the link `{link_of(pub)}` in "
+                               "a message of its own (the `**Read:**` line of the completion message), then "
+                               "ask the engine's Approval question with no link in it; the question is "
+                               "refused until that message was sent.")
+        changed = True
     return changed
 
 
