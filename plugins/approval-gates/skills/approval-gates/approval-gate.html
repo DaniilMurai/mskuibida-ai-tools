@@ -70,7 +70,12 @@
   --ok: #6cc28f; --ok-soft: #1a2f23; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
 
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--body); margin: 0; }
+/* Nothing widens the page: a block that can be wider than its column (a table, a diagram, code, a strip of
+   layers or bolts) scrolls inside its own box, and every column, card and section lets its content shrink. */
+.desk > *, #col > *, .block > .body, .block > .body > *, .vw, .vw > *, .secbody > *, .cards > *, .card > *, details.sub > *, .facts > dd { min-width: 0; max-width: 100%; }
+.tablewrap, .diagram, pre, .layers, .bolts { max-width: 100%; }
 [hidden] { display: none !important; }
 a { color: var(--ink); }
 code { font: 500 .88em var(--mono); background: var(--ink-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
@@ -86,7 +91,7 @@ textarea { width: 100%; resize: vertical; }
 .pill.quiet { font-size: 10px; padding: 3px 6px; }
 .hint { color: var(--muted); margin: 0; }
 .mono { font: 500 12px var(--mono); }
-.chip { display: inline-block; font: 500 11.5px/1.3 var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--ink-soft); color: var(--ink); white-space: nowrap; }
+.chip { display: inline-block; font: 500 11.5px/1.3 var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--ink-soft); color: var(--ink); max-width: 100%; overflow-wrap: anywhere; }
 .chip.muted { background: var(--line-soft); color: var(--muted); }
 .chip.warn { background: var(--warn-soft); color: var(--warn); }
 .chip.ok { background: var(--ok-soft); color: var(--ok); }
@@ -788,14 +793,16 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
       const sec = section(d, n++, title, true, `${items.length} components`);
       const cards = node('<div class="cards"></div>');
       items.forEach((c) => {
-        const card = node(`<div class="card"><div class="chead"><h3>${esc(str(c.name))}</h3><span class="end">${list(c.entities).length ? chips(c.entities, "muted") : ""}</span></div>${c.summary ? `<p class="desc">${inline(str(c.summary))}</p>` : ""}</div>`);
+        const ents = list(c.entities).map((e) => (e && typeof e === "object") ? { name: str(e.name || e.entity || ""), attrs: list(e.attributes).map((a) => str((a && typeof a === "object") ? (a.name || "") : a)).filter(Boolean), id: str(e.identifier || "") } : { name: str(e), attrs: [], id: "" }).filter((e) => e.name);
+        const card = node(`<div class="card"><div class="chead"><h3>${esc(str(c.name))}</h3><span class="end">${ents.map((e) => `<span class="chip muted">${esc(e.name)}</span>`).join(" ")}</span></div>${c.summary ? `<p class="desc">${inline(str(c.summary))}</p>` : ""}</div>`);
         regRef(str(c.name), card, str(c.summary));
         let html = '<dl class="facts">';
         const dep = (x) => `<li><b>${esc(str(x && x.component !== undefined ? x.component : x))}</b>${x && x.style ? ` <span class="chip muted">${esc(str(x.style))}</span>` : ""} ${inline(str((x && x.interaction) || ""))}</li>`;
         if (list(c.responsibilities).length) html += `<dt>Does</dt><dd><ul>${list(c.responsibilities).map((r) => `<li>${inline(str(r))}</li>`).join("")}</ul></dd>`;
         if (list(c.depends_on).length) html += `<dt>Depends on</dt><dd><ul>${list(c.depends_on).map(dep).join("")}</ul></dd>`;
         if (list(c.dependents).length) html += `<dt>Used by</dt><dd><ul>${list(c.dependents).map(dep).join("")}</ul></dd>`;
-        if (list(c.external_dependencies).length) html += `<dt>External</dt><dd>${chips(list(c.external_dependencies).map((x) => (x && (x.name || x.service)) || x), "muted")}</dd>`;
+        if (list(c.external_dependencies).length) html += `<dt>External</dt><dd>${chips(list(c.external_dependencies).map((x) => (x && typeof x === "object") ? (x.name || x.service || JSON.stringify(x)) : x), "muted")}</dd>`;
+        if (ents.some((e) => e.attrs.length || e.id)) html += `<dt>Entities</dt><dd><ul>${ents.map((e) => `<li><b>${esc(e.name)}</b>${e.id ? ` <span class="chip muted">id: ${esc(e.id)}</span>` : ""}${e.attrs.length ? ` <span class="hint">${esc(e.attrs.join(", "))}</span>` : ""}</li>`).join("")}</ul></dd>`;
         Object.keys(c).filter((k) => !["name", "summary", "behaviour", "behavior", "responsibilities", "depends_on", "dependents", "external_dependencies", "entities"].includes(k)).forEach((k) => { html += `<dt>${esc(k.replace(/_/g, " "))}</dt><dd>${inline(str(c[k]))}</dd>`; });
         html += "</dl>";
         const beh = c.behaviour || c.behavior; if (beh) html += `<details class="sub"><summary>Behaviour</summary><div class="md">${mdHtml(str(beh)) || esc(str(beh))}</div></details>`;
