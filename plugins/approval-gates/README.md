@@ -2,7 +2,7 @@
 
 At every AI-DLC approval gate, the stage's documents become one readable page in a private
 artifact, **AI-DLC approval gates**, published once per developer from the template in this plugin.
-The agent writes the documents as rows, puts the page's link in the gate question, and the developer
+The agent writes the documents as rows, sends the page's link in a message before the gate question, and the developer
 reads them there: the summary, the review brief, then every document of the stage in a view made for
 its kind. A note per document goes back to the agent, which quotes it when the developer chooses
 Request Changes. The decision itself is given in chat; the engine's gate question is unchanged and the
@@ -60,7 +60,7 @@ the `--reason` of the rejected report. It never writes your notes, and never upd
 
 - The Approval question (header `Approval`, an option such as Approve, Approve Plan or Accept as-is, no
   pull request named) until a `gates` row for the stage was written after the gate opened.
-- The same question without the link `<artifact url>#<gate id>` in its text.
+- The same question with the page's link in its text: the link goes in a message of its own, so the dialog stays readable.
 - `aidlc engine orchestrate report … --result approved|rejected|accepted` before that row exists.
 - A write to `gates/<id>` that carries `notes` (or a decision field: the page records none).
 

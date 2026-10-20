@@ -203,28 +203,32 @@ class TestTheQuestion(Case):
         self.assertTrue(err.strip().endswith(
             "(Blocked by the approval-gates plugin. The developer can release it by typing /approval-gates:release.)"))
 
-    def test_publishing_is_recorded_and_the_link_is_required(self):
+    def test_publishing_is_recorded_and_the_question_carries_no_link(self):
         self.open_gate()
         gate_id = self.publish()
         published = self.state_of()["published"]["user-stories"]
         self.assertEqual((published["id"], published["url"]), (gate_id, URL))
         code, _out, err = self.ask("User Stories complete. How would you like to proceed?")
-        self.assertEqual(code, 2)
-        self.assertIn(f"Put the link {URL}#{gate_id} in the question text.", err)
-        code, _out, err = self.ask(f"User Stories complete, read the documents at {URL}#{gate_id}. How would you like to proceed?")
         self.assertEqual((code, err), (0, ""))
+        code, _out, err = self.ask(f"User Stories complete, read the documents at {URL}#{gate_id}. How would you like to proceed?")
+        self.assertEqual(code, 2)
+        self.assertIn("in a message of its own", err)
+        self.assertIn(f"{URL}#{gate_id}", err)
 
-    def test_a_link_to_another_gate_does_not_count(self):
+    def test_any_gate_link_in_the_question_is_refused(self):
         self.open_gate()
         self.publish()
-        code, _out, err = self.ask(f"Read {URL}#{INTENT}-user-stories-20250101T0000 and decide.")
-        self.assertEqual(code, 2)
-        self.assertIn("Put the link", err)
+        for text in (f"Read {URL}#{INTENT}-user-stories-20250101T0000 and decide.",
+                     f"Read {URL} and decide.",
+                     f"Read claude.ai/artifact/zzz#{INTENT}-user-stories-20250101T0000 and decide."):
+            code, _out, err = self.ask(text)
+            self.assertEqual(code, 2, text)
+            self.assertIn("in a message of its own", err)
 
     def test_documents_published_before_the_gate_opened_do_not_count(self):
         self.open_gate()
         gate_id = self.publish()
-        self.assertEqual(self.ask(f"Read {URL}#{gate_id}")[0], 0)
+        self.assertEqual(self.ask("Stage complete. How would you like to proceed?")[0], 0)
         self.post("Bash", {"command": report("rejected", extra=' --user-input "Request Changes" --reason "fix"')})
         self.open_gate(result="revised")
         code, _out, err = self.ask(f"Read {URL}#{gate_id}")
@@ -239,7 +243,7 @@ class TestTheQuestion(Case):
         self.assertIn("--stage user-stories", err)
         gate_id = self.publish()  # recorded by matching the active directive's stage
         self.assertEqual(self.state_of()["published"]["user-stories"]["id"], gate_id)
-        self.assertEqual(self.ask(f"Read {URL}#{gate_id}")[0], 0)
+        self.assertEqual(self.ask("Stage complete. How would you like to proceed?")[0], 0)
 
     def test_a_row_for_another_stage_does_not_unlock_this_one(self):
         self.open_gate()
@@ -255,7 +259,7 @@ class TestTheQuestion(Case):
         self.assertEqual(self.state_of()["published"], {})
         right = self.publish(f"{INTENT}-functional-design-u1-core-20260101T0900")
         self.assertEqual(self.state_of()["published"]["functional-design/u1-core"]["id"], right)
-        self.assertEqual(self.ask(f"Read {URL}#{right}")[0], 0)
+        self.assertEqual(self.ask("Functional Design complete. How would you like to proceed?")[0], 0)
 
     def test_a_failed_write_is_not_recorded(self):
         self.open_gate()
@@ -276,9 +280,9 @@ class TestTheQuestion(Case):
         question = gate_question("Code generation plan ready. How would you like to proceed?", labels=("Approve Plan", "Request Changes"))
         self.assertEqual(self.pre("AskUserQuestion", question)[0], 2)
         gate_id = self.publish(f"{INTENT}-code-generation-u1-core-20260101T0900")
-        self.assertEqual(self.pre("AskUserQuestion", question)[0], 2)  # still no link
-        question = gate_question(f"Plan ready, read {URL}#{gate_id}.", labels=("Approve Plan", "Request Changes"))
         self.assertEqual(self.pre("AskUserQuestion", question)[0], 0)
+        question = gate_question(f"Plan ready, read {URL}#{gate_id}.", labels=("Approve Plan", "Request Changes"))
+        self.assertEqual(self.pre("AskUserQuestion", question)[0], 2)  # the link belongs in a message
 
     def test_accept_as_is_is_a_gate_label(self):
         self.open_gate()
@@ -304,17 +308,20 @@ class TestTheQuestion(Case):
             code, _out, err = self.pre("AskUserQuestion", question)
             self.assertEqual((code, err), (0, ""), question)
 
-    def test_a_number_in_the_link_is_not_a_pull_request(self):
+    def test_a_number_in_a_gate_id_is_not_a_pull_request(self):
         self.open_gate()
         gate_id = self.publish()
-        self.assertEqual(self.ask(f"Read {URL}#{gate_id} (2 documents).")[0], 0)
-        self.assertEqual(self.ask(f"Read claude.ai/artifact/abc123#{gate_id}")[0], 0)
+        # a question carrying the link is still a gate (so it is refused for the link, not passed as a pull request)
+        code, _out, err = self.ask(f"Read {URL}#{gate_id} (2 documents).")
+        self.assertEqual(code, 2)
+        self.assertIn("in a message of its own", err)
+        self.assertEqual(self.ask("Read the documents (2 of them). How would you like to proceed?")[0], 0)
         self.assertEqual(self.ask("Read it; also see #12.")[0], 0)  # a pull request is named: not an AI-DLC gate
 
     def test_two_sessions_do_not_share_state(self):
         self.open_gate(session="a")
         self.publish(session="a")
-        self.assertEqual(self.ask("x", session="a")[0], 2)  # no link
+        self.assertEqual(self.ask("x", session="a")[0], 0)
         self.open_gate(session="b")
         self.assertEqual(self.ask("x", session="b")[0], 2)
         self.assertIn("Publish them first", self.ask("x", session="b")[2])

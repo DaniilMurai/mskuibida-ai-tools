@@ -9,8 +9,9 @@ The order, for the session that opens a gate:
     "AI-DLC approval gates" artifact.
  2. This hook notices the write of a `gates` row for the stage (PostToolUse ArtifactData).
  3. Until that has happened, the Approval question (header `Approval`, options such as Approve) and the
-    approved or rejected report are refused (PreToolUse). The question must also carry the page's link
-    `<artifact url>#<gate id>`.
+    approved or rejected report are refused (PreToolUse). The page's link `<artifact url>#<gate id>` goes
+    to the developer in a message of its own before the question; a question that carries it is refused,
+    so the dialog stays readable.
  4. A write that sets `status: "decided"`, or carries `decision` or `notes`, on a `gates` row is refused: those
     belong to the developer, who writes them in the page.
  5. When the developer answers Request Changes, the assistant is told to read the notes they left in the page.
@@ -371,8 +372,8 @@ def publish_instruction(stage, unit):
     script = os.path.join(PLUGIN_ROOT, "scripts", "gate_bundle.py")
     cmd = f'python3 "{script}" --stage {stage}' + (f" --unit {unit}" if unit else "")
     return (f"run `{cmd} --why <first|revision> --summary-file <a file holding your summary> --out <a scratch folder>`, "
-            "write the rows of its writes.json with one ArtifactData batch, and put `<artifact url>#<gate id>` "
-            "in the question")
+            "write the rows of its writes.json with one ArtifactData batch, and give the developer the link "
+            "`<artifact url>#<gate id>` in a message of its own before the question (never inside the question)")
 
 
 def target_of(state, project, call_stage=None, call_unit=None):
@@ -428,9 +429,12 @@ def guard_question(state, project, questions):
         if not stage:
             continue
         pub = require_published(state, stage, unit, opened)
-        link = f"{pub.get('url', '')}#{pub.get('id', '')}"
-        if "#" + str(pub.get("id", "")) not in str(q.get("question", "")):
-            raise Refusal(f"Put the link {link} in the question text.")
+        text = str(q.get("question", ""))
+        url = str(pub.get("url", "")).strip()
+        if (url and url in text) or re.search(r"claude\.ai/artifact/|#[0-9]{6}-[a-z0-9.-]+-\d{8}T\d{4}\b", text, re.I):
+            raise Refusal("The page's link goes to the developer in a message of its own, before the question; the "
+                          "question text carries no link. Send the link "
+                          f"{url}#{pub.get('id', '')} as a message, then ask the engine's question as it is.")
 
 
 def guard_report(state, project, call):
