@@ -439,12 +439,14 @@ describe('Needs attention', () => {
     // 3 gates + the drift flag: four rows, the count a pill in the error colour (one row is an error).
     const count = (await probe(ui).findAll({ type: 'Text' })).find(el => el.text === padded('4'))
     expect([count?.props.color, count?.props.backgroundColor]).toEqual(['error', tint('error', '24')])
-    // The column: heading row first, then the cards, a line apart.
+    // The column: heading row first, a line above the cards, which stand two lines apart.
     const column = chains(root, node => node.type === 'Box' && node.props.gap === 1 && textOf(kids(node)[0] ?? '').startsWith('Needs attention'))[0]!.at(-1)!
-    expect(kids(column).length).toBe(5)
+    expect(kids(column).length).toBe(2)
     expect(textOf(kids(column)[0]!)).toBe(`Needs attention${padded('4')}`)
-    // Each card: tinted line and fill of its row's colour (raw hex, not a theme key).
-    const [questions, pr, resume, drift] = kids(column).slice(1)
+    const list = kids(column)[1]!
+    expect([list.props.gap, kids(list).length]).toEqual([2, 4])
+    // Each card: tinted line and fill of its row's colour (raw hex, not a theme key). One PR row stays a card of its own.
+    const [questions, pr, resume, drift] = kids(list)
     expect([questions, pr, resume, drift].map(card => [card!.props.borderColor, card!.props.backgroundColor])).toEqual([
       [tint('warning', '66'), tint('warning', '17')],
       [tint('error', '66'), tint('error', '17')],
@@ -462,6 +464,46 @@ describe('Needs attention', () => {
     // A gate with no caption has none; a command is a button under the title.
     expect(chains(resume!, node => node.type === 'Text' && node.props.dimColor === true && textOf(node) !== 'Resume it').map(chain => textOf(chain.at(-1)!))).toEqual([])
     expect(chains(resume!, node => node.type === 'Button')[0]?.at(-1)?.props.key).toBe('attention:fill:gate:cmd')
+    await ui.unmount()
+  })
+
+  test('desktop: two or more rows about pull requests are one card, where the first stood, in the worst tone', async ($, on) => {
+    const url = (n: number) => `https://github.com/acme/shop/pull/${n}`
+    const gates: Gate[] = [
+      { id: 'changes-requested:60', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #60', sectionId: '', isAttentionOnly: true, href: url(60), command: '/pr-review:address-review 60' },
+      { id: 'parked', kind: 'parked', tone: 'warning', title: 'Parked at contract-design', sectionId: '' },
+      { id: 'pr:66', kind: 'pr-not-merged', tone: 'warning', title: 'PR #66 not merged', sectionId: '', href: url(66) },
+      { id: 'conflicts:66', kind: 'conflicts', tone: 'error', title: 'PR #66 has conflicts with main', sectionId: '', href: url(66) },
+    ]
+    const ui = await draw($, on, stageModel({ gates }), 'desktop', MEDIUM)
+    const root = await tree(ui)
+    const column = chains(root, node => node.type === 'Box' && node.props.gap === 1 && textOf(kids(node)[0] ?? '').startsWith('Needs attention'))[0]!.at(-1)!
+    // Every row still counts.
+    expect(textOf(kids(column)[0]!)).toBe(`Needs attention${padded('4')}`)
+    const [prs, parked] = kids(kids(column)[1]!)
+    expect(kids(kids(column)[1]!).length).toBe(2)
+    expect([prs!.props.borderColor, prs!.props.backgroundColor]).toEqual([tint('error', '66'), tint('error', '17')])
+    expect(textOf(prs!)).toContain('Pull requests (3)')
+    for (const title of ['Changes requested on your PR #60', 'PR #66 not merged', 'PR #66 has conflicts with main']) expect(textOf(prs!)).toContain(title)
+    expect(textOf(parked!)).toContain('Parked at contract-design')
+    expect(textOf(parked!)).not.toContain('PR #66')
+    // A PR row's command is still a button under it, and still presses.
+    expect(chains(prs!, node => node.type === 'Button')[0]?.at(-1)?.props.key).toBe('attention:fill:gate:changes-requested:60')
+    await ui.unmount()
+  })
+
+  test('terminal: PR rows keep their places, no card', async ($, on) => {
+    const url = (n: number) => `https://github.com/acme/shop/pull/${n}`
+    const gates: Gate[] = [
+      { id: 'pr:66', kind: 'pr-not-merged', tone: 'warning', title: 'PR #66 not merged', sectionId: '', href: url(66) },
+      { id: 'parked', kind: 'parked', tone: 'warning', title: 'Parked at contract-design', sectionId: '' },
+      { id: 'conflicts:66', kind: 'conflicts', tone: 'error', title: 'PR #66 has conflicts with main', sectionId: '', href: url(66) },
+    ]
+    const ui = await draw($, on, stageModel({ gates }), 'terminal', MEDIUM)
+    const lines = await shown(ui)
+    const at = (text: string) => lines.findIndex(line => line.includes(text))
+    expect(at('PR #66 not merged') < at('Parked at contract-design') && at('Parked at contract-design') < at('PR #66 has conflicts')).toBe(true)
+    expect(lines.some(line => line.includes('Pull requests'))).toBe(false)
     await ui.unmount()
   })
 

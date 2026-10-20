@@ -145,7 +145,9 @@ read on a light and a dark theme alike.
   edge). Card labels are set in capitals (`NOW`, `NEXT`, `THIS SESSION`).
 - **Next**: the label, the command as a grey pill and the reason on one wrapping line, the button under them.
 - **Needs attention**: the heading with its count as a pill; each card tinted in its tone, the title in the text
-  colour, the where, and the gate's caption under it.
+  colour, the where, and the gate's caption under it. The cards stand two lines apart. Two or more rows about pull
+  requests (the rows that link to a PR) are one card, `Pull requests (5)`, where the first of them stood, in the worst
+  of their tones (0.23.0); the count still counts every row. The terminal draws no cards and keeps every row in place.
 - **Plan**: `Plan` bold over a dim summary. A section row is the chevron, its ring (a dashed one where nothing is
   counted or it is skipped), the numbered title, the count on the right.
 - **Items**: the status as a 14 px icon (its alt the status word), chips as grey pills without brackets, the status
@@ -880,6 +882,7 @@ renderer: check the real pane too when spacing matters.
 - **0.4.0** — the `ledger` provider (WORKPLAN.md against PRs, product sections you pin).
 - **M2 (0.5.0)** — freshness: re-read on session start, branch change, writes to the `watch` files, turn end, a surface attaching, and an mtime poll; a provider's remote `fingerprint` poll (the ledger's PRs and default-branch tip); redraw only when the model changes; the desktop pane opens when the app attaches.
 - **0.6.0** — the pane redesign: header, Now card, Needs attention, Plan; three breakpoints, done-folding and the open-items cap, the status strip.
+- **0.23.0** — on the desktop, the rows about pull requests under Needs attention are one card, and the cards stand further apart.
 - **0.22.0** — Units are listed in build order (the step of the dependency graph each can be built at, then by number), not in the dependency block's order.
 - **0.21.2** — a Unit stage re-opened after its approval (its latest receipt a start) is in progress, even while the engine's table still says `[x]`.
 - **0.21.1** — a session on a side branch the stage pattern reads but that names no stage (`ms/BM-218/sprint-rules`) no longer filters PRs by its ticket, so the plan's stage and phase PRs (`ms/BM-5/delivery-planning`) map there too.
