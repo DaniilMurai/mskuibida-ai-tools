@@ -52,6 +52,7 @@ export const en = {
 
   'attention.title': 'Needs attention ({count})',
   'attention.heading': 'Needs attention',
+  'attention.prs': 'Pull requests ({count})',
   'attention.whereAfter': '{section}, after {item}',
   'attention.whereOn': '{section}, {item}',
 

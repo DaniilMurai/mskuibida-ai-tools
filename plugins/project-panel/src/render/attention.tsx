@@ -1,6 +1,7 @@
 // Needs attention: what blocks, and what waits on the viewer. The freshness error, then the gates (a provider
 // puts the rows tied to the viewer first: a review asked of them, their approved PR), then the drift flags. A
-// row with a command offers it as a button that puts it in the prompt.
+// row with a command offers it as a button that puts it in the prompt. On a desktop the rows about pull requests (the
+// ones that link to a PR) are one card together, where the first of them stands; every other row is a card of its own.
 import { t } from '../strings/en'
 import type { Gate, PanelModel } from '../../types'
 import { gateColor, gateGlyph, isRich, safely, tint, toneColor, uniqueIds } from './kit'
@@ -61,9 +62,9 @@ function commandEl(ctx: Ctx, row: Row, key: string): El | false {
   )
 }
 
-function rowEl(ctx: Ctx, row: Row, key: string): El {
+/** A row's lines, without a card: its glyph, title and where, then its caption and command. */
+function rowBody(ctx: Ctx, row: Row, key: string): El {
   const { Box, Text, Link } = ctx.kit
-  const isBoxed = ctx.surface !== 'terminal'
   const glyph = (
     <Box width={1} flexShrink={0}>
       <Text bold color={row.color}>
@@ -129,29 +130,53 @@ function rowEl(ctx: Ctx, row: Row, key: string): El {
         {where}
       </Box>
     )
-  const body =
-    command === false && caption === false ? (
-      line
-    ) : (
-      <Box flexDirection="column" flexShrink={1} flexGrow={1} minWidth={0}>
-        {line}
-        {caption}
-        {command}
-      </Box>
-    )
-  // The desktop fills the card with a tint of its tone under a faint line of it; the title is in the text colour.
+  return command === false && caption === false ? (
+    line
+  ) : (
+    <Box flexDirection="column" flexShrink={1} flexGrow={1} minWidth={0}>
+      {line}
+      {caption}
+      {command}
+    </Box>
+  )
+}
+
+/** A card in `color`: the desktop fills it with a tint of the tone under a faint line of it; the title is in the text colour. */
+function card(ctx: Ctx, color: string | undefined, body: El): El {
+  const { Box } = ctx.kit
   const rich = isRich(ctx)
-  return isBoxed ? (
+  return (
     <Box
       borderStyle="round"
-      borderColor={rich ? tint(row.color, '66') : (row.color ?? 'subtle')}
-      backgroundColor={rich ? tint(row.color, '17') : undefined}
+      borderColor={rich ? tint(color, '66') : (color ?? 'subtle')}
+      backgroundColor={rich ? tint(color, '17') : undefined}
       paddingX={1}
     >
       {body}
     </Box>
-  ) : (
-    body
+  )
+}
+
+/** The worst tone of several rows, for the card that holds them all: an error over a warning over good news. */
+const RANK: Record<string, number> = { error: 3, warning: 2, accent: 1, success: 0 }
+const worstOf = (rows: readonly Row[]): string | undefined =>
+  rows.reduce<string | undefined>((worst, row) => ((RANK[row.color ?? ''] ?? 2) > (RANK[worst ?? ''] ?? -1) ? row.color : worst), undefined)
+
+/** The rows about pull requests as one card: a dim heading, then each PR row under it, a line apart. */
+function prCard(ctx: Ctx, rows: readonly { row: Row; key: string }[]): El {
+  const { Box, Text } = ctx.kit
+  const heading = t('attention.prs', { count: String(rows.length) })
+  return card(
+    ctx,
+    worstOf(rows.map(one => one.row)),
+    <Box flexDirection="column" gap={1} flexShrink={1} flexGrow={1} minWidth={0}>
+      {heading !== '' && (
+        <Text bold dimColor wrap="truncate-end">
+          {heading}
+        </Text>
+      )}
+      {rows.map(one => rowBody(ctx, one.row, one.key))}
+    </Box>,
   )
 }
 
@@ -164,6 +189,18 @@ export function attention(ctx: Ctx, model: PanelModel): El | false {
   const rich = isRich(ctx)
   const heading = rich ? t('attention.heading') : t('attention.title', { count: String(rows.length) })
   const tone = rows.some(row => row.color === 'error') ? 'error' : 'warning'
+  const keyed = rows.map((row, index) => ({ row, key: keys[index]! }))
+  // On a desktop, two or more rows about pull requests are one card, where the first of them stands; the terminal
+  // draws no cards and keeps every row in its place.
+  const isBoxed = ctx.surface !== 'terminal'
+  const prs = keyed.filter(one => one.row.href !== undefined)
+  const isFolded = isBoxed && prs.length >= 2
+  const firstPr = prs[0]?.key
+  const cards = keyed.flatMap(one => {
+    if (isFolded && one.row.href !== undefined) return one.key === firstPr ? [prCard(ctx, prs)] : []
+    const body = rowBody(ctx, one.row, one.key)
+    return [isBoxed ? card(ctx, one.row.color, body) : body]
+  })
   return (
     <Box flexDirection="column" gap={rich ? 1 : 0}>
       {heading !== '' &&
@@ -179,7 +216,10 @@ export function attention(ctx: Ctx, model: PanelModel): El | false {
             {heading}
           </Text>
         ))}
-      {rows.map((row, index) => rowEl(ctx, row, keys[index]!))}
+      {/* The cards stand apart, so each reads as its own. */}
+      <Box flexDirection="column" gap={rich ? 2 : 0}>
+        {cards}
+      </Box>
     </Box>
   )
 }

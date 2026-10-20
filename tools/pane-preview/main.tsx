@@ -90,6 +90,21 @@ function designModel(): PanelModel {
   })
 }
 
+/** Needs attention as blickmahl had it: five rows about four PRs, and the park. */
+function attentionModel(): PanelModel {
+  const model = designModel()
+  const url = (n: number) => `https://github.com/acme/shop/pull/${n}`
+  model.gates = [
+    { id: 'changes-requested:60', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #60', caption: 'Answer the review before it can merge.', sectionId: '', isAttentionOnly: true, href: url(60), command: '/pr-review:address-review 60' },
+    { id: 'review-not-requested:70', kind: 'review-not-requested', tone: 'warning', title: 'PR #70 is not sent for review', caption: 'Nobody is asked to review it yet.', sectionId: '', isAttentionOnly: true, href: url(70), command: '/pr-review:request-review 70' },
+    { id: 'pr:66', kind: 'pr-not-merged', tone: 'warning', title: 'PR #66 not merged', caption: "functional-design can't start on main until it lands.", sectionId: 'INCEPTION', afterItemId: 'refined-mockups', href: url(66) },
+    { id: 'changes-requested:66', kind: 'changes-requested', tone: 'warning', title: 'Changes requested on your PR #66', caption: 'Address the review before it can merge.', sectionId: 'INCEPTION', afterItemId: 'refined-mockups', href: url(66), command: '/pr-review:address-review 66' },
+    { id: 'conflicts:66', kind: 'conflicts', tone: 'error', title: 'PR #66 has conflicts with main', caption: 'Resolve them before it can merge.', sectionId: 'INCEPTION', afterItemId: 'refined-mockups', href: url(66) },
+    { id: 'parked', kind: 'parked', tone: 'warning', title: 'Parked at contract-design', caption: 'The workflow was parked 2026-10-13 22:36.', sectionId: 'INCEPTION', afterItemId: 'refined-mockups' },
+  ]
+  return model
+}
+
 // Built by the real AI-DLC provider (async), before the page draws.
 const [unitsFree, unitsClaimed] = await Promise.all([unitsModel(false), unitsModel(true)])
 
@@ -97,6 +112,7 @@ const SCENARIOS: Record<string, () => PanelModel | null> = {
   'Construction: no Unit claimed (provider)': () => unitsFree,
   'Construction: U3 claimed here (provider)': () => unitsClaimed,
   'Design sample (stage, PR in review)': designModel,
+  'Needs attention: several PRs': attentionModel,
   'Screenshot: side job, local only': screenshotModel,
   'Test world: stage': () => stageModel(),
   'Test world: side job': () => sideJobModel(),
