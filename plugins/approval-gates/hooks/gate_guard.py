@@ -28,6 +28,7 @@ and cannot be checked is refused. Standard library only.
 """
 
 import contextlib
+import datetime
 import json
 import os
 import re
@@ -463,18 +464,27 @@ def link_of(pub):
     return f"{url}#{pub.get('id', '')}"
 
 
+def epoch_of(stamp):
+    try:
+        return datetime.datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
 def link_sent(event, pub):
-    """True when a message of the assistant in this session's transcript carries the page's link. Tool results,
-    the developer's prompts and subagent transcripts do not count. A transcript that cannot be read refuses."""
-    gate_id, needle = str(pub.get("id", "")), link_of(pub)
+    """(True, _) when a message of the assistant in this session's transcript carries the page's link; else
+    (False, counts) of the assistant's text, thinking and tool_use blocks written since the page was published.
+    Tool results, the developer's prompts and subagent transcripts do not count. An unreadable transcript refuses."""
+    gate_id, needle, since = str(pub.get("id", "")), link_of(pub), pub.get("at")
     path = event.get("transcript_path")
     if not path or not gate_id:
         raise Refusal("the session transcript is not given, so whether the developer got the page's link cannot "
                       "be checked.")
+    counts = {"text": 0, "thinking": 0, "tool_use": 0}
     try:
         with open(path, encoding="utf-8") as f:
             for line in f:
-                if gate_id not in line:
+                if '"assistant"' not in line:
                     continue
                 try:
                     entry = json.loads(line)
@@ -484,13 +494,19 @@ def link_sent(event, pub):
                     continue
                 content = (entry.get("message") or {}).get("content") if isinstance(entry.get("message"), dict) else None
                 blocks = content if isinstance(content, list) else [{"type": "text", "text": content}]
+                stamp = epoch_of(entry.get("timestamp"))
+                recent = isinstance(since, (int, float)) and stamp is not None and stamp >= since
                 for block in blocks:
-                    if isinstance(block, dict) and block.get("type") == "text" and needle in str(block.get("text", "")):
-                        return True
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "text" and needle in str(block.get("text", "")):
+                        return True, counts
+                    if recent and block.get("type") in counts:
+                        counts[block["type"]] += 1
     except OSError as exc:
         raise Refusal(f"the session transcript cannot be read ({exc}), so whether the developer got the page's "
                       "link cannot be checked.") from None
-    return False
+    return False, counts
 
 
 def guard_question(event, state, project, questions):
@@ -505,10 +521,14 @@ def guard_question(event, state, project, questions):
             raise Refusal("The page's link goes to the developer in a message of its own, before the question; the "
                           "question text carries no link. Send the link "
                           f"{link_of(pub)} as a message, then ask the engine's question as it is.")
-        if not link_sent(event, pub):
+        sent, counts = link_sent(event, pub)
+        if not sent:
             raise Refusal("The developer gets the page's link before the question, and no message of yours carries "
-                          f"it yet. Send `{link_of(pub)}` in a message of its own (the `**Read:**` line of the "
-                          "completion message), then ask the engine's question as it is, with no link in it.")
+                          f"it yet. Since gates/{pub.get('id', '')} was published, your transcript holds "
+                          f"{counts['thinking']} thinking, {counts['tool_use']} tool-call and {counts['text']} text "
+                          "block(s), none with the link. Thinking is not output and a tool call is not a message: "
+                          f"write `**Read:** {link_of(pub)}` as the text of your message, then ask the engine's "
+                          "question as it is, with no link in it.")
 
 
 def guard_report(state, project, call):
