@@ -48,7 +48,35 @@ claude plugin update <plugin>@mskuibida-tooling
 ```
 
 **Releasing:** bump `version` in the plugin's `plugin.json` and its `marketplace.json` entry on every
-user-facing change — users only receive a plugin when its version changes. CI enforces it.
+user-facing change — users only receive a plugin when its version changes. Also bump the top-level
+`version` in `marketplace.json` whenever that file changes (a plugin bumped, added, removed or
+re-described): it names the tag of the merge. CI enforces both.
+
+### Pinning
+
+Every commit on `main` gets the tag `v<version>`, from the top-level `version` in
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json)
+([`tag-main.yml`](.github/workflows/tag-main.yml)). A tag never moves; a commit that changes no
+plugin keeps the previous one. To take updates only when you choose, pin the marketplace to a tag
+in your project's `.claude/settings.json`:
+
+```json
+"extraKnownMarketplaces": {
+  "mskuibida-tooling": {
+    "source": {
+      "source": "git",
+      "url": "https://github.com/maksymskuibida/mskuibida-ai-tools.git",
+      "ref": "v1.0.0"
+    }
+  }
+}
+```
+
+Moving to a newer version is then a change to that file, reviewed like any other. The tags:
+
+```bash
+git ls-remote --tags https://github.com/maksymskuibida/mskuibida-ai-tools.git
+```
 
 ## Plugins
 

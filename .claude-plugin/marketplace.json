@@ -4,6 +4,7 @@
     "name": "Maksym Skuibida"
   },
   "description": "Maksym Skuibida's personal Claude Code tooling — small, opinionated plugins.",
+  "version": "1.0.0",
   "plugins": [
     {
       "name": "response-format",
