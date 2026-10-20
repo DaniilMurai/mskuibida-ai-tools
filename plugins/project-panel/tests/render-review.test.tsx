@@ -162,17 +162,30 @@ describe('review state, drawn', () => {
       test(`the viewer's rows are under Needs attention only, the plan gate in both, at ${name} on ${surface}`, async ($, on) => {
         const ui = await draw($, on, reviewModel(), surface, columns)
         const texts = (await shown(ui)).map(el => bare(el.text))
-        for (const row of rows) expect(texts.filter(text => text === row.title)).toHaveLength(1)
-        expect(texts.filter(text => text === 'PR #35 not merged')).toHaveLength(2)
-        // The desktop's heading is the words alone with the count as a pill after it.
-        if (surface === 'terminal') expect(texts).toContain('Needs attention (4)')
-        else expect(texts.slice(texts.indexOf('Needs attention'), texts.indexOf('Needs attention') + 2)).toEqual(['Needs attention', '4'])
-        // A row about an item names the item itself, not what comes after it.
-        expect(texts).toContain('Inception, stage-you')
-        expect(texts).toContain('Inception, after stage-changes')
-        // A PR outside the plan has no place: the row says what the PR is instead.
-        expect(texts).toContain('SHOP-9 Fix the login redirect — by dev-b')
-        expect(texts.indexOf('Your review is requested on PR #34')).toBeLessThan(texts.indexOf('PR #35 not merged'))
+        if (surface === 'terminal') {
+          for (const row of rows) expect(texts.filter(text => text === row.title)).toHaveLength(1)
+          expect(texts.filter(text => text === 'PR #35 not merged')).toHaveLength(2)
+          expect(texts).toContain('Needs attention (4)')
+          // A row about an item names the item itself, not what comes after it.
+          expect(texts).toContain('Inception, stage-you')
+          expect(texts).toContain('Inception, after stage-changes')
+          // A PR outside the plan has no place: the row says what the PR is instead.
+          expect(texts).toContain('SHOP-9 Fix the login redirect — by dev-b')
+          expect(texts.indexOf('Your review is requested on PR #34')).toBeLessThan(texts.indexOf('PR #35 not merged'))
+        } else {
+          // The desktop's heading is the words alone with the count as a pill after it; the PRs are one card, a line each.
+          expect(texts.slice(texts.indexOf('Needs attention'), texts.indexOf('Needs attention') + 2)).toEqual(['Needs attention', '4'])
+          expect(texts).toContain('Pull requests (4)')
+          for (const row of rows) expect(texts).not.toContain(row.title)
+          expect(texts).toContain('your review requested')
+          expect(texts).toContain('approved')
+          // A PR outside the plan says what it is on its line.
+          expect(texts).toContain('your review requested · SHOP-9 Fix the login redirect — by dev-b')
+          // The plan's own gate line keeps its title; its PR's line under Needs attention says it in a word.
+          expect(texts.filter(text => text === 'PR #35 not merged')).toHaveLength(1)
+          expect(texts).toContain('not merged')
+          expect(texts.indexOf('PR #34')).toBeLessThan(texts.indexOf('PR #35'))
+        }
         await ui.unmount()
       })
 
@@ -180,9 +193,15 @@ describe('review state, drawn', () => {
         const filled: string[] = []
         const ui = await draw($, on, reviewModel(), surface, columns, filled)
         const buttons = (await shown(ui)).filter(el => el.type === 'Button').map(el => el.text)
-        expect(buttons).toContain('/pr-review:review-pr 34')
-        expect(buttons).toContain('/pr-review:address-review 36')
-        expect(buttons).toContain('/pr-review:review-pr 80')
+        // The terminal's button is the command; the desktop's, on the PR's line, its name (the line says which PR).
+        if (surface === 'terminal') {
+          expect(buttons).toContain('/pr-review:review-pr 34')
+          expect(buttons).toContain('/pr-review:address-review 36')
+          expect(buttons).toContain('/pr-review:review-pr 80')
+        } else {
+          expect(buttons.filter(text => text === 'review-pr')).toHaveLength(2)
+          expect(buttons).toContain('address-review')
+        }
         await ui.press({ key: 'attention:fill:gate:you:approved:36' })
         await ui.press({ key: 'next:fill' })
         expect(filled).toEqual(['/pr-review:address-review 36', '/pr-review:review-pr 34'])

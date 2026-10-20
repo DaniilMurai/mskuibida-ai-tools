@@ -1412,12 +1412,20 @@ describe('the wide left column lays out for its own width', () => {
       })
       for (const columns of [60, 160]) {
         const { ui } = await draw($, on, model, surface, columns)
-        const [trail] = chains(await tree(ui), isText(caption))
-        // The row's body, its line and the where may each shrink to nothing (the desktop otherwise holds a
-        // flex child at its full text length), and the where clips what is left.
-        for (const box of trail!.slice(-4, -1)) expect(box.props.minWidth).toBe(0)
-        expect(trail!.at(-2)!.props.overflow).toBe('hidden')
-        expect(trail!.at(-1)!.props.wrap).toBe('truncate-end')
+        if (surface === 'terminal') {
+          const [trail] = chains(await tree(ui), isText(caption))
+          // The row's body, its line and the where may each shrink to nothing (the desktop otherwise holds a
+          // flex child at its full text length), and the where clips what is left.
+          for (const box of trail!.slice(-4, -1)) expect(box.props.minWidth).toBe(0)
+          expect(trail!.at(-2)!.props.overflow).toBe('hidden')
+          expect(trail!.at(-1)!.props.wrap).toBe('truncate-end')
+        } else {
+          // The desktop's PR line says it after the PR's words, and wraps inside the card: the words' box and the
+          // line may shrink to nothing, so no flex child holds its full text length past the border.
+          const [trail] = chains(await tree(ui), isText(`your review requested · ${caption}`))
+          for (const box of trail!.slice(-3, -1)) expect(box.props.minWidth).toBe(0)
+          expect(trail!.at(-1)!.props.wrap).toBe('wrap')
+        }
         await ui.unmount()
       }
     })
