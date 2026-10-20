@@ -58,6 +58,12 @@
       "source": "./plugins/review-findings",
       "description": "Whenever review findings reach the developer (an AI-DLC stage review brief at a gate, or /code-review's findings), the agent shows a compact summary inline and asks one question: Fix, Accept (only when nothing is blocking) or Open in form, where each finding is sorted into fix, accept or reject with a reason. A hook enforces the order.",
       "version": "1.0.0"
+    },
+    {
+      "name": "aidlc-session-titles",
+      "source": "./plugins/aidlc-session-titles",
+      "description": "For AI-DLC projects: keeps every session that runs the workflow titled by what it is on — `<unit> — <stage>` on a Construction Unit, else `<phase> — <stage>` — read from the project's state (binding, claim, directive, stage graph), never from the agent. Set at each prompt and, in the desktop app, renamed mid-turn when the stage or Unit moves on.",
+      "version": "0.1.0"
     }
   ]
 }

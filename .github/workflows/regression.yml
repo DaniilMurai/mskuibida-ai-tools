@@ -100,6 +100,7 @@ jobs:
           claude plugin validate plugins/story-points
           claude plugin validate plugins/approval-gates
           claude plugin validate plugins/review-findings
+          claude plugin validate plugins/aidlc-session-titles
 
       - name: Test story-points
         # Python hook and script with a unittest suite.
@@ -112,6 +113,10 @@ jobs:
       - name: Test review-findings
         # Python hook and findings parser with a unittest suite.
         run: python3 -m unittest discover -s plugins/review-findings/tests
+
+      - name: Test aidlc-session-titles
+        # Python hook with a unittest suite.
+        run: python3 -m unittest discover -s plugins/aidlc-session-titles/tests
 
   upstream-aidlc:
     # project-panel's AI-DLC provider is keyed on upstream's state-file field names,
