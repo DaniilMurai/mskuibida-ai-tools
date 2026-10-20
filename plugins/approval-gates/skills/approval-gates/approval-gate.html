@@ -127,14 +127,20 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .railh .tools { display: flex; gap: 4px; }
 .railh button { font-size: 11px; padding: 2px 7px; border-color: transparent; color: var(--muted); }
 .railh button:hover { border-color: var(--line); color: var(--fg); }
-.rdoc { display: flex; align-items: center; gap: 6px; text-align: left; border: 1px solid transparent; padding: 5px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; min-width: 0; width: 100%; }
-.rdoc > span:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdoc { display: flex; align-items: center; gap: 6px; text-align: left; border: 1px solid transparent; padding: 5px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; min-width: 0; width: 100%; cursor: pointer; }
+.rdoc > .rtitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rdoc.active, .rsec.active { background: var(--ink-soft); border-color: transparent; color: var(--ink); }
 .rsec { display: block; text-align: left; border: 1px solid transparent; padding: 3px 8px 3px 20px; border-radius: 6px; font-weight: 400; font-size: 12.5px; color: var(--muted); width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rsec:hover, .rdoc:hover { border-color: var(--line); color: var(--fg); }
 .rsec.active { color: var(--ink); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
 .rgroup { display: grid; gap: 1px; margin-bottom: 4px; }
+details.rgroup > summary { list-style: none; display: block; }
+details.rgroup > summary::-webkit-details-marker { display: none; }
+.rcaret { width: 14px; flex: none; color: var(--muted); font-size: 10px; text-align: center; cursor: pointer; border-radius: 4px; }
+.rcaret:hover { color: var(--fg); background: var(--line-soft); }
+details.rgroup[open] > summary .rcaret { transform: rotate(90deg); }
+.rcaret.none { visibility: hidden; }
 .railtoggle { display: none; }
 
 #col { display: grid; gap: 12px; min-width: 0; }
@@ -319,12 +325,12 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
 
   let db = null;
   const view = { id: "", unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false,
-    noteTimer: null, painted: "", diagrams: 0, openNotes: new Set(), railSig: "", mode: {}, refs: new Map() };
+    noteTimer: null, painted: "", diagrams: 0, openNotes: new Set(), railSig: "", mode: {}, refs: new Map(), railOpen: {} };
   const hasMd = () => typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
 
   function teardown() {
     view.unsub.forEach((u) => { try { u(); } catch {} });
-    Object.assign(view, { unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false, painted: "", railSig: "", openNotes: new Set(), mode: {}, refs: new Map() });
+    Object.assign(view, { unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false, painted: "", railSig: "", openNotes: new Set(), mode: {}, refs: new Map(), railOpen: {} });
     clearTimeout(view.noteTimer);
     el.rail.innerHTML = ""; el.col.innerHTML = "";
   }
@@ -1119,25 +1125,29 @@ details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px;
     const sig = JSON.stringify([docs.map((d) => [d.key, d.title, (el.col.querySelector(`#d-${CSS.escape(d.key)} summary h2`) || {}).textContent, [...el.col.querySelectorAll(`#d-${CSS.escape(d.key)} details.sec`)].map((s) => s.dataset.title)]), Object.keys(view.notes).filter((k) => (view.notes[k] || "").trim())]);
     if (sig === view.railSig) return; view.railSig = sig;
     let html = `<div class="railh"><span>Outline</span><span class="tools"><button type="button" data-all="open">Expand all</button><button type="button" data-all="close">Collapse all</button></span></div>`;
-    if (view.gate && view.gate.summary) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-summary"><span>Summary</span></button></div>`;
-    if (view.gate && view.gate.brief) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-brief"><span>Review</span></button></div>`;
+    if (view.gate && view.gate.summary) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-summary"><span class="rcaret none">▶</span><span class="rtitle">Summary</span></button></div>`;
+    if (view.gate && view.gate.brief) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-brief"><span class="rcaret none">▶</span><span class="rtitle">Review</span></button></div>`;
     docs.forEach((d) => {
       const shown = el.col.querySelector(`#d-${CSS.escape(d.key)} summary h2`); const title = (shown && shown.textContent.trim()) || d.title || d.key;
       const secs = [...el.col.querySelectorAll(`#d-${CSS.escape(d.key)} details.sec`)];
-      html += `<div class="rgroup"><button type="button" class="rdoc" data-go="d-${esc(d.key)}" title="${esc(title)}"><span>${esc(title)}</span>${(view.notes[d.key] || "").trim() ? '<i class="dot"></i>' : ""}${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}</button>` +
-        secs.map((s) => `<button type="button" class="rsec" data-go="${esc(s.id)}" title="${esc(s.dataset.title)}">${esc(s.dataset.title)}</button>`).join("") + `</div>`;
+      const block = $("d-" + d.key); const open = Object.prototype.hasOwnProperty.call(view.railOpen, d.key) ? view.railOpen[d.key] : !!(block && block.open);
+      html += `<details class="rgroup" data-key="${esc(d.key)}"${open ? " open" : ""}><summary><span class="rdoc" data-go="d-${esc(d.key)}" title="${esc(title)}" role="button" tabindex="0"><span class="rcaret${secs.length ? "" : " none"}" title="${secs.length ? "Fold or unfold the sections" : ""}">▶</span><span class="rtitle">${esc(title)}</span>${(view.notes[d.key] || "").trim() ? '<i class="dot"></i>' : ""}${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}</span></summary>` +
+        secs.map((s) => `<button type="button" class="rsec" data-go="${esc(s.id)}" title="${esc(s.dataset.title)}">${esc(s.dataset.title)}</button>`).join("") + `</details>`;
     });
     el.rail.innerHTML = html;
   }
   el.rail.addEventListener("click", (e) => {
     const all = e.target.closest("[data-all]");
-    if (all) { el.col.querySelectorAll("details").forEach((d) => { d.open = all.dataset.all === "open"; }); if (all.dataset.all === "open") drawDiagrams(el.col); return; }
+    if (all) { el.col.querySelectorAll("details").forEach((d) => { d.open = all.dataset.all === "open"; }); if (all.dataset.all === "open") drawDiagrams(el.col); el.rail.querySelectorAll("details.rgroup").forEach((g) => { g.open = all.dataset.all === "open"; view.railOpen[g.dataset.key] = g.open; }); return; }
+    if (e.target.closest(".rcaret")) { const g = e.target.closest("details.rgroup"); if (g) { e.preventDefault(); g.open = !g.open; view.railOpen[g.dataset.key] = g.open; } return; }
+    if (e.target.closest("summary")) e.preventDefault();
     const b = e.target.closest("[data-go]"); if (!b) return;
     const target = document.getElementById(b.dataset.go); if (!target) return;
     jumpTo(target);
     el.rail.querySelectorAll(".active").forEach((x) => x.classList.remove("active")); b.classList.add("active");
     if (matchMedia("(max-width: 900px)").matches) el.rail.classList.remove("show");
   });
+  el.rail.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest(".rdoc")) { e.preventDefault(); e.target.closest(".rdoc").click(); } });
   el.railtoggle.addEventListener("click", () => el.rail.classList.toggle("show"));
   el.col.addEventListener("click", (e) => {
     const sb = e.target.closest(".seg button");
