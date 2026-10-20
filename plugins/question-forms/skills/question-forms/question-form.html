@@ -68,20 +68,20 @@
 /* Layout: one reading column. A form is a numbered list of sections; options are selectable rows,
    the note sits under them, the proposal apart. A fixed bar carries save state and Done. */
 :root {
-  --bg: #f4f6f5; --surface: #ffffff; --fg: #17221f; --muted: #5a6964; --line: #d7dfdc;
-  --accent: #c8781a; --accent-soft: #fbefdf; --ink: #1d4a40; --ink-soft: #e3eeea;
-  --ok: #2f7a4d; --warn: #a33a2a; --warn-soft: #fbe7e2;
+  --bg: #f2f4f7; --surface: #ffffff; --fg: #151b26; --muted: #5a6474; --line: #d6dce6;
+  --accent: #b06f0c; --accent-soft: #fbefd9; --ink: #24427a; --ink-soft: #e2e9f6;
+  --ok: #2c7a4f; --warn: #a63a2b; --warn-soft: #fbe6e2;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
-  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442;
+  --accent: #eab062; --accent-soft: #3a2b14; --ink: #8fb0ec; --ink-soft: #1d2a42;
   --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834;
-  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442;
+  --accent: #eab062; --accent-soft: #3a2b14; --ink: #8fb0ec; --ink-soft: #1d2a42;
   --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
 
 body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); padding: 0 16px; }

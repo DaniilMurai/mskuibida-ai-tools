@@ -7,14 +7,13 @@
   (capabilities: {db: {}}, icon "document"); never regenerated per stage. Every gate is rows
   INSIDE this artifact, written by the agent with the ArtifactData tool (see SKILL.md next to
   this file; scripts/gate_bundle.py builds the rows). The page renders whatever the rows say, live.
-  Same tokens as the question forms (question-forms/skills/question-forms/question-form.html).
+  Same tokens as the question forms and the story points pages.
 
   Data contract (what the agent writes — always NEW rows, a fresh id per presentation):
 
     gates/<id>                  {title, stage, stageName, phase?, intent, project?, unit?, round, why?,
-                                 status: "open"|"decided", createdAt (ISO), summary?, brief?,
+                                 status: "open", createdAt (ISO), summary?, brief?,
                                  review?: {verdict, reviewer, iteration, file}, nextStage?,
-                                 options: [{k: "approve"|"changes"|"other", t, d}],
                                  documents: [{key, title, path, kind, bytes, parts?}]}
       id: <intent>-<stage>[-<unit>]-<YYYYMMDDTHHMM>
       summary: Markdown (the agent's completion summary). brief: the review brief exactly as
@@ -26,17 +25,21 @@
       at its H2 headings into rows <key>-p1, <key>-p2, … with {key, part: 1.., parts: N}; the page
       joins the parts in order (an index entry carries `parts`).
 
-    Markdown is rendered with marked, passed through DOMPurify. A document's single leading H1 is
-    its title in the block header; every H2 (or H1 when a document has several) becomes a
-    collapsible section and an outline entry; ```mermaid fences are drawn
-    with mermaid when their section is open (on an error the source stays, with a note).
+    Views. By the document's key the page renders a purpose-built view, with a Text switch back
+    to the document as written: entities (the `entities:` YAML block as cards and an entity
+    diagram), rules (the `rules:` block as filterable tables by group), components (the
+    `components:` block as a dependency graph and cards), unit dependencies (the `units:` block as
+    build layers), the story map, stories (cards by epic with Given/When/Then criteria),
+    requirements (tables by group), decisions (ADR cards), bolt plans, contract operations and
+    traceability coverage. Any other document, or one whose shape is not recognised, is Markdown
+    with every H2 a collapsible section. Ids such as FR1.2, BR3.5, US1.1, AC1.1.2, ADR-003, U3 or
+    C4 that name something in this gate are links to it.
 
   What the page writes (the only thing the agent reads back, one `get` of gates/<id>):
 
-    gates/<id>.notes[<document key>] = "text"                 the developer's note for Claude on a document
-    gates/<id>.decision = {k: "approve"|"changes", note, at}  a DRAFT decision; the answer is given in chat
-    gates/<id>.status   = "decided" once a draft decision is saved
+    gates/<id>.notes[<document key>] = "text"   the developer's note for Claude on a document
 
+  The decision itself is given in chat, as the engine prescribes; the page holds no decision.
   Link to a gate: <artifact url>#<id>. No hash: the list of gates.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,44 +47,62 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <style>
-/* Layout: a reading desk, not a page. A compact sticky header carries the gate's facts; below it
-   an outline rail on the left (documents and their sections) and a full-width column of
-   collapsible blocks: summary, review findings, then every document with its sections. A thin
-   bar at the bottom holds the draft decision. */
+/* Layout: a reading desk. A compact sticky header carries the gate's facts; below it an outline
+   rail on the left (documents and their sections) and a full-width column of collapsible blocks:
+   summary, review findings, then every document in its own view. */
 :root {
-  --bg: #f4f6f5; --surface: #ffffff; --fg: #17221f; --muted: #5a6964; --line: #d7dfdc; --line-soft: #e8edeb;
-  --accent: #c8781a; --accent-soft: #fbefdf; --ink: #1d4a40; --ink-soft: #e3eeea;
-  --ok: #2f7a4d; --warn: #a33a2a; --warn-soft: #fbe7e2; --bar-h: 60px; --head-h: 52px;
+  --bg: #f2f4f7; --surface: #ffffff; --fg: #151b26; --muted: #5a6474; --line: #d6dce6; --line-soft: #e6eaf0;
+  --accent: #b06f0c; --accent-soft: #fbefd9; --ink: #24427a; --ink-soft: #e2e9f6;
+  --ok: #2c7a4f; --ok-soft: #e0f0e6; --warn: #a63a2b; --warn-soft: #fbe6e2; --head-h: 52px;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834; --line-soft: #222d29;
-  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
-  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark } }
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442; --line-soft: #222a36;
+  --accent: #eab062; --accent-soft: #3a2b14; --ink: #8fb0ec; --ink-soft: #1d2a42;
+  --ok: #6cc28f; --ok-soft: #1a2f23; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark } }
 :root[data-theme="dark"] {
-  --bg: #111816; --surface: #19221f; --fg: #e6ece9; --muted: #9aa9a3; --line: #2c3834; --line-soft: #222d29;
-  --accent: #e7a04a; --accent-soft: #3a2a17; --ink: #8cc7b6; --ink-soft: #1f302b;
-  --ok: #6cc28f; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
+  --bg: #10141b; --surface: #181e28; --fg: #e5e9f0; --muted: #98a2b3; --line: #2b3442; --line-soft: #222a36;
+  --accent: #eab062; --accent-soft: #3a2b14; --ink: #8fb0ec; --ink-soft: #1d2a42;
+  --ok: #6cc28f; --ok-soft: #1a2f23; --warn: #ef8f7c; --warn-soft: #3d221d; color-scheme: dark }
 
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--body); margin: 0; }
+/* Nothing widens the page: a block that can be wider than its column (a table, a diagram, code, a strip of
+   layers or bolts) scrolls inside its own box, and every column, card and section lets its content shrink. */
+.desk > *, #col > *, .block > .body, .block > .body > *, .vw, .vw > *, .secbody > *, .cards > *, .card > *, details.sub > *, .facts > dd { min-width: 0; max-width: 100%; }
+.tablewrap, .diagram, pre, .layers, .bolts { max-width: 100%; }
 [hidden] { display: none !important; }
 a { color: var(--ink); }
 code { font: 500 .88em var(--mono); background: var(--ink-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
 button { font: 600 13px var(--body); border-radius: 6px; cursor: pointer; color: var(--fg); background: transparent; border: 1px solid var(--line); padding: 5px 10px; }
 button:hover { border-color: var(--ink); }
-button:focus-visible, summary:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-textarea { width: 100%; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; resize: vertical; }
+button:focus-visible, summary:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea, input[type="search"] { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+textarea { width: 100%; resize: vertical; }
 .pill { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
-.pill.decided, .pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.ok { color: var(--ok); border-color: var(--ok); }
 .pill.open, .pill.accent { color: var(--accent); border-color: var(--accent); }
 .pill.warn { color: var(--warn); border-color: var(--warn); }
 .pill.quiet { font-size: 10px; padding: 3px 6px; }
 .hint { color: var(--muted); margin: 0; }
 .mono { font: 500 12px var(--mono); }
+.chip { display: inline-block; font: 500 11.5px/1.3 var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--ink-soft); color: var(--ink); max-width: 100%; overflow-wrap: anywhere; }
+.chip.muted { background: var(--line-soft); color: var(--muted); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.accent { background: var(--accent-soft); color: var(--accent); }
+.xref { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--ink); cursor: pointer; }
+.xref:hover { background: var(--ink-soft); }
+#pop { position: fixed; z-index: 20; max-width: min(520px, 90vw); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 13px; pointer-events: none; }
+#pop b { font-family: var(--mono); font-weight: 500; color: var(--ink); margin-right: 6px; }
+#pop p { margin: 2px 0 0; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
 
 /* header */
 .head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
@@ -95,23 +116,31 @@ h1 { font: 700 20px/1.2 var(--display); margin: 0; min-width: 0; overflow-wrap: 
 .meta .sep::before { content: "·"; margin-right: 12px; }
 .spacer { flex: 1 1 auto; }
 .project { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; max-width: 110ch; overflow-wrap: anywhere; }
+#status { font-size: 12.5px; color: var(--muted); }
+#status.warn { color: var(--warn); }
 
 /* page body */
-main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px calc(var(--bar-h) + 20px); }
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 40px; }
 .desk { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
-#rail { position: sticky; top: calc(var(--head-h) + env(safe-area-inset-top, 0px) + 10px); max-height: calc(100vh - var(--head-h) - var(--bar-h) - 24px); overflow: auto; display: grid; gap: 2px; align-content: start; padding-right: 4px; }
+#rail { position: sticky; top: calc(var(--head-h) + env(safe-area-inset-top, 0px) + 10px); max-height: calc(100vh - var(--head-h) - 24px); overflow: auto; display: grid; gap: 2px; align-content: start; padding-right: 4px; }
 .railh { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .railh .tools { display: flex; gap: 4px; }
 .railh button { font-size: 11px; padding: 2px 7px; border-color: transparent; color: var(--muted); }
 .railh button:hover { border-color: var(--line); color: var(--fg); }
-.rdoc { display: flex; align-items: center; gap: 6px; text-align: left; border: 1px solid transparent; padding: 5px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; min-width: 0; width: 100%; }
-.rdoc > span:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdoc { display: flex; align-items: center; gap: 6px; text-align: left; border: 1px solid transparent; padding: 5px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; min-width: 0; width: 100%; cursor: pointer; }
+.rdoc > .rtitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rdoc.active, .rsec.active { background: var(--ink-soft); border-color: transparent; color: var(--ink); }
 .rsec { display: block; text-align: left; border: 1px solid transparent; padding: 3px 8px 3px 20px; border-radius: 6px; font-weight: 400; font-size: 12.5px; color: var(--muted); width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rsec:hover, .rdoc:hover { border-color: var(--line); color: var(--fg); }
 .rsec.active { color: var(--ink); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
 .rgroup { display: grid; gap: 1px; margin-bottom: 4px; }
+details.rgroup > summary { list-style: none; display: block; }
+details.rgroup > summary::-webkit-details-marker { display: none; }
+.rcaret { width: 14px; flex: none; color: var(--muted); font-size: 10px; text-align: center; cursor: pointer; border-radius: 4px; }
+.rcaret:hover { color: var(--fg); background: var(--line-soft); }
+details.rgroup[open] > summary .rcaret { transform: rotate(90deg); }
+.rcaret.none { visibility: hidden; }
 .railtoggle { display: none; }
 
 #col { display: grid; gap: 12px; min-width: 0; }
@@ -133,6 +162,9 @@ details[open] > summary .caret { transform: rotate(90deg); }
 .notebox .stat { margin-left: auto; }
 .notebox .stat.warn { color: var(--warn); }
 .notebtn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 3px 9px; font-size: 11.5px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--ink-soft); color: var(--ink); }
 
 /* findings table */
 .ftable { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -142,8 +174,7 @@ details[open] > summary .caret { transform: rotate(90deg); }
 .ftable tr.frow:hover td { background: var(--ink-soft); }
 .ftable tr.frow td:first-child { white-space: nowrap; font: 500 12px var(--mono); }
 .ftable td.where { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
-.ftable tr.fdet td { background: var(--bg); padding: 10px 14px 12px 32px; }
-.ftable tr.fdet td { border-bottom: 1px solid var(--line); }
+.ftable tr.fdet td { background: var(--bg); padding: 10px 14px 12px 32px; border-bottom: 1px solid var(--line); }
 .fdet dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 13px; }
 .fdet dt { font: 500 10.5px/1.9 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 .fdet dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -167,25 +198,136 @@ details[open] > summary .caret { transform: rotate(90deg); }
 .md pre, .jsonbox pre, .src { font: 400 12.5px/1.45 var(--mono); background: var(--ink-soft); border-radius: 6px; padding: 10px 12px; overflow-x: auto; margin: 0 0 .8em; white-space: pre; }
 .md pre code { background: none; padding: 0; font-size: inherit; }
 .tablewrap { overflow-x: auto; margin: 0 0 .8em; border: 1px solid var(--line); border-radius: 6px; }
-.md table { border-collapse: collapse; width: 100%; font-size: 13px; }
-.md th, .md td { text-align: left; vertical-align: top; padding: 5px 9px; border-bottom: 1px solid var(--line-soft); }
-.md th { background: var(--ink-soft); font-weight: 600; white-space: nowrap; }
-.md tr:last-child td { border-bottom: 0; }
+.md table, table.grid { border-collapse: collapse; width: 100%; font-size: 13px; }
+.md th, .md td, table.grid th, table.grid td { text-align: left; vertical-align: top; padding: 5px 9px; border-bottom: 1px solid var(--line-soft); }
+.md th, table.grid th { background: var(--ink-soft); font-weight: 600; white-space: nowrap; }
+.md tr:last-child td, table.grid tr:last-child td { border-bottom: 0; }
+table.grid th { font: 500 11px/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: transparent; }
+table.grid td.id { font: 500 12px var(--mono); white-space: nowrap; color: var(--ink); }
+table.grid td.dim, tr.dim td { color: var(--muted); font-size: 12.5px; }
 .md img { max-width: 100%; }
 .diagram { overflow-x: auto; margin: 0 0 .8em; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .diagram svg { max-width: none; height: auto; }
 .diagram .note, .jsonnote { color: var(--muted); font-size: 12px; margin: 0 0 6px; }
 .jsonbox pre { margin: 0; max-height: 60vh; }
 .plain { white-space: pre-wrap; font: 400 12.5px/1.45 var(--mono); }
-/* sections inside a document */
 details.sec { border-top: 1px solid var(--line-soft); }
 details.sec:first-child { border-top: 0; }
-details.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+details.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 7px 0; flex-wrap: wrap; }
 details.sec > summary::-webkit-details-marker { display: none; }
-details.sec > summary h1, details.sec > summary h2 { margin: 0; font-size: 15px; }
+details.sec > summary h1, details.sec > summary h2, details.sec > summary h3 { margin: 0; font: 600 15px/1.25 var(--display); min-width: 0; }
 details.sec > summary .cnt { color: var(--muted); font-size: 11.5px; font-family: var(--mono); margin-left: auto; white-space: nowrap; }
 details.sec > .secbody { padding: 2px 0 10px 22px; }
 .md.flat { padding-top: 10px; }
+
+/* views */
+.vtools { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 0 6px; font-size: 12.5px; color: var(--muted); }
+.vtools input[type="search"] { width: 220px; max-width: 100%; padding: 4px 8px; font-size: 12.5px; }
+.vtools .fchip { cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 500 11.5px var(--mono); padding: 3px 8px; border-radius: 999px; }
+.vtools .fchip[aria-pressed="true"] { background: var(--ink-soft); color: var(--ink); border-color: var(--ink); }
+.cards { display: grid; gap: 10px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; background: var(--surface); }
+.card.flat { border: 0; padding: 0; }
+.chead { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; margin-bottom: 4px; }
+.chead h3, .chead h4 { margin: 0; font: 600 14.5px/1.3 var(--display); min-width: 0; }
+.chead .end { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.facts { display: grid; grid-template-columns: fit-content(190px) minmax(0, 1fr); gap: 3px 14px; font-size: 13px; margin: 6px 0; }
+.facts dt { font: 500 10.5px/1.9 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); overflow-wrap: anywhere; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts dd ul { margin: 0; padding-left: 18px; }
+.desc { margin: 0 0 6px; }
+.gwt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 6px 12px; font-size: 13px; }
+.gwt > div > b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); display: block; }
+.ac { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; padding: 6px 0; border-top: 1px solid var(--line-soft); align-items: start; }
+.ac:first-child { border-top: 0; }
+.ac .acid { font: 500 11.5px/1.6 var(--mono); color: var(--ink); white-space: nowrap; }
+.ac .tags { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.rule-logic { white-space: pre-wrap; font: 400 12.5px/1.5 var(--mono); background: var(--ink-soft); border-radius: 6px; padding: 8px 10px; margin: 6px 0; }
+.rule-logic .kw { color: var(--accent); font-weight: 500; }
+tr.rrow { cursor: pointer; }
+tr.rrow:hover td { background: var(--ink-soft); }
+tr.rdet td { background: var(--bg); padding: 8px 14px 10px 28px; }
+.attr td.id { color: var(--fg); font-weight: 500; }
+.attr td.ty, td.ty { font: 400 12.5px var(--mono); color: var(--muted); white-space: nowrap; }
+.layers { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 8px; align-items: stretch; }
+.layer { flex: 0 0 auto; min-width: 150px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; align-content: start; }
+.layer > b { font: 500 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.unit { padding: 5px 8px; border-radius: 6px; background: var(--ink-soft); font-size: 12.5px; display: grid; gap: 2px; }
+.unit b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+.unit small { color: var(--muted); }
+.bolts { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 8px; }
+.bolt { flex: 1 0 180px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 4px; }
+.bolt b { font: 600 13.5px var(--display); }
+.bolt .bar { height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.bolt .bar i { display: block; height: 100%; background: var(--ink); }
+.cov { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.wrap { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+details.sub > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 4px 0; }
+
+/* structured views */
+.factrow { display: flex; flex-wrap: wrap; gap: 8px 26px; padding: 6px 0 10px; }
+.factrow > div { min-width: 0; display: grid; gap: 0; }
+.factrow b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.factrow span { overflow-wrap: anywhere; }
+.vw-lead { margin: 0 0 6px; }
+.vw-lead > details.sub { margin: 2px 0 6px; }
+.smart { min-width: 0; }
+.smart > :first-child { margin-top: 0; }
+.smart table.grid td, .smart table.grid th { overflow-wrap: anywhere; }
+.smart table.grid td.id { overflow-wrap: normal; }
+.smart table.grid td:last-child .chip { white-space: nowrap; }
+.tablewrap.tall { max-height: 68vh; overflow: auto; }
+.tablewrap.tall thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+.smart table.grid tbody tr:hover td { background: color-mix(in srgb, var(--ink-soft) 55%, transparent); }
+td.dirc { white-space: nowrap; vertical-align: top; color: var(--muted); }
+code.fchipc { display: inline-block; margin: 1px 2px 1px 0; }
+tr.dirrow td { background: var(--bg); padding-top: 4px; padding-bottom: 4px; font-size: 12px; }
+details.sub { margin: 4px 0 8px; }
+details.sub.h { border-top: 1px solid var(--line-soft); margin: 6px 0 0; padding-top: 2px; }
+details.sub.h > summary { display: list-item; color: var(--fg); padding: 5px 0; }
+details.sub.h > summary h3 { display: inline; margin: 0; font: 600 14.5px/1.3 var(--display); }
+details.sub.h > :not(summary) { margin-left: 18px; }
+ol.steps { list-style: none; counter-reset: st; padding: 0; margin: 0 0 .8em; display: grid; gap: 6px; }
+ol.steps > li { counter-increment: st; position: relative; padding: 6px 10px 6px 42px; border: 1px solid var(--line-soft); border-radius: 8px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+ol.steps > li::before { content: counter(st); position: absolute; left: 9px; top: 7px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink-soft); color: var(--ink); font: 600 12px/22px var(--mono); text-align: center; }
+ol.steps > li > :first-child { margin-top: 0; } ol.steps > li > :last-child { margin-bottom: 0; }
+ol.steps > li > p { margin: 0 0 .3em; }
+.md li.task { list-style: none; margin-left: -20px; padding-left: 24px; position: relative; overflow-wrap: anywhere; }
+.md li.task > p { margin: 0; }
+.tick { position: absolute; left: 0; top: .28em; width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line); text-align: center; font: 700 11px/12px var(--body); color: #fff; }
+li.task.done > .tick { background: var(--ok); border-color: var(--ok); }
+li.task.done { color: var(--muted); }
+details.step { border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: var(--surface); margin: 0; }
+details.step > summary { display: flex; align-items: center; gap: 10px; color: var(--fg); padding: 8px 0; }
+details.step > summary .end { margin-left: auto; display: flex; gap: 6px; }
+details.step[open] > summary { border-bottom: 1px solid var(--line-soft); margin-bottom: 6px; }
+.stepno { flex: none; min-width: 26px; height: 22px; border-radius: 11px; background: var(--ink-soft); color: var(--ink); font: 600 12px/22px var(--mono); text-align: center; padding: 0 6px; }
+details.step > summary .lead { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+details.step.lb > summary .stitle { flex: none; max-width: 55%; }
+.stitle { font: 600 14px/1.3 var(--display); min-width: 0; overflow-wrap: anywhere; }
+.steps-list { gap: 8px; }
+.progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 6px; }
+.pbar { flex: 1 1 160px; max-width: 360px; height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--ok); }
+.cards.cols { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.card .facts { margin: 6px 0 0; }
+.desc.role { font-size: 14px; }
+ol.opts { list-style: none; padding: 0; margin: 6px 0 10px; display: grid; gap: 6px; }
+ol.opts > li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 7px 10px; border: 1px solid var(--line-soft); border-radius: 8px; align-items: baseline; margin: 0; }
+ol.opts > li > b { font: 600 12px/22px var(--mono); text-align: center; border-radius: 50%; background: var(--line-soft); color: var(--muted); height: 22px; width: 22px; }
+ol.opts > li.chosen { border-color: var(--ok); background: var(--ok-soft); }
+ol.opts > li.chosen > b { background: var(--ok); color: #fff; }
+ol.opts > li > div { min-width: 0; overflow-wrap: anywhere; }
+.answer { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; border-left: 3px solid var(--ok); background: var(--ok-soft); border-radius: 0 6px 6px 0; margin: 6px 0 2px; }
+.answer b { font: 500 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.answer span { min-width: 0; overflow-wrap: anywhere; }
+.qafter { color: var(--muted); font-size: 13px; }
+.screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 12px; margin: 0 0 .8em; align-items: start; }
+figure.screen { margin: 0; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; min-width: 0; }
+figure.screen > figcaption { font: 500 11px/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 6px 12px; border-bottom: 1px solid var(--line-soft); background: var(--bg); }
+figure.screen > pre { margin: 0; padding: 10px 12px; overflow-x: auto; font: 400 12px/1.3 var(--mono); white-space: pre; max-width: 100%; }
+figure.screen > details.sub { margin: 0; padding: 4px 12px 6px; border-top: 1px solid var(--line-soft); }
+.filelist { display: grid; }
 
 /* index */
 #list { display: grid; gap: 6px; max-width: 900px; }
@@ -198,24 +340,6 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
 .empty { padding: 16px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); display: grid; gap: 6px; max-width: 66ch; }
 .empty p { margin: 0; }
 
-/* decision bar */
-.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line);
-  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-.barrow { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; }
-#status { color: var(--muted); font-size: 12.5px; min-width: 0; flex: 1 1 200px; }
-#status.ok { color: var(--ok); }
-#status.warn { color: var(--warn); }
-#dnote { height: 34px; min-height: 34px; max-height: 30vh; flex: 2 1 260px; width: auto; min-width: 0; padding: 6px 10px; font-size: 13px; }
-#dnote:focus { height: 72px; }
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.decide { color: var(--ink); border-color: var(--ink); padding: 7px 14px; }
-.decide:hover { background: var(--ink-soft); }
-.decide[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
-.decide.changes { color: var(--warn); border-color: var(--warn); }
-.decide.changes:hover { background: var(--warn-soft); }
-.decide.changes[aria-pressed="true"] { background: var(--warn); color: var(--surface); }
-.decide:disabled { opacity: .5; cursor: default; }
-
 @media (max-width: 900px) {
   .desk { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   #rail { position: static; max-height: none; display: none; }
@@ -223,8 +347,9 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   .railtoggle { display: inline-block; }
   .block > summary .file { display: none; }
   h1 { font-size: 17px; }
+  .gwt { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 </style>
 
 <div class="head">
@@ -233,6 +358,7 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     <h1 id="title">Approval gates</h1>
     <div class="meta" id="meta" hidden></div>
     <span class="spacer"></span>
+    <span id="status" hidden></span>
     <button type="button" class="railtoggle" id="railtoggle" hidden>Outline</button>
   </div>
   <p class="project" id="lede">Connecting to your gates…</p>
@@ -244,39 +370,33 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     <div id="col"></div>
   </div>
 </main>
-<div class="bar" id="bar" hidden><div class="barrow">
-  <span id="status">Connecting…</span>
-  <textarea id="dnote" rows="1" aria-label="Note with your draft decision" placeholder="Note with your draft decision (optional)"></textarea>
-  <div class="actions">
-    <button class="decide approve" id="d-approve" type="button" aria-pressed="false" disabled>Approve</button>
-    <button class="decide changes" id="d-changes" type="button" aria-pressed="false" disabled>Request changes</button>
-  </div>
-</div></div>
+<div id="pop" hidden></div>
 
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const el = { crumb: $("crumb"), title: $("title"), lede: $("lede"), meta: $("meta"), list: $("list"), gate: $("gate"), rail: $("rail"), col: $("col"),
-    bar: $("bar"), status: $("status"), dnote: $("dnote"), approve: $("d-approve"), changes: $("d-changes"), railtoggle: $("railtoggle") };
+    status: $("status"), railtoggle: $("railtoggle"), pop: $("pop") };
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (iso) => { try { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); } catch { return iso || ""; } };
   const clock = () => new Date().toLocaleTimeString([], { timeStyle: "short" });
   const gateId = () => { const h = decodeURIComponent(location.hash.replace(/^#/, "")); return /^[a-z0-9._-]+$/i.test(h) ? h : ""; };
-  const setStatus = (t, cls) => { el.status.textContent = t; el.status.className = cls || ""; };
+  const setStatus = (t, cls) => { el.status.textContent = t || ""; el.status.className = cls || ""; el.status.hidden = !t; };
   const WHY = { first: "first presentation", revision: "after a revision", stale: "review was out of date" };
   const KIND = { questions: "questions", json: "JSON", review: "review" };
   const upper = (s) => String(s || "").replace(/^./, (c) => c.toUpperCase());
   const kb = (n) => n >= 1024 ? Math.round(n / 1024) + " KB" : n + " B";
+  const str = (v) => v === undefined || v === null ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
 
   let db = null;
   const view = { id: "", unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false,
-    noteTimer: null, decideTimer: null, painted: "", diagrams: 0, openNotes: new Set(), railSig: "" };
+    noteTimer: null, painted: "", diagrams: 0, openNotes: new Set(), railSig: "", mode: {}, refs: new Map(), railOpen: {} };
   const hasMd = () => typeof marked !== "undefined" && typeof DOMPurify !== "undefined";
 
   function teardown() {
     view.unsub.forEach((u) => { try { u(); } catch {} });
-    Object.assign(view, { unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false, painted: "", railSig: "", openNotes: new Set() });
-    clearTimeout(view.noteTimer); clearTimeout(view.decideTimer);
+    Object.assign(view, { unsub: [], gate: null, docs: new Map(), docsLoaded: false, notes: {}, unsaved: false, saving: false, painted: "", railSig: "", openNotes: new Set(), mode: {}, refs: new Map(), railOpen: {} });
+    clearTimeout(view.noteTimer);
     el.rail.innerHTML = ""; el.col.innerHTML = "";
   }
 
@@ -296,6 +416,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     try { return DOMPurify.sanitize(marked.parse(String(text ?? ""), { gfm: true, breaks: !!breaks }), { USE_PROFILES: { html: true } }); }
     catch { return null; }
   }
+  /* inline markdown (bold, code, links) for one line of text */
+  const inline = (text) => { if (!hasMd()) return esc(text); try { return DOMPurify.sanitize(marked.parseInline(String(text ?? "")), { USE_PROFILES: { html: true } }); } catch { return esc(text); } };
   function renderMarkdown(target, text, breaks) {
     const html = mdHtml(text, breaks);
     if (html === null) { target.innerHTML = '<pre class="plain"></pre>'; target.firstChild.textContent = text; return; }
@@ -304,11 +426,12 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   }
   function decorate(root) {
     root.querySelectorAll("table").forEach((t) => { if (t.parentElement.classList.contains("tablewrap")) return; const w = document.createElement("div"); w.className = "tablewrap"; t.replaceWith(w); w.appendChild(t); });
-    root.querySelectorAll("pre > code.language-mermaid").forEach((code) => {
-      const box = document.createElement("div"); box.className = "diagram"; box.dataset.src = code.textContent;
-      const src = document.createElement("pre"); src.className = "src"; src.textContent = code.textContent; box.appendChild(src);
-      code.parentElement.replaceWith(box);
-    });
+    root.querySelectorAll("pre > code.language-mermaid").forEach((code) => { code.parentElement.replaceWith(diagramBox(code.textContent)); });
+  }
+  function diagramBox(source) {
+    const box = document.createElement("div"); box.className = "diagram"; box.dataset.src = source;
+    const src = document.createElement("pre"); src.className = "src"; src.textContent = source; box.appendChild(src);
+    return box;
   }
   /* A diagram is drawn when its section is open; the source stays when it cannot be drawn. */
   function drawDiagrams(root) {
@@ -332,8 +455,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     teardown(); view.id = "";
     el.title.textContent = "Approval gates";
     el.crumb.textContent = "AI-DLC approval gates";
-    el.lede.textContent = "Every stage's documents, read before you are asked to approve. Pick a gate; your notes and a draft decision go back to Claude.";
-    el.meta.hidden = true; el.gate.hidden = true; el.bar.hidden = true; el.list.hidden = false; el.lede.hidden = false; el.railtoggle.hidden = true;
+    el.lede.textContent = "Every stage's documents, read before you are asked to approve. Pick a gate; notes you leave on a document go back to Claude.";
+    el.meta.hidden = true; el.gate.hidden = true; el.list.hidden = false; el.lede.hidden = false; el.railtoggle.hidden = true; setStatus("");
     el.list.innerHTML = '<div class="empty"><p>Loading gates…</p></div>';
     if (!db) return;
     view.unsub.push(db.collection("gates").orderBy("createdAt", "desc").limit(100).onSnapshot((snap) => {
@@ -341,8 +464,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
       const groups = new Map();
       snap.docs.forEach((d) => { const g = d.data(); const k = g.intent || "Other"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push({ id: d.id, g }); });
       el.list.innerHTML = [...groups].map(([intent, rows]) => `<h2>${esc(intent)}</h2>` + rows.map(({ id, g }) => {
-        const n = (g.documents || []).length; const decided = g.status === "decided";
-        return `<a class="row" href="#${esc(id)}"><span><b>${esc(g.title || g.stageName || id)}</b><small>Round ${esc(g.round || 1)} · ${esc(fmt(g.createdAt))}${n ? ` · ${n} document${n === 1 ? "" : "s"}` : ""}</small></span><span class="pill ${decided ? "decided" : "open"}">${decided ? "decided" : "open"}</span></a>`;
+        const n = (g.documents || []).length;
+        return `<a class="row" href="#${esc(id)}"><span><b>${esc(g.title || g.stageName || id)}</b><small>Round ${esc(g.round || 1)} · ${esc(fmt(g.createdAt))}${n ? ` · ${n} document${n === 1 ? "" : "s"}` : ""}</small></span><span class="pill quiet">${esc(g.phase || "")}</span></a>`;
       }).join("")).join("");
     }, () => { el.list.innerHTML = '<div class="empty"><p>Couldn’t load the gates. Reload the page.</p></div>'; }));
   }
@@ -350,18 +473,18 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   /* ---------- one gate ---------- */
   function showGate(id) {
     teardown(); view.id = id;
-    el.list.hidden = true; el.gate.hidden = false; el.bar.hidden = false; el.meta.hidden = true; el.lede.hidden = false; el.railtoggle.hidden = false;
+    el.list.hidden = true; el.gate.hidden = false; el.meta.hidden = true; el.lede.hidden = false; el.railtoggle.hidden = false;
     el.title.textContent = id; el.lede.textContent = "Loading the gate…";
     el.crumb.innerHTML = '<a href="#">All gates</a>';
     el.col.innerHTML = '<p class="hint">Loading documents…</p>';
-    setStatus("Connecting…"); setDeciding(false);
+    setStatus("");
     if (!db) return;
     const ref = db.doc("gates/" + id);
     view.unsub.push(ref.onSnapshot((snap) => {
       if (!snap.exists) {
         view.gate = null; el.title.textContent = "Waiting for this gate";
         el.lede.textContent = "Nothing is stored under this id yet. Claude writes the gate just before it asks you, and this page fills in when it lands. If nothing happens, check the link Claude gave you.";
-        el.meta.hidden = true; el.col.innerHTML = ""; el.rail.innerHTML = ""; setDeciding(false); setStatus("Waiting for Claude to write the gate…"); return;
+        el.meta.hidden = true; el.col.innerHTML = ""; el.rail.innerHTML = ""; return;
       }
       view.gate = snap.data(); paintGate();
     }, () => { setStatus("Couldn’t load the gate. Reload the page.", "warn"); el.lede.textContent = "Couldn’t load the gate."; }));
@@ -376,13 +499,11 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     el.title.textContent = g.title || g.stageName || view.id;
     el.crumb.innerHTML = `<a href="#">All gates</a> · ${esc(g.intent || "")}`;
     el.lede.textContent = g.project || ""; el.lede.hidden = !g.project;
-    const decided = g.status === "decided";
     el.meta.hidden = false;
     el.meta.innerHTML = [g.phase ? `<span>${esc(upper(g.phase))}</span>` : "", `<span class="sep">Round ${esc(g.round || 1)}${g.why ? ", " + esc(WHY[g.why] || g.why) : ""}</span>`,
-      g.createdAt ? `<span class="sep">${esc(fmt(g.createdAt))}</span>` : "", g.nextStage ? `<span class="sep">then ${esc(g.nextStage)}</span>` : "",
-      `<span class="pill ${decided ? "decided" : "open"}">${decided ? "draft decided" : "open"}</span>`].join("");
+      g.createdAt ? `<span class="sep">${esc(fmt(g.createdAt))}</span>` : "", g.nextStage ? `<span class="sep">then ${esc(g.nextStage)}</span>` : ""].join("");
     if (!view.unsaved && !view.saving) view.notes = Object.assign({}, g.notes || {});
-    paintBar(); paintAll();
+    paintAll();
   }
 
   /* ---------- documents: parts joined, index order ---------- */
@@ -393,8 +514,7 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
       const key = d.key || d.id; const cur = byKey.get(key) || { parts: [] };
       cur.parts.push(Object.assign({ part: d.part || 1 }, d)); byKey.set(key, cur);
     });
-    const out = [];
-    const seen = new Set();
+    const out = []; const seen = new Set();
     const push = (key, meta) => {
       if (seen.has(key)) return; seen.add(key);
       const got = byKey.get(key);
@@ -412,9 +532,9 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   function paintAll() {
     if (!view.gate) return;
     const g = view.gate; const docs = docList();
-    const sig = JSON.stringify([view.id, g.summary, g.brief, g.review, docs.map((d) => [d.key, d.title, d.kind, d.text, !!d.pending, !!d.partial]), isDark()]);
+    const sig = JSON.stringify([view.id, g.summary, g.brief, g.review, docs.map((d) => [d.key, d.title, d.kind, d.text, !!d.pending, !!d.partial]), isDark(), view.mode]);
     if (sig === view.painted) { paintRail(docs); return; }
-    view.painted = sig;
+    view.painted = sig; view.refs = new Map();
     const frag = [];
     if (g.summary) frag.push(`<details class="block sum" open id="b-summary"><summary><span class="caret">▶</span><span class="bt">Summary</span></summary><div class="body md" id="summarymd"></div></details>`);
     if (g.brief) frag.push(briefBlock(g));
@@ -424,6 +544,7 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     if (g.summary) renderMarkdown($("summarymd"), g.summary);
     if (g.brief) fillBrief(g);
     docs.forEach((d, i) => fillDoc(d, i));
+    linkRefs(el.col);
     drawDiagrams(el.col);
     view.railSig = ""; paintRail(docs);
   }
@@ -470,18 +591,8 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     if (!b) { body.className = "body md"; renderMarkdown(body, g.brief, true); return; }
     const h = b.head;
     let html = `<p class="outcome">${h["Review outcome"] ? `<b>${esc(h["Review outcome"])}</b>` : ""}${h["Why now"] ? `<span>${esc(h["Why now"])}</span>` : ""}${h["Review artifact"] ? `<span class="mono">${esc(h["Review artifact"])}</span>` : ""}</p>`;
-    if (b.rows.length) {
-      html += `<div class="tablewrap"><table class="ftable"><thead><tr><th>ID</th><th>Severity</th><th>Where</th><th>Status</th></tr></thead><tbody>` + b.rows.map((r, i) => {
-        const open = isOpenStatus(r.status); const det = r.Finding || r.Where || r["Required action"];
-        return `<tr class="frow${open ? "" : " closed"}" data-i="${i}" aria-expanded="${open && i < 3 ? "true" : "false"}"><td>${esc(r.id)}</td><td><span class="sev${isHi(r.severity) ? " hi" : ""}">${esc(r.severity)}</span></td><td class="where">${esc(r.where)}</td><td>${esc(r.status)}</td></tr>` +
-          (det ? `<tr class="fdet" data-for="${i}"${open && i < 3 ? "" : " hidden"}><td colspan="4"><dl>${r.Finding ? `<dt>Finding</dt><dd>${esc(r.Finding)}</dd>` : ""}${r.Where ? `<dt>Where</dt><dd>${esc(r.Where)}</dd>` : ""}${r["Required action"] ? `<dt>Required action</dt><dd>${esc(r["Required action"])}</dd>` : ""}</dl></td></tr>` : "");
-      }).join("") + `</tbody></table></div>`;
-    }
     body.innerHTML = html;
-    body.querySelectorAll("tr.frow").forEach((tr) => tr.addEventListener("click", () => {
-      const det = body.querySelector(`tr.fdet[data-for="${tr.dataset.i}"]`); if (!det) return;
-      det.hidden = !det.hidden; tr.setAttribute("aria-expanded", String(!det.hidden));
-    }));
+    if (b.rows.length) body.appendChild(findingsTable(b.rows));
   }
 
   /* ---------- a document block ---------- */
@@ -489,8 +600,9 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     const note = (view.notes[d.key] || "").trim();
     const file = d.path ? `<span class="file" title="${esc(d.path)}"><span>${esc(d.path)}</span></span>` : "";
     const size = d.bytes ? `<span class="hint mono">${kb(d.bytes)}</span>` : "";
-    return `<details class="block doc" id="d-${esc(d.key)}"${d.kind === "json" || d.kind === "questions" || d.kind === "review" ? "" : " open"}>
-      <summary><span class="caret">▶</span><h2>${esc(d.title || d.key)}</h2>${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}${file}<span class="end">${size}${note ? '<i class="dot" title="You left a note"></i>' : ""}<button type="button" class="notebtn" data-key="${esc(d.key)}" aria-pressed="${view.openNotes.has(d.key) || note ? "true" : "false"}">Note</button></span></summary>
+    const closed = (d.kind === "json" && !viewFor(d)) || d.kind === "questions" || d.kind === "review";
+    return `<details class="block doc" id="d-${esc(d.key)}"${closed ? "" : " open"}>
+      <summary><span class="caret">▶</span><h2>${esc(d.title || d.key)}</h2>${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}${file}<span class="end">${size}${note ? '<i class="dot" title="You left a note"></i>' : ""}<span class="seg" id="seg-${esc(d.key)}" hidden><button type="button" data-mode="view" data-key="${esc(d.key)}">View</button><button type="button" data-mode="text" data-key="${esc(d.key)}">Text</button></span><button type="button" class="notebtn" data-key="${esc(d.key)}" aria-pressed="${view.openNotes.has(d.key) || note ? "true" : "false"}">Note</button></span></summary>
       <div class="body"><div class="notebox" id="nb-${esc(d.key)}"${view.openNotes.has(d.key) || note ? "" : " hidden"}><label for="nt-${esc(d.key)}"><b>Note for Claude</b><span>on this document, saved as you type</span><span class="stat" id="ns-${esc(d.key)}"></span></label><textarea id="nt-${esc(d.key)}" rows="2" placeholder="Something to change, check or keep in mind"></textarea></div><div id="db-${esc(d.key)}"></div></div>
     </details>`;
   }
@@ -501,6 +613,23 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     ta.addEventListener("blur", () => { if (view.unsaved) flushNotes(); });
     if (d.pending) { body.innerHTML = '<p class="hint">This document is still being written.</p>'; return; }
     if (d.partial) body.insertAdjacentHTML("beforeend", '<p class="hint">Part of this document is still being written.</p>');
+    const vf = viewFor(d);
+    const mode = view.mode[d.key] || "view";
+    if (vf && mode === "view") {
+      let built = null;
+      try { built = vf.render(d, i); } catch (e) { built = null; console.warn("view failed", d.key, e); }
+      if (built) {
+        $("seg-" + d.key).hidden = false; setSeg(d.key, "view");
+        body.appendChild(built);
+        body.querySelectorAll("details.sec").forEach((s) => s.addEventListener("toggle", () => { if (s.open) drawDiagrams(s); }));
+        return;
+      }
+    }
+    if (vf && mode === "text") { $("seg-" + d.key).hidden = false; setSeg(d.key, "text"); }
+    fillText(body, d, i);
+  }
+  function setSeg(key, mode) { const seg = $("seg-" + key); if (!seg) return; seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode))); }
+  function fillText(body, d, i) {
     if (d.kind === "json") {
       const text = String(d.text ?? ""); const lines = text.split("\n").length;
       body.innerHTML = `<div class="jsonbox"><p class="jsonnote">JSON · ${lines} line${lines === 1 ? "" : "s"}</p><pre></pre></div>`;
@@ -509,33 +638,1097 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     const html = mdHtml(d.text);
     if (html === null) { body.innerHTML = '<pre class="plain"></pre>'; body.firstChild.textContent = d.text; return; }
     const tmp = document.createElement("div"); tmp.innerHTML = html; decorate(tmp);
+    promoteTitle(tmp, d);
+    sectionize(tmp, d, i === 0);
+    body.innerHTML = ""; body.appendChild(tmp); tmp.className = "md" + (tmp.querySelector("details.sec") ? "" : " flat");
+    tmp.querySelectorAll("details.sec").forEach((s) => s.addEventListener("toggle", () => { if (s.open) drawDiagrams(s); }));
+    registerMdRefs(tmp);
+  }
+  function promoteTitle(tmp, d) {
     const first = tmp.firstElementChild;
     if (first && first.tagName === "H1" && tmp.querySelectorAll("h1").length === 1) {
       const h = $("d-" + d.key).querySelector("summary h2"); if (h && first.textContent.trim()) h.textContent = first.textContent.trim();
       first.remove();
     }
-    sectionize(tmp, d, i === 0);
-    body.innerHTML = ""; body.appendChild(tmp); tmp.className = "md" + (tmp.querySelector("details.sec") ? "" : " flat");
-    tmp.querySelectorAll("details.sec").forEach((s) => s.addEventListener("toggle", () => { if (s.open) drawDiagrams(s); }));
   }
   /* Every H2 (or H1 when there are several) starts a collapsible section. */
-  function sectionize(root, d, expand) {
+  function sectionize(root, d, expand, level) {
     const kids = [...root.childNodes];
-    const level = kids.filter((n) => n.nodeType === 1 && n.tagName === "H2").length >= 1 ? "H2" : (kids.filter((n) => n.nodeType === 1 && n.tagName === "H1").length >= 2 ? "H1" : null);
+    level = level || (kids.filter((n) => n.nodeType === 1 && n.tagName === "H2").length >= 1 ? "H2" : (kids.filter((n) => n.nodeType === 1 && n.tagName === "H1").length >= 2 ? "H1" : null));
     if (!level) return;
     const out = document.createDocumentFragment(); let cur = null, n = 0, lead = null;
     const flush = () => { if (cur) { const cnt = cur.secbody.querySelectorAll("p, li, tr, pre").length; cur.querySelector(".cnt").textContent = cnt ? cnt + " items" : ""; } };
     kids.forEach((node) => {
       if (node.nodeType === 1 && node.tagName === level) {
         flush(); n++;
-        const det = document.createElement("details"); det.className = "sec"; det.open = expand; det.id = `s-${d.key}-${n}`; det.dataset.title = node.textContent.trim();
-        const sum = document.createElement("summary"); sum.innerHTML = '<span class="caret">▶</span>'; sum.appendChild(node); sum.insertAdjacentHTML("beforeend", '<span class="cnt"></span>');
-        const body = document.createElement("div"); body.className = "secbody md";
-        det.appendChild(sum); det.appendChild(body); det.secbody = body; out.appendChild(det); cur = det; lead = null;
+        cur = section(d, n, node, expand); out.appendChild(cur); lead = null;
       } else if (cur) cur.secbody.appendChild(node);
       else { if (!lead) { lead = document.createElement("div"); lead.className = "md lead"; out.appendChild(lead); } lead.appendChild(node); }
     });
     flush(); root.innerHTML = ""; root.appendChild(out);
+  }
+  /* a collapsible section of document d: title is an element (moved in) or a string */
+  function section(d, n, title, open, count) {
+    const det = document.createElement("details"); det.className = "sec"; det.open = !!open; det.id = `s-${d.key}-${n}`;
+    const sum = document.createElement("summary"); sum.innerHTML = '<span class="caret">▶</span>';
+    if (typeof title === "string") { const h = document.createElement("h3"); h.textContent = title; sum.appendChild(h); det.dataset.title = title; }
+    else { sum.appendChild(title); det.dataset.title = title.textContent.trim(); }
+    sum.insertAdjacentHTML("beforeend", `<span class="cnt">${esc(count || "")}</span>`);
+    const body = document.createElement("div"); body.className = "secbody md";
+    det.appendChild(sum); det.appendChild(body); det.secbody = body;
+    return det;
+  }
+
+  /* ---------- cross-references: an id that names something in this gate becomes a link ---------- */
+  const ID_RE = /\b((?:ADR|RAID|NFR|SCD|SM|SD|RD|PD|OD|IB|CT|CO|CR|CB|OC|RC|TC|SC|BR|FR|US|AC|WF|RA|R|U|C|D|E|P|Q|A|I|S|M|T)-?\d+(?:\.\d+)*[a-z]?(?:-\d+)?|Step \d+|Bolt \d+)\b/g;
+  const HEAD_ID = /^((?:[A-Z]{1,5}-?\d+(?:\.\d+)*[a-z]?|Step \d+|Bolt \d+))\b/;
+  const BULLET_ID = /^((?:ADR|BR|FR|NFR|US|AC|WF|U|C|R|TC|SC|E|D)-?\d+(?:\.\d+)*[a-z]?)\b/;
+  function regRef(id, element, title) { if (!id || !element) return; const k = String(id).toUpperCase(); if (!view.refs.has(k)) { element.dataset.ref = id; view.refs.set(k, { element, title: title || "" }); } }
+  function registerMdRefs(root) {
+    root.querySelectorAll("h1, h2, h3, h4").forEach((h) => { const m = h.textContent.trim().match(HEAD_ID); if (m) regRef(m[1], h.closest("details.sec, details.sub") || h, h.textContent.trim()); });
+    root.querySelectorAll("tr").forEach((tr) => { const td = tr.querySelector("td"); if (!td) return; const t = td.textContent.trim().replace(/[`*]/g, ""); const m = t.match(/^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)$/) || t.match(/^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)\s+\S/); if (m) regRef(m[1], tr, tr.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
+    root.querySelectorAll("li").forEach((li) => { const m = li.textContent.trim().match(BULLET_ID); if (m) regRef(m[1], li, li.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); });
+  }
+  function linkRefs(root) {
+    if (!view.refs.size) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => {
+      const p = n.parentElement; if (!p) return NodeFilter.FILTER_REJECT;
+      if (p.closest("a, pre, textarea, .xref, summary h2, h1, h2, h3, h4, .acid, td.id, .chip, .unit b, .pill")) return NodeFilter.FILTER_REJECT;
+      ID_RE.lastIndex = 0; return ID_RE.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const text = node.nodeValue; ID_RE.lastIndex = 0; let last = 0, m; const frag = document.createDocumentFragment(); let any = false;
+      while ((m = ID_RE.exec(text))) {
+        const id = m[1]; const hit = view.refs.get(id.toUpperCase());
+        if (!hit || hit.element.contains(node)) continue;
+        frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const a = document.createElement("a"); a.className = "xref"; a.textContent = id; a.dataset.ref = id; frag.appendChild(a); last = m.index + id.length; any = true;
+      }
+      if (!any) return;
+      frag.appendChild(document.createTextNode(text.slice(last))); node.replaceWith(frag);
+    });
+  }
+  function jumpTo(target) {
+    let d = target.closest("details"); while (d) { d.open = true; d = d.parentElement && d.parentElement.closest("details"); }
+    if (target.classList.contains("frow")) { const det = target.parentElement.querySelector(`tr.fdet[data-for="${target.dataset.i}"]`); if (det) { det.hidden = false; target.setAttribute("aria-expanded", "true"); } }
+    if (target.classList.contains("rrow")) { const det = target.nextElementSibling; if (det && det.classList.contains("rdet")) det.hidden = false; }
+    drawDiagrams(target);
+    const top = target.getBoundingClientRect().top + window.scrollY - (document.querySelector(".head").offsetHeight + 12);
+    window.scrollTo({ top, behavior: "smooth" });
+    target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+  }
+  el.col.addEventListener("click", (e) => {
+    const a = e.target.closest("a.xref"); if (!a) return;
+    e.preventDefault(); const hit = view.refs.get(a.dataset.ref.toUpperCase()); if (hit) jumpTo(hit.element);
+  });
+  el.col.addEventListener("mouseover", (e) => {
+    const a = e.target.closest("a.xref"); if (!a) return;
+    const hit = view.refs.get(a.dataset.ref.toUpperCase()); if (!hit) return;
+    const t = hit.title || hit.element.textContent.trim().replace(/\s+/g, " ").slice(0, 400);
+    el.pop.innerHTML = `<b>${esc(a.dataset.ref)}</b><p>${esc(t)}</p>`; el.pop.hidden = false;
+    const r = a.getBoundingClientRect(); el.pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 540)) + "px"; el.pop.style.top = (r.bottom + 6) + "px";
+  });
+  el.col.addEventListener("mouseout", (e) => { if (e.target.closest && e.target.closest("a.xref")) el.pop.hidden = true; });
+
+  /* ---------- views ---------- */
+  /* The documents are YAML written by hand in prose: a plain value with ": " or " #" inside (a "(Q4: …)" aside)
+     is not strict YAML. Quote such values before parsing; if the block still fails, read it as a list of
+     `- key: value` maps line by line. */
+  const yamlSafe = (raw) => raw.split("\n").map((l) => {
+    const m = l.match(/^(\s*(?:- )?[A-Za-z_][\w-]*:)\s+(.*?)\s*$/); if (!m) return l;
+    const v = m[2]; if (!v || /^["'\[{|>&*!%@`]/.test(v) || /^[\d.-]+$/.test(v) || /^(true|false|null|yes|no|~)$/i.test(v)) return l;
+    if (!/:\s|\s#|^-\s/.test(v)) return l;
+    return m[1] + " \"" + v.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + "\"";
+  }).join("\n");
+  const yamlLoose = (raw, topKey) => {
+    const lines = raw.split("\n"); const items = []; let cur = null, field = null, indent = 0;
+    if (!new RegExp("^" + topKey + "\\s*:", "m").test(raw)) return null;
+    for (const l of lines) {
+      if (/^\s*#/.test(l) || !l.trim() || new RegExp("^" + topKey + "\\s*:").test(l)) { if (!l.trim()) field = null; continue; }
+      let m = l.match(/^(\s*)-\s+([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (m) { cur = {}; items.push(cur); indent = m[1].length; cur[m[2]] = m[3].trim(); field = m[2]; continue; }
+      m = l.match(/^(\s*)([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (m && cur && m[1].length > indent) { const v = m[3].trim(); cur[m[2]] = v; field = m[2]; if (v === "") cur[m[2]] = []; continue; }
+      m = l.match(/^(\s*)-\s+(.*)$/);
+      if (m && cur && field && Array.isArray(cur[field])) { const v = m[2].trim().replace(/^["']|["']$/g, ""); cur[field].push(v); continue; }
+      if (cur && field && typeof cur[field] === "string" && l.trim()) cur[field] = (cur[field] + " " + l.trim()).trim();
+    }
+    return items.length ? { [topKey]: items.map((it) => Object.fromEntries(Object.entries(it).map(([k, v]) => [k, typeof v === "string" ? v.replace(/^["'](.*)["']$/s, "$1") : v]))) } : null;
+  };
+  const yamlBlock = (text, topKey) => {
+    const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m;
+    while ((m = re.exec(text))) {
+      if (topKey && !new RegExp("^" + topKey + "\\s*:", "m").test(m[1])) continue;
+      const found = (v) => (v && typeof v === "object") ? { data: v, raw: m[1], start: m.index, end: m.index + m[0].length } : null;
+      if (typeof jsyaml !== "undefined") {
+        try { const r = found(jsyaml.load(m[1])); if (r) return r; } catch { /* quote the prose values and try again */ }
+        try { const r = found(jsyaml.load(yamlSafe(m[1]))); if (r) return r; } catch { /* fall through to the loose reader */ }
+      }
+      if (topKey) { const r = found(yamlLoose(m[1], topKey)); if (r) return r; }
+    }
+    return null;
+  };
+  /* comment lines `# ---- BR1 Dates and days ----` inside a YAML list: position -> group title */
+  const yamlGroups = (raw) => { const out = []; const re = /^[ \t]*#[ \t]*[-─—=]{2,}[ \t]*(.+?)[ \t]*[-─—=]{2,}[ \t]*$/gm; let m; while ((m = re.exec(raw))) out.push({ at: m.index, title: m[1].trim() }); return out; };
+  const groupOf = (groups, raw, needle) => { const pos = raw.indexOf(needle); if (pos < 0) return null; let g = null; for (const x of groups) { if (x.at < pos) g = x.title; else break; } return g; };
+  const textAround = (text, block) => ({ before: text.slice(0, block.start), after: text.slice(block.end) });
+  const list = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  const chips = (arr, cls) => list(arr).map((x) => `<span class="chip${cls ? " " + cls : ""}">${esc(str(x))}</span>`).join(" ");
+  const stripH1 = (t) => String(t || "").replace(/^#\s[^\n]+\n/, "");
+  /* markdown as sections (H2) inside a view; n0 numbers them apart from the view's own sections */
+  const mdBlocks = (d, text, open, n0) => {
+    const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(text) || ""; decorate(tmp);
+    if (!tmp.querySelector("h2") && text.length > 700) { const det = node('<details class="sub"><summary>About this document</summary></details>'); const inner = document.createElement("div"); inner.className = "md"; while (tmp.firstChild) inner.appendChild(tmp.firstChild); det.appendChild(inner); tmp.appendChild(det); tmp.className = "md"; registerMdRefs(tmp); return tmp; }
+    if (tmp.querySelector("h2")) {
+      const kids = [...tmp.childNodes]; const out = document.createDocumentFragment(); let cur = null, n = n0 || 100, lead = null;
+      kids.forEach((node) => { if (node.nodeType === 1 && node.tagName === "H2") { n++; cur = section(d, n, node, open); out.appendChild(cur); } else if (cur) cur.secbody.appendChild(node); else { if (!lead) { lead = document.createElement("div"); lead.className = "md lead"; out.appendChild(lead); } lead.appendChild(node); } });
+      tmp.innerHTML = ""; tmp.appendChild(out);
+    }
+    tmp.className = "md"; registerMdRefs(tmp); return tmp;
+  };
+  const wrap = (...nodes) => { const root = document.createElement("div"); root.className = "vw"; nodes.forEach((n) => { if (typeof n === "string") root.insertAdjacentHTML("beforeend", n); else if (n) root.appendChild(n); }); return root; };
+  const keyOf = (d) => String(d.key || "").replace(/-p\d+$/, "");
+  const node = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+  const mdDiv = (text) => { const div = document.createElement("div"); div.className = "md"; div.innerHTML = mdHtml(text) || esc(text); decorate(div); registerMdRefs(div); return div; };
+
+  /* a filter bar: chips over rows' dataset.f, and a search over dataset.q (or text) */
+  function filterBar(rows, label) {
+    const counts = new Map(); rows.forEach((r) => { const v = r.dataset.f || ""; counts.set(v, (counts.get(v) || 0) + 1); });
+    const bar = node(`<div class="vtools"><span>${esc(label || "")}</span>${(counts.size === 1 && counts.has("") ? [] : [...counts]).map(([v, c]) => `<button type="button" class="fchip" data-v="${esc(v)}" aria-pressed="false">${esc(v || "other")} <span class="hint">${c}</span></button>`).join("")}<input type="search" placeholder="Find…" aria-label="Find"></div>`);
+    const state = { f: null, q: "" };
+    const apply = () => rows.forEach((r) => { const ok = (!state.f || r.dataset.f === state.f) && (!state.q || (r.dataset.q || r.textContent).toLowerCase().includes(state.q)); r.hidden = !ok; if (ok && state.q) { let p = r.closest("details"); while (p) { p.open = true; p = p.parentElement && p.parentElement.closest("details"); } } });
+    bar.querySelectorAll(".fchip").forEach((b) => b.addEventListener("click", () => { state.f = state.f === b.dataset.v ? null : b.dataset.v; bar.querySelectorAll(".fchip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === state.f))); apply(); }));
+    bar.querySelector("input").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); apply(); });
+    return bar;
+  }
+
+  /* --- entities: the `entities:` YAML block --- */
+  function viewEntities(d) {
+    const blk = yamlBlock(d.text, "entities"); if (!blk || !Array.isArray(blk.data.entities) || !blk.data.entities.length) return null;
+    const ents = blk.data.entities; const { before, after } = textAround(d.text, blk);
+    const names = new Set(ents.map((e) => str(e.name)));
+    const edge = (c) => { const s = str(c).toLowerCase(); const [left = "", right = ""] = s.split(/\bto\b/); const manyL = /many|\*|\bn\b|\d+\.\./.test(left); const manyR = /many|\*|\bn\b|\.\./.test(right); return `${manyL ? "}o" : "||"}--${manyR ? "o{" : "||"}`; };
+    let dia = "erDiagram\n"; const seen = new Set();
+    ents.forEach((e) => list(e.relationships).forEach((r) => { const to = str(r.to); if (!names.has(to)) return; const k = [e.name, to].sort().join("|"); if (seen.has(k)) return; seen.add(k); const lab = str(r.cardinality || "").replace(/["\n]/g, " ").slice(0, 24); dia += `  ${str(e.name).replace(/\W/g, "_")} ${edge(r.cardinality)} ${to.replace(/\W/g, "_")} : "${lab}"\n`; }));
+    const root = wrap();
+    if (before.trim()) root.appendChild(mdBlocks(d, stripH1(before), true, 0));
+    const owners = [...new Set(ents.map((e) => str(e.owner)).filter(Boolean))];
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${ents.length} entities</span>${owners.map((o) => `<span class="chip muted">${esc(o)}</span>`).join("")}</div>`);
+    if (seen.size) { const sec = section(d, 1, "Entity relationships", true, `${seen.size} relations`); sec.secbody.appendChild(diagramBox(dia)); root.appendChild(sec); }
+    ents.forEach((e, i) => {
+      const sec = section(d, 10 + i, str(e.name), i < 8, `${list(e.attributes).length} attributes`);
+      if (e.owner) sec.querySelector("summary").insertAdjacentHTML("beforeend", `<span class="chip muted">${esc(str(e.owner))}</span>`);
+      regRef(str(e.name), sec, str(e.description));
+      let html = e.description ? `<p class="desc">${inline(str(e.description))}</p>` : "";
+      if (e.identifier) html += `<dl class="facts"><dt>Identifier</dt><dd>${inline(str(e.identifier))}</dd></dl>`;
+      const attrs = list(e.attributes);
+      if (attrs.length) html += `<div class="tablewrap"><table class="grid attr"><thead><tr><th>Attribute</th><th>Type</th><th>Facts</th><th>Constraints</th></tr></thead><tbody>${attrs.map((a) => {
+        const facts = []; if (a.required) facts.push("required"); if (a.unique) facts.push("unique"); if (a.derived) facts.push("derived"); if (a.default !== undefined) facts.push("default " + (str(a.default) === "" ? '""' : str(a.default))); if (a.min !== undefined) facts.push("min " + str(a.min)); if (a.max !== undefined) facts.push("max " + str(a.max)); if (a.allowed) facts.push(list(a.allowed).join(" | ")); if (a.applies_to) facts.push(str(a.applies_to));
+        return `<tr><td class="id">${esc(str(a.name))}</td><td class="ty">${esc(str(a.type))}</td><td>${facts.map((f) => `<span class="chip muted">${esc(f)}</span>`).join(" ")}</td><td class="dim">${inline(str(a.constraints || ""))}</td></tr>`; }).join("")}</tbody></table></div>`;
+      const cons = list(e.entity_constraints); if (cons.length) html += `<dl class="facts"><dt>Constraints</dt><dd><ul>${cons.map((c) => `<li>${inline(str(c))}</li>`).join("")}</ul></dd></dl>`;
+      const rels = list(e.relationships); if (rels.length) html += `<dl class="facts"><dt>Relations</dt><dd><ul>${rels.map((r) => `<li><b>${esc(str(r.to))}</b> <span class="chip muted">${esc(str(r.cardinality))}</span> ${inline(str(r.direction || ""))}</li>`).join("")}</ul></dd></dl>`;
+      Object.keys(e).filter((k) => !["name", "owner", "description", "identifier", "attributes", "entity_constraints", "relationships"].includes(k)).forEach((k) => { html += `<dl class="facts"><dt>${esc(k.replace(/_/g, " "))}</dt><dd>${inline(str(e[k]))}</dd></dl>`; });
+      sec.secbody.innerHTML = html; root.appendChild(sec);
+    });
+    if (after.trim()) root.appendChild(mdBlocks(d, after, false, 200));
+    return root;
+  }
+
+  /* --- rules: the `rules:` YAML block --- */
+  function viewRules(d) {
+    const blk = yamlBlock(d.text, "rules"); if (!blk || !Array.isArray(blk.data.rules) || !blk.data.rules.length) return null;
+    const rules = blk.data.rules; const { before, after } = textAround(d.text, blk); const groups = yamlGroups(blk.raw);
+    const groupTitle = (r) => { const g = groupOf(groups, blk.raw, "id: " + str(r.id)); if (g) return g; const m = str(r.id).match(/^([A-Z]+\d+)/); return m ? m[1] : "Rules"; };
+    const byGroup = new Map(); rules.forEach((r) => { const g = groupTitle(r); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(r); });
+    const root = wrap();
+    if (before.trim()) root.appendChild(mdBlocks(d, stripH1(before), false, 0));
+    const rows = []; const secs = [];
+    let n = 10;
+    byGroup.forEach((items, title) => {
+      const sec = section(d, n++, title, true, `${items.length} rules`);
+      const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>ID</th><th>Rule</th><th>Category</th><th>When</th><th>On violation</th></tr></thead><tbody></tbody></table></div>`);
+      const tb = table.querySelector("tbody");
+      items.forEach((r) => {
+        const tr = node(`<tr class="rrow" data-f="${esc(str(r.category))}"><td class="id">${esc(str(r.id))}</td><td>${inline(str(r.statement))}</td><td><span class="chip muted">${esc(str(r.category))}</span></td><td class="dim">${inline(str(r.trigger || r.applies_to || ""))}</td><td class="dim">${inline(str(r.violation || ""))}</td></tr>`);
+        tr.dataset.q = [r.id, r.statement, r.logic, r.applies_to, r.trigger, r.violation, r.source].map(str).join(" ");
+        const extra = Object.keys(r).filter((k) => !["id", "statement", "category", "applies_to", "trigger", "logic", "violation", "source"].includes(k));
+        const det = node(`<tr class="rdet" hidden><td colspan="5"><dl class="facts">${r.applies_to ? `<dt>Applies to</dt><dd>${inline(str(r.applies_to))}</dd>` : ""}${r.trigger ? `<dt>Trigger</dt><dd>${inline(str(r.trigger))}</dd>` : ""}${r.logic ? `<dt>Logic</dt><dd><div class="rule-logic">${esc(str(r.logic)).replace(/\b(IF|THEN|ELSE|AND|OR|NOT|WHEN|UNLESS)\b/g, '<span class="kw">$1</span>')}</div></dd>` : ""}${r.violation ? `<dt>Violation</dt><dd>${inline(str(r.violation))}</dd>` : ""}${r.source ? `<dt>Source</dt><dd>${inline(str(r.source))}</dd>` : ""}${extra.map((k) => `<dt>${esc(k.replace(/_/g, " "))}</dt><dd>${inline(str(r[k]))}</dd>`).join("")}</dl></td></tr>`);
+        tr.addEventListener("click", () => { det.hidden = !det.hidden; });
+        regRef(str(r.id), tr, str(r.statement));
+        tb.appendChild(tr); tb.appendChild(det); rows.push(tr);
+      });
+      sec.secbody.appendChild(table); secs.push(sec);
+    });
+    root.appendChild(filterBar(rows, `${rules.length} rules`)); secs.forEach((s) => root.appendChild(s));
+    if (after.trim()) root.appendChild(mdBlocks(d, after, false, 200));
+    return root;
+  }
+
+  /* --- components: the `components:` YAML block --- */
+  function viewComponents(d) {
+    const blk = yamlBlock(d.text, "components"); if (!blk || !Array.isArray(blk.data.components) || !blk.data.components.length) return null;
+    const comps = blk.data.components; const { before, after } = textAround(d.text, blk); const groups = yamlGroups(blk.raw);
+    const names = new Set(comps.map((c) => str(c.name)));
+    const groupTitle = (c) => groupOf(groups, blk.raw, "name: " + str(c.name)) || "Components";
+    const byGroup = new Map(); comps.forEach((c) => { const g = groupTitle(c); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(c); });
+    const sid = (s) => "n_" + str(s).replace(/[^A-Za-z0-9]/g, "_");
+    let dia = "flowchart LR\n"; let gi = 0;
+    byGroup.forEach((items, title) => { dia += `  subgraph g${gi++}["${title.replace(/["]/g, "'").slice(0, 60)}"]\n`; items.forEach((c) => { dia += `    ${sid(c.name)}["${str(c.name)}"]\n`; }); dia += "  end\n"; });
+    comps.forEach((c) => list(c.depends_on).forEach((dep) => { const to = str(dep && dep.component !== undefined ? dep.component : dep); if (!names.has(to)) return; dia += `  ${sid(c.name)} ${/event|async|queue|message/i.test(str(dep.style)) ? "-.->" : "-->"} ${sid(to)}\n`; }));
+    const root = wrap();
+    if (before.trim()) root.appendChild(mdBlocks(d, stripH1(before), false, 0));
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${comps.length} components in ${byGroup.size} group${byGroup.size === 1 ? "" : "s"}</span><span class="hint">solid: a call · dashed: an event or message</span></div>`);
+    const dsec = section(d, 1, "Dependency graph", comps.length <= 30, `${comps.length} nodes`); dsec.secbody.appendChild(diagramBox(dia)); root.appendChild(dsec);
+    let n = 10;
+    byGroup.forEach((items, title) => {
+      const sec = section(d, n++, title, true, `${items.length} components`);
+      const cards = node('<div class="cards"></div>');
+      items.forEach((c) => {
+        const ents = list(c.entities).map((e) => (e && typeof e === "object") ? { name: str(e.name || e.entity || ""), attrs: list(e.attributes).map((a) => str((a && typeof a === "object") ? (a.name || "") : a)).filter(Boolean), id: str(e.identifier || "") } : { name: str(e), attrs: [], id: "" }).filter((e) => e.name);
+        const card = node(`<div class="card"><div class="chead"><h3>${esc(str(c.name))}</h3><span class="end">${ents.map((e) => `<span class="chip muted">${esc(e.name)}</span>`).join(" ")}</span></div>${c.summary ? `<p class="desc">${inline(str(c.summary))}</p>` : ""}</div>`);
+        regRef(str(c.name), card, str(c.summary));
+        let html = '<dl class="facts">';
+        const dep = (x) => `<li><b>${esc(str(x && x.component !== undefined ? x.component : x))}</b>${x && x.style ? ` <span class="chip muted">${esc(str(x.style))}</span>` : ""} ${inline(str((x && x.interaction) || ""))}</li>`;
+        if (list(c.responsibilities).length) html += `<dt>Does</dt><dd><ul>${list(c.responsibilities).map((r) => `<li>${inline(str(r))}</li>`).join("")}</ul></dd>`;
+        if (list(c.depends_on).length) html += `<dt>Depends on</dt><dd><ul>${list(c.depends_on).map(dep).join("")}</ul></dd>`;
+        if (list(c.dependents).length) html += `<dt>Used by</dt><dd><ul>${list(c.dependents).map(dep).join("")}</ul></dd>`;
+        if (list(c.external_dependencies).length) html += `<dt>External</dt><dd>${chips(list(c.external_dependencies).map((x) => (x && typeof x === "object") ? (x.name || x.service || JSON.stringify(x)) : x), "muted")}</dd>`;
+        if (ents.some((e) => e.attrs.length || e.id)) html += `<dt>Entities</dt><dd><ul>${ents.map((e) => `<li><b>${esc(e.name)}</b>${e.id ? ` <span class="chip muted">id: ${esc(e.id)}</span>` : ""}${e.attrs.length ? ` <span class="hint">${esc(e.attrs.join(", "))}</span>` : ""}</li>`).join("")}</ul></dd>`;
+        Object.keys(c).filter((k) => !["name", "summary", "behaviour", "behavior", "responsibilities", "depends_on", "dependents", "external_dependencies", "entities"].includes(k)).forEach((k) => { html += `<dt>${esc(k.replace(/_/g, " "))}</dt><dd>${inline(str(c[k]))}</dd>`; });
+        html += "</dl>";
+        const beh = c.behaviour || c.behavior; if (beh) html += `<details class="sub"><summary>Behaviour</summary><div class="md">${mdHtml(str(beh)) || esc(str(beh))}</div></details>`;
+        card.insertAdjacentHTML("beforeend", html); cards.appendChild(card);
+      });
+      sec.secbody.appendChild(cards); root.appendChild(sec);
+    });
+    if (after.trim()) root.appendChild(mdBlocks(d, after, false, 200));
+    return root;
+  }
+
+  /* --- unit dependencies: the `units:` YAML block as build layers --- */
+  function viewUnitDeps(d) {
+    const blk = yamlBlock(d.text, "units"); if (!blk || !Array.isArray(blk.data.units) || !blk.data.units.length) return null;
+    const units = blk.data.units.map((u) => ({ name: str(u.name || u.id), kind: str(u.kind || ""), deps: list(u.depends_on).map(str) }));
+    const byName = new Map(units.map((u) => [u.name, u])); const layer = new Map();
+    const depth = (u, seen) => { if (layer.has(u.name)) return layer.get(u.name); seen = seen || new Set(); if (seen.has(u.name)) return 0; seen.add(u.name); const l = u.deps.length ? 1 + Math.max(0, ...u.deps.map((n) => byName.has(n) ? depth(byName.get(n), seen) : 0)) : 0; layer.set(u.name, l); return l; };
+    units.forEach((u) => depth(u));
+    const layers = []; units.forEach((u) => { const l = layer.get(u.name) || 0; (layers[l] = layers[l] || []).push(u); });
+    const root = wrap(); const { before, after } = textAround(d.text, blk);
+    if (before.trim()) root.appendChild(mdBlocks(d, stripH1(before), false, 0));
+    const sec = section(d, 1, "Build order", true, `${units.length} units in ${layers.length} layers`);
+    sec.secbody.innerHTML = `<div class="layers">${layers.map((us, i) => `<div class="layer"><b>${i === 0 ? "First · no dependencies" : "Layer " + (i + 1)}</b>${(us || []).map((u) => `<div class="unit" data-unit="${esc(u.name)}"><b>${esc(u.name)}</b>${u.kind ? `<small>${esc(u.kind)}</small>` : ""}${u.deps.length ? `<small>after ${esc(u.deps.join(", "))}</small>` : ""}</div>`).join("")}</div>`).join("")}</div>`;
+    sec.secbody.querySelectorAll(".unit").forEach((x) => { regRef(x.dataset.unit, x, ""); const m = x.dataset.unit.match(/^(u\d+)/i); if (m) regRef(m[1].toUpperCase(), x, x.dataset.unit); });
+    root.appendChild(sec);
+    if (after.trim()) root.appendChild(mdBlocks(d, after, true, 100));
+    return root;
+  }
+
+  /* --- traceability.json: coverage by status --- */
+  function viewTraceability(d) {
+    let j; try { j = JSON.parse(d.text); } catch { return null; }
+    const cov = Array.isArray(j.coverage) ? j.coverage : null; const rev = Array.isArray(j.reverse) ? j.reverse : []; if (!cov || (!cov.length && !rev.length)) return null;
+    const counts = new Map(); cov.forEach((c) => { const s = str(c.status || "").toUpperCase() || "?"; counts.set(s, (counts.get(s) || 0) + 1); });
+    const tone = (s) => /^(ok|covered|done|full)$/i.test(s) ? "ok" : /^(partial|part)/i.test(s) ? "accent" : /^(missing|gap|none|uncovered)/i.test(s) ? "warn" : "muted";
+    const root = wrap(`<div class="cov">${[...counts].map(([s, c]) => `<span class="chip ${tone(s)}">${esc(s)} ${c}</span>`).join("")}<span class="chip muted">${cov.length} of ${list(j.upstream_ids).length || cov.length} upstream ids</span>${j.stage ? `<span class="chip muted">${esc(str(j.stage))}${j.unit ? " · " + esc(str(j.unit)) : ""}</span>` : ""}</div>`);
+    const rows = [];
+    const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Upstream</th><th>Status</th><th>Covered by</th><th>Note</th></tr></thead><tbody></tbody></table></div>`);
+    cov.forEach((c) => { const tr = node(`<tr data-f="${esc(str(c.status || ""))}"><td class="id">${esc(str(c.id))}</td><td><span class="chip ${tone(str(c.status || ""))}">${esc(str(c.status || ""))}</span></td><td>${inline(str(c.target || c.targets || c.covered_by || ""))}</td><td class="dim">${inline(str(c.note || c.notes || c.gap || c.reason || ""))}</td></tr>`); rows.push(tr); table.querySelector("tbody").appendChild(tr); });
+    if (cov.length) { root.appendChild(filterBar(rows, "Coverage")); root.appendChild(table); }
+    if (rev.length) {
+      const rrows = []; const rt = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Id</th><th>Status</th><th>Reason or target</th></tr></thead><tbody></tbody></table></div>`);
+      rev.forEach((c) => { const tr = node(`<tr data-f="${esc(str(c.status || ""))}"><td class="id">${esc(str(c.id))}</td><td><span class="chip ${tone(str(c.status || ""))}">${esc(str(c.status || ""))}</span></td><td class="dim">${inline(str(c.target || c.note || ""))}</td></tr>`); rrows.push(tr); rt.querySelector("tbody").appendChild(tr); });
+      const rsec = section(d, 3, "Reverse trace", true, `${rev.length} entries`); rsec.secbody.appendChild(filterBar(rrows, "Not mapped to a story")); rsec.secbody.appendChild(rt); root.appendChild(rsec);
+    }
+    const other = Object.keys(j).filter((k) => !["coverage", "reverse", "upstream_ids", "stage", "unit"].includes(k));
+    if (other.length) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = JSON.stringify(Object.fromEntries(other.map((k) => [k, j[k]])), null, 2); const sec = section(d, 2, "Other fields", false, other.join(", ")); sec.secbody.appendChild(pre); root.appendChild(sec); }
+    return root;
+  }
+
+  /* --- id-anchored markdown helpers --- */
+  const mdLines = (text) => String(text || "").replace(/\r/g, "").split("\n");
+  /* split markdown into [{title, body}] by one heading level ("##" or "###"); the first entry is the lead with an empty title */
+  function splitHeadings(text, level) {
+    const lines = mdLines(text); const out = []; let cur = { title: "", body: [] }; let fence = false;
+    const re = new RegExp("^" + level + "\\s+(.*)$");
+    lines.forEach((l) => { if (/^```/.test(l)) fence = !fence; const m = !fence && l.match(re); if (m) { out.push(cur); cur = { title: m[1].trim(), body: [] }; } else cur.body.push(l); });
+    out.push(cur); return out.map((s) => ({ title: s.title, body: s.body.join("\n") }));
+  }
+  const priorityTone = (p) => /must/i.test(p) ? "warn" : /should/i.test(p) ? "accent" : "muted";
+  /* acceptance criteria in a story body: table rows `| AC… | text |` or bullets `- AC… text`; Given/When/Then split when present */
+  function criteria(body) {
+    const out = [];
+    mdLines(body).forEach((l) => {
+      let m = l.match(/^\|\s*(AC[\w.]+)\s*\|\s*(.*?)\s*\|?\s*$/); if (m) { out.push({ id: m[1], text: m[2] }); return; }
+      m = l.match(/^\s*[-*]\s+\*?\*?(AC[\w.]+)\*?\*?\s*[:.]?\s*(.*)$/); if (m) out.push({ id: m[1], text: m[2] });
+    });
+    return out.map((ac) => {
+      const tags = []; const t = ac.text.replace(/\[([A-Za-z0-9 _-]{1,16})\]/g, (_, tag) => { tags.push(tag); return ""; }).trim();
+      const g = t.match(/^\*{0,2}given\*{0,2}\s+([\s\S]*?)[,;]?\s+\*{0,2}when\*{0,2}\s+([\s\S]*?)[,;]?\s+\*{0,2}then\*{0,2}\s+([\s\S]*)$/i);
+      return Object.assign(ac, { tags, gwt: g ? [g[1], g[2], g[3]] : null, text: t });
+    });
+  }
+  const acHtml = (acs) => acs.map((ac) => `<div class="ac" data-ac="${esc(ac.id)}"><span class="acid">${esc(ac.id)}${ac.tags.length ? `<span class="tags">${ac.tags.map((t) => `<span class="chip muted">${esc(t)}</span>`).join("")}</span>` : ""}</span>${ac.gwt ? `<div class="gwt"><div><b>Given</b>${inline(ac.gwt[0])}</div><div><b>When</b>${inline(ac.gwt[1])}</div><div><b>Then</b>${inline(ac.gwt[2])}</div></div>` : `<div>${inline(ac.text)}</div>`}</div>`).join("");
+  /* bold-label facts: `**Priority:** Must. **Requirements:** FR1…` and `Priority: Must · Repo: api · Traces: …` lines */
+  const FACT_LINE = (l) => (/\*\*[^*]+:\*\*/.test(l) && !/^\s*(?:[-*]\s|[|#])/.test(l)) || (/^[A-Z][A-Za-z ]{1,20}:\s*\S/.test(l) && /\s·\s/.test(l));
+  function factsOf(body) {
+    const facts = []; const seen = new Set();
+    const add = (k, v) => { k = k.trim(); v = v.trim().replace(/\.$/, ""); if (!k || !v || seen.has(k.toLowerCase())) return; seen.add(k.toLowerCase()); facts.push([k, v]); };
+    mdLines(body).forEach((l) => {
+      if (/^```/.test(l) || !FACT_LINE(l)) return;
+      if (/\*\*[^*]+:\*\*/.test(l)) { l.split(/(?=\*\*[^*]+:\*\*)/).forEach((p) => { const m = p.match(/^\*\*([^*]+):\*\*\s*([\s\S]*)$/); if (m) add(m[1], m[2]); }); return; }
+      l.split(/\s·\s/).forEach((p) => { const m = p.match(/^([A-Z][A-Za-z ]{1,20}):\s*(.+)$/); if (m) add(m[1], m[2]); });
+    });
+    return facts;
+  }
+  /* the body without its fact lines and acceptance criteria (table rows, their header and delimiter, or bullets) */
+  const stripFacts = (body) => {
+    const lines = mdLines(body); let fence = false; const keep = [];
+    lines.forEach((l, i) => {
+      if (/^```/.test(l)) fence = !fence;
+      if (fence) { keep.push(l); return; }
+      if (FACT_LINE(l) || /^\|?\s*AC[\w.]+\s*\|/.test(l) || /^\s*[-*]\s+\*?\*?AC[\w.]+/.test(l)) return;
+      const acHeader = /^\|\s*ID\s*\|/i.test(l) && /^\|\s*AC[\w.]+\s*\|/.test(lines[i + 2] || "");
+      const acDelim = /^\|[-|: ]+\|$/.test(l) && /^\|\s*ID\s*\|/i.test(lines[i - 1] || "") && /^\|\s*AC[\w.]+\s*\|/.test(lines[i + 1] || "");
+      if (acHeader || acDelim) return;
+      keep.push(l);
+    });
+    return keep.join("\n");
+  };
+
+  /* --- stories: cards by epic --- */
+  function viewStories(d) {
+    const epics = splitHeadings(d.text, "##"); const stories = [];
+    epics.forEach((e) => { splitHeadings(e.body, "###").forEach((s) => { const m = s.title.match(/^(US[\w.]+)\s+(.*)$/); if (m) stories.push({ epic: e.title, id: m[1], title: m[2], body: s.body }); }); });
+    if (stories.length < 2) return null;
+    const root = wrap(); const lead = stripH1(epics[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    const prios = new Map(); stories.forEach((s) => { const f = factsOf(s.body).find(([k]) => /^priority$/i.test(k)); s.priority = f ? f[1].replace(/\s*have$/i, "") : ""; prios.set(s.priority || "?", (prios.get(s.priority || "?") || 0) + 1); });
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${stories.length} stories in ${new Set(stories.map((s) => s.epic)).size} groups</span>${[...prios].map(([p, c]) => `<span class="chip ${priorityTone(p)}">${esc(p)} ${c}</span>`).join("")}</div>`);
+    let n = 10; const groups = new Map(); stories.forEach((s) => { if (!groups.has(s.epic)) groups.set(s.epic, []); groups.get(s.epic).push(s); });
+    groups.forEach((items, epic) => {
+      const sec = section(d, n++, epic.replace(/^Epic\s+/i, ""), true, `${items.length} stories`);
+      const cards = node('<div class="cards"></div>');
+      items.forEach((s) => {
+        const facts = factsOf(s.body); const acs = criteria(s.body); const rest = stripFacts(s.body).trim();
+        const nm = rest.match(/^\s*(?:\*\*)?As(?:\*\*)?\s[\s\S]*?(?=\n\s*\n|$)/); const narrative = nm ? nm[0].trim() : "";
+        const other = narrative ? rest.replace(narrative, "").trim() : rest;
+        const card = node(`<div class="card"><div class="chead"><span class="chip">${esc(s.id)}</span><h3>${inline(s.title)}</h3><span class="end">${s.priority ? `<span class="chip ${priorityTone(s.priority)}">${esc(s.priority)}</span>` : ""}</span></div></div>`);
+        regRef(s.id, card, s.title);
+        if (narrative) card.insertAdjacentHTML("beforeend", `<p class="desc">${inline(narrative)}</p>`);
+        const fx = facts.filter(([k]) => !/^priority$/i.test(k)); if (fx.length) card.insertAdjacentHTML("beforeend", `<dl class="facts">${fx.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${inline(v)}</dd>`).join("")}</dl>`);
+        if (acs.length) { const det = node(`<details class="sub" open><summary>${acs.length} acceptance criteria</summary><div class="acs">${acHtml(acs)}</div></details>`); card.appendChild(det); det.querySelectorAll(".ac").forEach((a) => regRef(a.dataset.ac, a, a.textContent.trim().replace(/\s+/g, " ").slice(0, 300))); }
+        if (other) card.appendChild(mdDiv(other));
+        cards.appendChild(card);
+      });
+      sec.secbody.appendChild(cards); root.appendChild(sec);
+    });
+    epics.slice(1).filter((e) => !groups.has(e.title) && e.title).forEach((e) => { const sec = section(d, n++, e.title, false); sec.secbody.appendChild(mdDiv(e.body)); root.appendChild(sec); });
+    return root;
+  }
+
+  /* --- requirements: tables by group --- */
+  function viewRequirements(d) {
+    const top = splitHeadings(d.text, "##"); const groups = []; let found = 0;
+    const ID = "((?:FR|NFR|TC|SC|RAID|C|A|R)-?\\d[\\w.]*)";
+    const reqLine = (l) => {
+      let m = l.match(new RegExp("^\\|\\s*" + ID + "\\s*\\|(.*)\\|?\\s*$"));
+      if (m) { const cells = m[2].split("|").map((c) => c.trim()).filter((c, i, arr) => !(i === arr.length - 1 && c === "")); return { id: m[1], text: cells[0] || "", source: cells.slice(1).join(" · ") }; }
+      m = l.match(new RegExp("^\\s*[-*]\\s+\\*\\*" + ID + "(?:\\s*[—–:-]\\s*([^*]*?))?[.:]?\\*\\*\\s*[:.]?\\s*(.*)$"));
+      if (m) { const text = (m[2] ? "**" + m[2].trim() + ".** " : "") + m[3]; const s = text.match(/^([\s\S]*?)\s*(\((?:[^()]*)\)|(?:\s*\[[^\]]+\])+)\s*$/); return { id: m[1], text: s ? s[1] : text, source: s ? s[2].replace(/^\(|\)$/g, "") : "" }; }
+      return null;
+    };
+    top.forEach((sec) => {
+      const subs = splitHeadings(sec.body, "###"); const parts = subs.length > 1 ? subs.slice(1) : [{ title: sec.title, body: sec.body }];
+      parts.forEach((p) => { const rows = []; let last = null; mdLines(p.body).forEach((l) => { const r = reqLine(l); if (r) { rows.push(r); last = r; return; } const sub = l.match(/^\s{2,}[-*]\s+(.*)$/); if (sub && last) last.text += " · " + sub[1]; }); if (rows.length) { found += rows.length; groups.push({ title: p.title || sec.title, section: sec.title, rows }); } });
+    });
+    if (found < 3) return null;
+    const root = wrap(); const lead = stripH1(top[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    let n = 10; const all = []; const secs = [];
+    groups.forEach((g) => {
+      const sec = section(d, n++, g.title, true, `${g.rows.length}`);
+      const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>ID</th><th>Requirement</th><th>Source</th></tr></thead><tbody></tbody></table></div>`);
+      g.rows.forEach((r) => { const w = /^(withdrawn|removed|dropped)/i.test(r.text); const tr = node(`<tr data-f="${esc(g.section)}"${w ? ' class="dim"' : ""}><td class="id">${esc(r.id)}</td><td>${inline(r.text)}</td><td class="dim">${inline(r.source)}</td></tr>`); tr.dataset.q = r.id + " " + r.text; regRef(r.id, tr, r.text); table.querySelector("tbody").appendChild(tr); all.push(tr); });
+      sec.secbody.appendChild(table); secs.push(sec);
+    });
+    root.appendChild(filterBar(all, `${found} requirements`)); secs.forEach((s) => root.appendChild(s));
+    top.slice(1).filter((s) => s.title && !groups.some((g) => g.section === s.title)).forEach((s) => { const sec = section(d, n++, s.title, false); sec.secbody.appendChild(mdDiv(s.body)); root.appendChild(sec); });
+    return root;
+  }
+
+  /* --- decisions: ADR cards --- */
+  function viewDecisions(d) {
+    const all = splitHeadings(d.text, "##"); const adrs = all.filter((s) => /^ADR-?\d+/i.test(s.title)); if (!adrs.length) return null;
+    const root = wrap(); const lead = stripH1(all[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    const statusOf = (body) => { const m = body.match(/\*\*Status:?\*\*:?\s*([A-Za-z][A-Za-z -]*)/) || body.match(/^#+\s*Status:?\s*\[?([A-Za-z]+)/m) || body.match(/\bStatus:\s*([A-Za-z]+)/); return m ? m[1].trim() : ""; };
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${adrs.length} decisions</span></div>`);
+    let n = 10;
+    adrs.forEach((a) => {
+      const m = a.title.match(/^(ADR-?\d+)[:\s·-]*\s*(.*)$/); const id = m ? m[1] : a.title; const title = m ? m[2] : "";
+      const status = statusOf(a.body); const date = (a.body.match(/\*\*Date:?\*\*:?\s*([0-9-]+)/) || [])[1];
+      const sec = section(d, n++, `${id} ${title}`, false);
+      sec.querySelector("summary").insertAdjacentHTML("beforeend", `${status ? `<span class="chip ${/accept/i.test(status) ? "ok" : /propos/i.test(status) ? "accent" : "muted"}">${esc(status)}</span>` : ""}${date ? `<span class="hint mono">${esc(date)}</span>` : ""}`);
+      regRef(id, sec, title);
+      const subs = splitHeadings(a.body, "###");
+      if (subs.length > 1) { sec.secbody.appendChild(mdDiv(subs[0].body)); subs.slice(1).forEach((s) => { const det = node(`<details class="sub"${/decision/i.test(s.title) ? " open" : ""}><summary>${esc(s.title)}</summary></details>`); det.appendChild(mdDiv(s.body)); sec.secbody.appendChild(det); }); }
+      else { a.body.split(/(?=^\*\*(?:Context|Decision|Consequences|Alternatives[^*]*|Status|Security|Rationale)[.:]?\*\*)/m).forEach((p) => { const mm = p.match(/^\*\*([^*]+?)[.:]?\*\*[.:]?\s*([\s\S]*)$/); if (!mm) { if (p.trim()) sec.secbody.appendChild(mdDiv(p)); return; } if (/^status$/i.test(mm[1])) return; const det = node(`<details class="sub"${/decision/i.test(mm[1]) ? " open" : ""}><summary>${esc(mm[1])}</summary></details>`); det.appendChild(mdDiv(mm[2])); sec.secbody.appendChild(det); }); }
+      root.appendChild(sec);
+    });
+    all.slice(1).filter((s) => s.title && !/^ADR-?\d+/i.test(s.title)).forEach((s) => { const sec = section(d, n++, s.title, false); sec.secbody.appendChild(mdDiv(s.body)); root.appendChild(sec); });
+    return root;
+  }
+
+  /* --- units of work: a section per `## U1 · Title (slug)` or `### U1 …` --- */
+  function viewUnits(d) {
+    const secs = splitHeadings(d.text, "##"); const subs = []; const used = new Set();
+    const isUnit = (t) => /^U\d+\b/.test(t);
+    secs.forEach((s) => {
+      if (isUnit(s.title)) { subs.push(s); used.add(s); return; }
+      let hit = false;
+      splitHeadings(s.body, "###").forEach((x) => {
+        if (isUnit(x.title)) { subs.push(Object.assign(x, { group: s.title })); hit = true; return; }
+        splitHeadings(x.body, "####").forEach((y) => { if (isUnit(y.title)) { subs.push(Object.assign(y, { group: x.title || s.title })); hit = true; } });
+      });
+      if (hit) used.add(s);
+    });
+    if (subs.length < 2) return null;
+    const root = wrap(); const lead = stripH1(secs[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    let n = 1;
+    const indexSec = secs.find((s) => /\bindex\b/i.test(s.title) && !used.has(s)); if (indexSec) { const sec = section(d, n++, indexSec.title, true); sec.secbody.appendChild(mdDiv(indexSec.body)); root.appendChild(sec); }
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${subs.length} units</span></div>`);
+    n = 10;
+    subs.forEach((u) => {
+      const m = u.title.match(/^(U\d+)\s*[·:—–-]?\s*(.*?)\s*(?:\(`?([a-z0-9-]+)`?\))?\s*$/); const id = m ? m[1] : u.title; let title = m ? m[2] : ""; let slug = m ? m[3] || "" : "";
+      const sm = title.match(/^`?([a-z0-9][a-z0-9-]+)`?\s*[—–:-]?\s*(.*)$/); if (!slug && sm && /-/.test(sm[1])) { slug = sm[1]; title = sm[2] || sm[1]; }
+      const sec = section(d, n++, `${id} ${title}`, true, slug);
+      if (u.group) sec.querySelector("summary").insertAdjacentHTML("beforeend", `<span class="chip muted">${esc(u.group)}</span>`);
+      regRef(id, sec, title); if (slug) regRef(slug, sec, title);
+      const facts = factsOf(u.body); const rest = stripFacts(u.body);
+      if (facts.length) sec.secbody.insertAdjacentHTML("beforeend", `<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${inline(v)}</dd>`).join("")}</dl>`);
+      sec.secbody.appendChild(mdDiv(rest)); root.appendChild(sec);
+    });
+    secs.slice(1).filter((s) => s.title && !used.has(s) && s !== indexSec).forEach((s) => { const sec = section(d, n++, s.title, false); sec.secbody.appendChild(mdDiv(s.body)); root.appendChild(sec); });
+    return root;
+  }
+
+  /* --- story map: the table grouped by unit --- */
+  function viewStoryMap(d) {
+    const rows = []; let header = null;
+    mdLines(d.text).forEach((l) => { if (!/^\|/.test(l)) return; const cells = l.split("|").slice(1, -1).map((c) => c.trim()); if (/^:?-+:?$/.test(cells[0])) return; if (!header) { header = cells.map((c) => c.toLowerCase()); return; } if (cells.length === header.length) rows.push(Object.fromEntries(header.map((h, i) => [h, cells[i]]))); });
+    if (!header || rows.length < 3) return null;
+    const unitKey = header.find((h) => /unit id/.test(h)) || header.find((h) => /^unit$/.test(h)); const storyKey = header.find((h) => /^story$/.test(h) || /story id/.test(h)); const critKey = header.find((h) => /criteria/.test(h)); const titleKey = header.find((h) => /title/.test(h)); const prioKey = header.find((h) => /priority/.test(h));
+    if (!unitKey || !storyKey) return null;
+    const root = wrap(); const lead = stripH1(d.text.split(/\n## /)[0]).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    const byUnit = new Map(); rows.forEach((r) => { const u = r[unitKey]; if (!byUnit.has(u)) byUnit.set(u, []); byUnit.get(u).push(r); });
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${rows.length} rows · ${byUnit.size} units · ${new Set(rows.map((r) => r[storyKey])).size} stories</span></div>`);
+    let n = 10; const sorted = [...byUnit].sort((a, b) => (parseInt(a[0].replace(/\D/g, "")) || 0) - (parseInt(b[0].replace(/\D/g, "")) || 0));
+    sorted.forEach(([unit, items]) => {
+      const name = unitKey !== "unit" && header.includes("unit") ? items[0].unit : ""; const dir = items[0].directory || "";
+      const sec = section(d, n++, `${unit}${name ? " · " + name : ""}`, true, `${items.length} stories`);
+      sec.secbody.innerHTML = `${dir ? `<p class="hint mono">${inline(dir)}</p>` : ""}<div class="tablewrap"><table class="grid"><thead><tr><th>Story</th><th>Title</th>${prioKey ? "<th>Priority</th>" : ""}${critKey ? "<th>Criteria</th>" : ""}</tr></thead><tbody>${items.map((r) => `<tr><td class="id">${esc(r[storyKey])}</td><td>${inline(r[titleKey] || "")}</td>${prioKey ? `<td><span class="chip ${priorityTone(r[prioKey] || "")}">${esc(r[prioKey] || "")}</span></td>` : ""}${critKey ? `<td class="dim">${inline(r[critKey] || "")}</td>` : ""}</tr>`).join("")}</tbody></table></div>`;
+      regRef(unit, sec, name); root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- bolt plan: a strip of bolts, then each section --- */
+  function viewBolts(d) {
+    let secs = splitHeadings(d.text, "##"); let bolts = secs.filter((s) => /^bolt\s*\d+/i.test(s.title));
+    if (!bolts.length) { /* bolts as H3 under milestone H2s: flatten to one list, each bolt tagged with its milestone */
+      const flat = [secs[0]]; secs.slice(1).forEach((s) => { const inner = splitHeadings(s.body, "###"); const hits = inner.filter((x) => /^bolt\s*\d+/i.test(x.title)); if (hits.length) { if (inner[0].body.trim()) flat.push({ title: s.title, body: inner[0].body }); hits.forEach((x) => flat.push(Object.assign(x, { group: s.title }))); } else flat.push(s); });
+      secs = flat; bolts = secs.filter((s) => /^bolt\s*\d+/i.test(s.title)); if (!bolts.length) return null;
+    }
+    const root = wrap(); const lead = stripH1(secs[0].body).trim(); if (lead) root.appendChild(mdBlocks(d, lead, false, 0));
+    const info = bolts.map((b) => { const units = (b.body.match(/\*\*Units:?\*\*:?\s*([^\n]*)/) || [])[1] || ""; const pts = parseInt((b.body.match(/(\d+)\s*(?:story\s*)?points?\b/i) || [])[1] || "0"); const count = parseInt((units.match(/^\s*(\d+)/) || [])[1] || "") || (b.body.match(/^\|\s*\d+\s*\|/gm) || []).length || (units.match(/\bU\d+\b/g) || []).length; return { title: b.title, pts, count }; });
+    const max = Math.max(1, ...info.map((i) => i.pts));
+    root.insertAdjacentHTML("beforeend", `<div class="bolts">${info.map((i) => `<div class="bolt"><b>${inline(i.title)}</b><span class="hint">${i.count ? i.count + " units" : ""}${i.pts ? ` · ${i.pts} points` : ""}</span>${i.pts ? `<div class="bar"><i style="width:${Math.round(100 * i.pts / max)}%"></i></div>` : ""}</div>`).join("")}</div>`);
+    let n = 10;
+    secs.slice(1).forEach((s) => { if (!s.title) return; const isBolt = /^bolt\s*\d+/i.test(s.title); const sec = section(d, n++, s.title, isBolt); if (s.group) sec.querySelector("summary").insertAdjacentHTML("beforeend", `<span class="chip muted">${esc(s.group)}</span>`); const facts = isBolt ? factsOf(s.body) : []; const rest = isBolt ? stripFacts(s.body) : s.body; if (facts.length) sec.secbody.insertAdjacentHTML("beforeend", `<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${inline(v)}</dd>`).join("")}</dl>`); sec.secbody.appendChild(mdDiv(rest)); if (isBolt) { const m = s.title.match(/^(Bolt)\s*(\d+)/i); if (m) regRef("Bolt " + m[2], sec, s.title); } root.appendChild(sec); });
+    return root;
+  }
+
+  /* OpenAPI component schemas as folded cards: name, type, properties (type, format or enum or $ref, required, description) */
+  function schemaCards(schemas) {
+    const tyOf = (p) => { if (!p || typeof p !== "object") return ""; if (p.$ref) return str(p.$ref).split("/").pop(); if (p.enum) return list(p.enum).join(" | "); if (p.type === "array") return "array of " + (tyOf(p.items) || "?"); return [p.type, p.format].filter(Boolean).join(" ") + (p.pattern ? " /" + p.pattern + "/" : "") + (p.maxLength !== undefined ? " ≤" + p.maxLength : ""); };
+    const root = document.createElement("div"); root.className = "cards";
+    root.insertAdjacentHTML("beforeend", `<p class="hint">${Object.keys(schemas).length} schemas</p>`);
+    Object.entries(schemas).forEach(([name, sc]) => {
+      const props = (sc && sc.properties && typeof sc.properties === "object") ? Object.entries(sc.properties) : []; const req = new Set(list(sc && sc.required).map(str));
+      const det = node(`<details class="sub" data-schema="${esc(name)}"><summary>${esc(name)} <span class="hint">· ${esc(str((sc && sc.type) || (props.length ? "object" : "")))}${props.length ? " · " + props.length + " properties" : ""}${sc && sc.enum ? " · " + list(sc.enum).join(" | ") : ""}</span></summary></details>`);
+      if (sc && sc.description) det.insertAdjacentHTML("beforeend", `<p class="desc">${inline(str(sc.description))}</p>`);
+      if (props.length) det.insertAdjacentHTML("beforeend", `<div class="tablewrap"><table class="grid"><tbody>${props.map(([f, p]) => `<tr><td class="id">${esc(f)}</td><td class="ty">${esc(tyOf(p))}</td><td>${req.has(f) ? '<span class="chip muted">required</span>' : ""}</td><td class="dim">${inline(str((p && p.description) || ""))}</td></tr>`).join("")}</tbody></table></div>`);
+      else if (sc && !sc.enum) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = JSON.stringify(sc, null, 2); det.appendChild(pre); }
+      root.appendChild(det); regRef(name, det, str((sc && sc.description) || ""));
+    });
+    return root;
+  }
+
+  /* ---------- structured documents: the building blocks every table-first and list-first view shares ---------- */
+  const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s; };
+  const ANYID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)$/;
+  const LEADID = /^((?:[A-Z]{1,5})-?\d+(?:\.\d+)*[a-z]?)\s+\S/;
+  const TONE_COL = /^(likelihood|impact|severity|priority|moscow|status|result|verdict|confidence|outcome)$/i;
+  const FACET_COL = /^(kind|category|type|layer|phase|owner|area|group|scope|class|tier)$/i;
+  const tone = (s) => {
+    s = String(s || "").trim().toLowerCase().replace(/[*_`]/g, "");
+    if (/^(critical|major|high|must|blocked|fail|failed|failing|unresolved|missing|gap|breaking|rejected|uncovered)/.test(s)) return "warn";
+    if (/^(medium|moderate|should|partial|pending|proposed|open|new|planned|todo|maybe|not run|in progress|minor)/.test(s)) return "accent";
+    if (/^(low|could|done|ok\b|pass|resolved|accepted|covered|ready|feasible|yes|complete|met\b|green|closed)/.test(s)) return "ok";
+    return "muted";
+  };
+  const factRow = (facts) => node(`<div class="factrow">${facts.map(([k, v]) => `<div><b>${esc(k)}</b><span>${inline(v)}</span></div>`).join("")}</div>`);
+  /* a table's cells split at unescaped pipes */
+  const cellsOf = (line) => line.trim().replace(/^\|/, "").replace(/\|\s*$/, "").split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+  /* the first table in a markdown text: {head, rows} or null */
+  function mdTable(text) {
+    const lines = mdLines(text); let head = null; const rows = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!/^\s*\|/.test(l)) { if (head && rows.length) break; if (head && !rows.length && l.trim() === "") continue; head = null; continue; }
+      const cells = cellsOf(l);
+      if (!head) { if (/^\s*\|[-: |]+\|\s*$/.test(lines[i + 1] || "")) { head = cells; i++; } continue; }
+      rows.push(cells);
+    }
+    return head ? { head, rows } : null;
+  }
+  /* the <!-- Text fallback: … --> comments under diagrams and wireframes become a folded description */
+  const foldFallbacks = (text) => String(text || "").replace(/<!--\s*Text fallback:\s*([\s\S]*?)-->/g, (_, t) => `\n\n<details class="sub"><summary>Describe in words</summary>\n\n${t.trim()}\n\n</details>\n\n`);
+
+  /* a table → upgraded grid: ids linked and registered, categorical columns as chips, step numbers as links */
+  function upgradeTable(tbl) {
+    const heads = [...tbl.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+    const rows = [...tbl.querySelectorAll("tbody tr")];
+    if (!heads.length || !rows.length) return { rows: [], heads, facet: -1 };
+    tbl.classList.add("grid");
+    rows.forEach((tr) => {
+      const td = tr.cells[0]; if (!td) return;
+      const raw = td.textContent.trim().replace(/[`*]/g, "");
+      const whole = raw.match(ANYID); const lead = whole || raw.match(LEADID);
+      if (lead) { regRef(lead[1], tr, tr.textContent.trim().replace(/\s+/g, " ").slice(0, 300)); if (whole) td.classList.add("id"); }
+    });
+    let facet = -1;
+    heads.forEach((h, i) => {
+      const isTone = TONE_COL.test(h); if (!isTone && !FACET_COL.test(h)) return;
+      const vals = rows.map((tr) => tr.cells[i] ? tr.cells[i].textContent.trim() : "");
+      const set = new Set(vals.filter(Boolean)); if (!set.size || set.size > 8 || vals.some((v) => v.length > 28)) return;
+      rows.forEach((tr, k) => { const td = tr.cells[i]; if (td && vals[k]) td.innerHTML = `<span class="chip ${isTone ? tone(vals[k]) : "muted"}">${esc(vals[k])}</span>`; });
+      if (facet < 0 && set.size >= 2) facet = i;
+    });
+    rows.forEach((tr) => { if (facet >= 0 && tr.cells[facet]) tr.dataset.f = tr.cells[facet].textContent.trim(); });
+    heads.forEach((h, i) => { if (/^steps?$/i.test(h)) rows.forEach((tr) => { const td = tr.cells[i]; if (td) td.innerHTML = td.innerHTML.replace(/\b(\d+)\b/g, (_, n) => `<a class="xref" data-ref="Step ${n}">${n}</a>`); }); });
+    return { rows, heads, facet };
+  }
+  /* a two-column Field | Value table is a list of facts; a list whose every item is `Label: text` is one too */
+  function kvTables(root) {
+    root.querySelectorAll("table").forEach((tbl) => {
+      const heads = [...tbl.querySelectorAll("thead th")].map((t) => t.textContent.trim());
+      if (heads.length !== 2 || !/^(field|key|property|attribute|item|name)$/i.test(heads[0]) || !/^(value|description|detail|details)$/i.test(heads[1])) return;
+      const rows = [...tbl.querySelectorAll("tbody tr")]; if (!rows.length) return;
+      const dl = node(`<dl class="facts">${rows.map((tr) => `<dt>${esc(tr.cells[0].textContent.trim())}</dt><dd>${tr.cells[1] ? tr.cells[1].innerHTML : ""}</dd>`).join("")}</dl>`);
+      (tbl.closest(".tablewrap") || tbl).replaceWith(dl);
+    });
+  }
+  function kvLists(root) {
+    root.querySelectorAll("ul").forEach((ul) => {
+      if (ul.closest("li, dd")) return;
+      const lis = [...ul.children].filter((x) => x.tagName === "LI"); if (lis.length < 2) return;
+      const parsed = lis.map((li) => {
+        const h = li.innerHTML;
+        let m = h.match(/^\s*<strong>([^<]{1,40}?):\s*<\/strong>\s*([\s\S]*)$/) || h.match(/^\s*<strong>([^<]{1,40}?)<\/strong>:\s*([\s\S]*)$/) || h.match(/^\s*([A-Z][\w ’'\/&()-]{1,48}):\s+([\s\S]*)$/);
+        if (m) return [m[1].trim(), m[2].trim()];
+        m = h.match(/^\s*<strong>([^<]{1,40})<\/strong>\s*((?:\((?:[^()]|<[^>]+>)*\))?)\s*:\s*([\s\S]*)$/);
+        return m ? [m[1].trim(), ((m[2] ? m[2] + " " : "") + m[3]).trim()] : null;
+      });
+      if (parsed.some((p) => !p || !p[1])) return;
+      ul.replaceWith(node(`<dl class="facts">${parsed.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>`));
+    });
+  }
+  /* `- [x]` items become done / open marks */
+  function taskMarks(root) {
+    root.querySelectorAll("li input[type=checkbox]").forEach((inp) => {
+      const li = inp.closest("li"); const done = inp.checked || inp.hasAttribute("checked");
+      li.classList.add("task", done ? "done" : "todo");
+      const tick = document.createElement("span"); tick.className = "tick"; tick.setAttribute("aria-label", done ? "done" : "not done"); tick.textContent = done ? "✓" : "";
+      inp.replaceWith(tick);
+    });
+  }
+  /* JSON anywhere: an object as facts, a list of objects as cards, a list of text as bullets */
+  function jsonTree(v, depth) {
+    depth = depth || 0;
+    const scalar = (x) => { const s = str(x); if (/^sha\d*:|^[0-9a-f]{24,}$/i.test(s)) return `<code title="${esc(s)}">${esc(s.length > 24 ? s.slice(0, 20) + "…" : s)}</code>`; if (s.length > 160 || s.includes("\n")) return `<div class="md">${mdHtml(s) || esc(s)}</div>`; return typeof x === "boolean" || x === null ? `<span class="chip muted">${esc(s)}</span>` : inline(s); };
+    if (Array.isArray(v)) {
+      if (!v.length) return node('<span class="hint">none</span>');
+      if (v.every((x) => x === null || typeof x !== "object")) return node(`<ul>${v.map((x) => `<li>${scalar(x)}</li>`).join("")}</ul>`);
+      const box = node('<div class="cards"></div>');
+      v.forEach((x, i) => {
+        const label = x && typeof x === "object" && !Array.isArray(x) ? str(x.id || x.name || x.layer || x.path || x.title || x.key || "") : "";
+        const inner = (x && typeof x === "object" && !Array.isArray(x) && label) ? Object.fromEntries(Object.entries(x).filter(([k]) => !["id", "name", "layer", "path", "title", "key"].includes(k) || str(x[k]) !== label)) : x;
+        const head = label ? `<span class="chip">${esc(clip(label, 60))}</span>` : `<span class="chip muted">${i + 1}</span>`;
+        if (depth >= 1) { const first = Object.values(inner || {}).find((y) => typeof y === "string"); const det = node(`<details class="sub">${`<summary>${head} <span class="hint">${esc(clip(first || "", 110))}</span></summary>`}</details>`); det.appendChild(jsonTree(inner, depth + 1)); box.appendChild(det); return; }
+        const card = node(`<div class="card"><div class="chead">${head}</div></div>`);
+        card.appendChild(jsonTree(inner, depth + 1)); box.appendChild(card);
+      });
+      return box;
+    }
+    if (v && typeof v === "object") {
+      const dl = node('<dl class="facts"></dl>');
+      Object.entries(v).forEach(([k, val]) => {
+        const dt = document.createElement("dt"); dt.textContent = k.replace(/_/g, " "); const dd = document.createElement("dd");
+        if (val && typeof val === "object") dd.appendChild(jsonTree(val, depth + 1)); else dd.innerHTML = scalar(val);
+        dl.appendChild(dt); dl.appendChild(dd);
+      });
+      return dl;
+    }
+    return node(`<span>${scalar(v)}</span>`);
+  }
+  /* a JSON fence inside a document: the tree, the raw text folded under it */
+  function jsonFences(root) {
+    root.querySelectorAll("pre > code.language-json").forEach((code) => {
+      const pre = code.parentElement; const raw = code.textContent; if (raw.split("\n").length < 6 || pre.closest(".screen")) return;
+      let v; try { v = JSON.parse(raw); } catch { return; }
+      if (!v || typeof v !== "object") return;
+      const card = node('<div class="card"></div>'); card.appendChild(jsonTree(v));
+      const det = node(`<details class="sub"><summary>Raw JSON · ${raw.split("\n").length} lines</summary></details>`); const src = document.createElement("pre"); src.className = "src"; src.textContent = raw; det.appendChild(src);
+      pre.replaceWith(card); card.after(det);
+    });
+  }
+  /* long code is folded under a line that names it */
+  function foldCode(root, limit) {
+    root.querySelectorAll("pre").forEach((pre) => {
+      if (pre.classList.contains("src") || pre.closest(".screen, details.sub")) return;
+      const n = pre.textContent.replace(/\n$/, "").split("\n").length; if (n <= (limit || 40)) return;
+      const lang = ((pre.firstElementChild && pre.firstElementChild.className.match(/language-([\w-]+)/)) || [])[1] || "Code";
+      const det = node(`<details class="sub"><summary>${esc(lang)} · ${n} lines</summary></details>`); pre.replaceWith(det); det.appendChild(pre);
+    });
+  }
+  /* H3 headings inside a section fold their content */
+  function foldH3(root) {
+    const hs = [...root.children].filter((e) => e.tagName === "H3"); if (hs.length < 2) return;
+    const frag = document.createDocumentFragment(); let cur = null; let n = 0;
+    [...root.childNodes].forEach((k) => {
+      if (k.nodeType === 1 && k.tagName === "H3") { n++; cur = node(`<details class="sub h"${hs.length <= 6 || n <= 2 ? " open" : ""}><summary></summary></details>`); cur.firstChild.appendChild(k); frag.appendChild(cur); }
+      else if (cur) cur.appendChild(k); else frag.appendChild(k);
+    });
+    root.innerHTML = ""; root.appendChild(frag);
+  }
+  /* markdown with every upgrade a structured document gets */
+  function smartMd(d, text, o) {
+    o = o || {};
+    const tmp = document.createElement("div"); tmp.innerHTML = mdHtml(foldFallbacks(text)) || `<pre class="plain">${esc(text)}</pre>`;
+    decorate(tmp);
+    kvTables(tmp); kvLists(tmp);
+    tmp.querySelectorAll(".tablewrap").forEach((w) => {
+      const t = w.querySelector("table"); if (!t || t.classList.contains("grid")) return;
+      const info = upgradeTable(t); if (!info.rows.length) return;
+      if (info.rows.length > 12) w.classList.add("tall");
+      if (info.rows.length > 8 && !o.noFilter) w.before(filterBar(info.rows, `${info.rows.length} rows`));
+    });
+    tmp.querySelectorAll("ol").forEach((ol) => {
+      if (ol.closest("li") || ol.children.length < 2) return; ol.classList.add("steps");
+      const start = parseInt(ol.getAttribute("start") || "1", 10); if (start > 1) ol.style.counterReset = "st " + (start - 1);
+    });
+    taskMarks(tmp); jsonFences(tmp); foldCode(tmp, o.foldCode); foldH3(tmp);
+    tmp.className = "md smart"; registerMdRefs(tmp);
+    return tmp;
+  }
+  const countOf = (body) => {
+    const sp = body.querySelectorAll("details.step").length; if (sp) return sp + (body.querySelector("details.step .stepno") ? " steps" : " entries");
+    const rows = body.querySelectorAll("tbody tr").length; if (rows) return rows + (rows === 1 ? " row" : " rows");
+    const steps = body.querySelectorAll("ol.steps > li").length; if (steps) return steps + (steps === 1 ? " step" : " steps");
+    const items = body.querySelectorAll("li, dl.facts dt").length; return items ? items + (items === 1 ? " item" : " items") : "";
+  };
+  /* the lead of a document: facts from its bold labels, the rest folded under its first words when it is long */
+  function leadNode(d, text) {
+    text = stripH1(text).trim(); if (!text) return null;
+    const facts = factsOf(text); const rest = stripFacts(text).trim();
+    const box = document.createElement("div"); box.className = "vw-lead";
+    if (facts.length) box.appendChild(factRow(facts));
+    if (rest) {
+      if (rest.length > 700) { const det = node(`<details class="sub"><summary>${esc(clip(rest.replace(/[`*_#>]|\[([^\]]*)\]\([^)]*\)/g, "$1"), 150))}</summary></details>`); det.appendChild(smartMd(d, rest)); box.appendChild(det); }
+      else box.appendChild(smartMd(d, rest));
+    }
+    return box.childNodes.length ? box : null;
+  }
+  /* H2 sections, the H3 entries under chosen H2s lifted to sections of their own: [{title, body, group?}] with the lead first */
+  function flatSections(text, pick) {
+    const secs = splitHeadings(text, "##"); const out = [secs[0]];
+    secs.slice(1).forEach((s) => {
+      const inner = splitHeadings(s.body, "###"); const hits = inner.slice(1).filter((x) => pick(s.title, x.title));
+      if (!hits.length) { out.push(s); return; }
+      if (inner[0].body.trim()) out.push({ title: s.title, body: inner[0].body });
+      inner.slice(1).forEach((x) => out.push(pick(s.title, x.title) ? Object.assign(x, { group: s.title }) : { title: s.title + " · " + x.title, body: x.body }));
+    });
+    return out;
+  }
+  const QUIET = /derived|^sources?\b|^assumptions|^references|^open questions|^appendix/i;
+  /* the generic view: a facts row, then every H2 as a collapsible section with its tables as grids, its numbered lists as steppers */
+  function viewStructured(d, o) {
+    o = o || {};
+    const parts = o.pick ? flatSections(d.text, o.pick) : splitHeadings(d.text, "##");
+    const secs = parts.slice(1).filter((s) => s.title);
+    if (!secs.length && !/\n\s*\|.*\|\s*\n\s*\|[-: |]+\|/.test(d.text) && (d.text.match(/\n\d+\.\s/g) || []).length < 3) return null;
+    const root = wrap(); const ln = leadNode(d, parts[0].body); if (ln) root.appendChild(ln);
+    let n = 10;
+    secs.forEach((s, i) => {
+      const quiet = QUIET.test(s.title);
+      const open = o.open ? o.open(s, i, quiet) : (!quiet && (i === 0 || s.body.length <= 2200));
+      const body = (o.custom && o.custom(s, d)) || smartMd(d, s.body, o);
+      const sec = section(d, n++, s.title, open, countOf(body));
+      if (s.group) sec.querySelector("summary").insertBefore(node(`<span class="chip muted">${esc(s.group)}</span>`), sec.querySelector(".cnt"));
+      const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
+      sec.secbody.appendChild(body); root.appendChild(sec);
+    });
+    if (!secs.length) root.appendChild(smartMd(d, stripH1(d.text), o));
+    return root;
+  }
+
+  /* --- functional spec: the workflows as steppers, the state machines drawn, the derived views folded --- */
+  const viewFunctionalSpec = (d) => viewStructured(d, { pick: (h2, h3) => /^(workflows?|state machines?)$/i.test(h2) && h3.trim() !== "" });
+
+  /* --- components without YAML: the inventory and failure tables as grids --- */
+  const viewComponentsAny = (d) => viewComponents(d) || viewStructured(d, {});
+
+  /* --- NFR documents: the id column linked, the Meets column linked, decisions as cards --- */
+  function decisionCards(d, s) {
+    const t = mdTable(s.body); if (!t || t.rows.length < 2) return null;
+    const idCol = 0; const titleCol = t.head.findIndex((h, i) => i > 0 && /^(decision|choice|tool|requirement)$/i.test(h)); if (titleCol < 0 || t.head.length < 3) return null;
+    if (t.rows.some((r) => !ANYID.test((r[idCol] || "").replace(/[`*]/g, "")))) return null;
+    const box = document.createElement("div");
+    const before = s.body.split(/\n\s*\|/)[0].trim(); if (before) box.appendChild(smartMd(d, before));
+    const cards = node('<div class="cards"></div>');
+    t.rows.forEach((r) => {
+      const id = r[idCol].replace(/[`*]/g, "");
+      const card = node(`<div class="card"><div class="chead"><span class="chip">${esc(id)}</span></div><p class="desc">${inline(r[titleCol] || "")}</p></div>`);
+      regRef(id, card, clip(r[titleCol], 300));
+      const facts = t.head.map((h, i) => [h, r[i]]).filter(([h, v], i) => i !== idCol && i !== titleCol && v);
+      if (facts.length) card.appendChild(node(`<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${inline(v)}</dd>`).join("")}</dl>`));
+      cards.appendChild(card);
+    });
+    box.appendChild(cards);
+    const after = s.body.slice(s.body.lastIndexOf("|") + 1).trim(); if (after) box.appendChild(smartMd(d, after));
+    return box;
+  }
+  const viewNfrDesign = (d) => viewStructured(d, { custom: (s, doc) => /decision/i.test(s.title) ? decisionCards(doc, s) : null });
+  /* tech-stack-decisions: a card per choice */
+  function techCards(d, s) {
+    const t = mdTable(s.body); if (!t || t.rows.length < 2 || t.head.length < 2) return null;
+    const ti = t.head.findIndex((h) => /^(choice|tool|technology|piece|component)$/i.test(h)); if (ti < 0) return null;
+    const why = t.head.findIndex((h) => /^(why|purpose|reason|rationale)$/i.test(h));
+    const box = document.createElement("div"); const before = s.body.split(/\n\s*\|/)[0].trim(); if (before) box.appendChild(smartMd(d, before));
+    const cards = node('<div class="cards cols"></div>');
+    t.rows.forEach((r) => {
+      const chips = t.head.map((h, i) => [h, r[i]]).filter(([h, v], i) => i !== ti && i !== why && v && v !== "—");
+      const card = node(`<div class="card"><div class="chead"><h3>${inline(r[ti])}</h3><span class="end">${chips.map(([, v]) => `<span class="chip muted">${esc(clip(v.replace(/[`*]/g, ""), 40))}</span>`).join("")}</span></div>${why >= 0 && r[why] ? `<p class="desc">${inline(r[why])}</p>` : ""}</div>`);
+      cards.appendChild(card);
+    });
+    box.appendChild(cards);
+    const after = s.body.slice(s.body.lastIndexOf("|") + 1).trim(); if (after) box.appendChild(smartMd(d, after));
+    return box;
+  }
+  const viewTechStack = (d) => viewStructured(d, { custom: (s, doc) => (/^(runtime|dev|development|tools|stack)/i.test(s.title) && mdTable(s.body) && mdTable(s.body).rows.length >= 3) ? techCards(doc, s) : null });
+
+  /* a section that is a list of `- **Label:** text` bullets: each bullet folds under its label, the first words beside it */
+  function labelBullets(d, s) {
+    const items = []; const pre = []; let cur = null, fence = false;
+    mdLines(s.body).forEach((l) => {
+      if (/^```/.test(l)) fence = !fence;
+      const m = !fence && l.match(/^[-*]\s+(\*\*[^*]+\*\*.*)$/);
+      if (m) { cur = [m[1]]; items.push(cur); } else if (cur) cur.push(l.replace(/^ {2}/, "")); else pre.push(l);
+    });
+    if (items.length < 4 || items.some((it) => !/^\*\*[^*]+\*\*/.test(it[0]))) return null;
+    const box = document.createElement("div"); if (pre.join("").trim()) box.appendChild(smartMd(d, pre.join("\n")));
+    const list = node('<div class="cards steps-list"></div>'); const rows = [];
+    items.forEach((it) => {
+      const label = it[0].match(/^\*\*([^*]+)\*\*/)[1].replace(/:\s*$/, "").trim();
+      const md = [it[0].replace(/^\*\*[^*]+\*\*:?\s*/, ""), ...it.slice(1)].join("\n").trim();
+      const body = smartMd(d, md, { noFilter: true }); const lead = (body.querySelector("p, li") || {}).textContent || "";
+      const det = node(`<details class="sub step lb"><summary><span class="stitle">${esc(label)}</span><span class="hint lead">${esc(clip(lead, 110))}</span></summary></details>`);
+      det.dataset.q = label + " " + body.textContent; det.appendChild(body); list.appendChild(det); rows.push(det);
+    });
+    if (rows.length > 8) box.appendChild(filterBar(rows, `${rows.length} entries`));
+    box.appendChild(list); return box;
+  }
+  const viewCodeSummary = (d) => viewStructured(d, { custom: (s, doc) => labelBullets(doc, s), open: (s, i, quiet) => !quiet && i < 2 });
+
+  /* --- the code generation plan: summary as facts, the testing contract as a card, the steps as a numbered plan --- */
+  function stepsBody(d, s) {
+    const subs = splitHeadings(s.body, "###"); const steps = subs.slice(1).filter((x) => /^Step\s+\d+/i.test(x.title)); if (steps.length < 2) return null;
+    const box = document.createElement("div"); if (subs[0].body.trim()) box.appendChild(smartMd(d, subs[0].body));
+    const list = node('<div class="cards steps-list"></div>'); const nodes = []; let doneAll = 0, totalAll = 0, stepsDone = 0;
+    steps.forEach((x) => {
+      const m = x.title.match(/^Step\s+(\d+)\s*[:.—–-]?\s*(.*)$/i); const num = m[1]; const title = m[2] || x.title;
+      const body = smartMd(d, x.body, { noFilter: true });
+      const total = body.querySelectorAll("li.task").length; const done = body.querySelectorAll("li.task.done").length;
+      doneAll += done; totalAll += total;
+      const state = !total ? "no tasks" : done === total ? "done" : done ? "in progress" : "pending"; if (state === "done") stepsDone++;
+      const det = node(`<details class="sub step" data-f="${state}"${state === "done" ? "" : " open"}><summary><span class="stepno">${esc(num)}</span><span class="stitle">${inline(title)}</span><span class="end">${total ? `<span class="chip ${done === total ? "ok" : done ? "accent" : "muted"}">${done}/${total}</span>` : ""}</span></summary></details>`);
+      det.dataset.q = x.title + " " + body.textContent; det.appendChild(body); regRef("Step " + num, det, title);
+      list.appendChild(det); nodes.push(det);
+    });
+    const pct = totalAll ? Math.round(100 * doneAll / totalAll) : 0;
+    box.appendChild(node(`<div class="progress"><div class="pbar"><i style="width:${pct}%"></i></div><span class="hint">${steps.length} steps · ${stepsDone} done · ${doneAll} of ${totalAll} tasks ticked</span></div>`));
+    box.appendChild(filterBar(nodes, "Steps")); box.appendChild(list);
+    return box;
+  }
+  const viewCodePlan = (d) => viewStructured(d, { custom: (s, doc) => /^steps$/i.test(s.title) ? stepsBody(doc, s) : null, open: (s, i, quiet) => !quiet && (/^(summary|steps|where the code goes)$/i.test(s.title) || s.body.length <= 1500) });
+
+  /* --- file lists: source-manifest.json (or the same JSON as text) --- */
+  function viewManifest(d) {
+    let j; try { j = JSON.parse(d.text); } catch { return null; }
+    if (!j || typeof j !== "object" || Array.isArray(j)) return null;
+    const lists = Object.entries(j).filter(([, v]) => Array.isArray(v) && v.length && v.every((x) => x && typeof x === "object" && (typeof x.path === "string" || typeof x.file === "string")));
+    if (!lists.length) return null;
+    const root = wrap(); const scal = Object.entries(j).filter(([, v]) => v === null || typeof v !== "object").map(([k, v]) => [k.replace(/_/g, " "), str(v)]);
+    if (scal.length) root.appendChild(factRow(scal));
+    let n = 10;
+    lists.forEach(([key, arr]) => {
+      const byRepo = new Map(); arr.forEach((x) => { const r = str(x.repo || ""); if (!byRepo.has(r)) byRepo.set(r, []); byRepo.get(r).push(x); });
+      byRepo.forEach((items, repo) => {
+        const extra = [...new Set(items.flatMap((x) => Object.keys(x)))].filter((k) => !["repo", "path", "file"].includes(k));
+        const sec = section(d, n++, repo || key, true, `${items.length} paths`);
+        if (!extra.length) {
+          const dirOf2 = (p) => { const t = p.replace(/\/$/, ""); const i = t.lastIndexOf("/"); return i < 0 ? "" : t.slice(0, i + 1); };
+          const g2 = new Map(); items.forEach((x) => { const p = str(x.path || x.file); const dir = p.endsWith("/") ? "\u0000" : dirOf2(p); if (!g2.has(dir)) g2.set(dir, []); g2.get(dir).push(p); });
+          const rows2 = []; const tb2 = node('<div class="tablewrap"><table class="grid"><thead><tr><th>Folder</th><th>Files</th></tr></thead><tbody></tbody></table></div>');
+          [...g2].sort((a, b) => (a[0] === "\u0000") - (b[0] === "\u0000")).forEach(([dir, ps]) => {
+            const whole = dir === "\u0000";
+            const tr = node(`<tr><td class="mono dirc">${whole ? "Whole folders" : esc(dir || "/")}</td><td>${ps.map((p) => `<code class="fchipc">${esc(whole ? p : p.slice(dir.length))}</code>`).join(" ")}</td></tr>`);
+            tr.dataset.q = dir + " " + ps.join(" "); tb2.querySelector("tbody").appendChild(tr); rows2.push(tr);
+          });
+          if (rows2.length > 8) sec.secbody.appendChild(filterBar(rows2, `${items.length} paths`));
+          sec.secbody.appendChild(tb2); root.appendChild(sec); return;
+        }
+        const rows = []; const table = node(`<div class="tablewrap"><table class="grid"><thead><tr><th>Path</th>${extra.map((k) => `<th>${esc(k.replace(/_/g, " "))}</th>`).join("")}</tr></thead><tbody></tbody></table></div>`); const tb = table.querySelector("tbody");
+        const dirOf = (p) => { const t = p.replace(/\/$/, ""); const i = t.lastIndexOf("/"); return i < 0 ? "" : t.slice(0, i + 1); };
+        const groups = new Map(); items.forEach((x) => { const p = str(x.path || x.file); const dir = p.endsWith("/") ? "\u0000" : dirOf(p); if (!groups.has(dir)) groups.set(dir, []); groups.get(dir).push(x); });
+        groups.forEach((xs, dir) => {
+          if (groups.size > 1 || dir) tb.appendChild(node(`<tr class="dirrow"><td colspan="${1 + extra.length}">${dir === "\u0000" ? "Whole folders, everything inside" : `<code>${esc(dir || "/")}</code>`} <span class="hint">${xs.length}</span></td></tr>`));
+          xs.forEach((x) => {
+            const p = str(x.path || x.file); const isDir = p.endsWith("/"); const name = isDir ? p : p.slice(dir.length);
+            const tr = node(`<tr><td><span class="mono">${esc(name)}</span></td>${extra.map((k) => { const v = x[k]; const nm = /size|bytes/i.test(k) && typeof v === "number" ? kb(v) : str(v); return /sha|hash|digest/i.test(k) ? `<td><code title="${esc(nm)}">${esc(nm.length > 18 ? nm.slice(0, 14) + "…" : nm)}</code></td>` : `<td class="dim">${esc(nm)}</td>`; }).join("")}</tr>`);
+            tr.dataset.q = p; tb.appendChild(tr); rows.push(tr);
+          });
+        });
+        if (rows.length > 8) sec.secbody.appendChild(filterBar(rows, `${rows.length} paths`));
+        sec.secbody.appendChild(table); root.appendChild(sec);
+      });
+    });
+    const other = Object.fromEntries(Object.entries(j).filter(([k, v]) => v !== null && typeof v === "object" && !lists.some(([lk]) => lk === k)));
+    if (Object.keys(other).length) { const sec = section(d, n++, "Other fields", false, Object.keys(other).join(", ")); sec.secbody.appendChild(jsonTree(other)); root.appendChild(sec); }
+    return root;
+  }
+  /* any other JSON document: its tree */
+  function viewJsonGeneric(d) {
+    if (String(d.text).length > 90000) return null;
+    let j; try { j = JSON.parse(d.text); } catch { return null; }
+    if (!j || typeof j !== "object") return null;
+    const root = wrap(); const sec = section(d, 1, "Contents", true, Array.isArray(j) ? j.length + " entries" : Object.keys(j).length + " fields"); sec.secbody.appendChild(jsonTree(j)); root.appendChild(sec); return root;
+  }
+
+  /* --- personas: a section and a card of facts per persona --- */
+  function viewPersonas(d) {
+    const secs = splitHeadings(d.text, "##"); const people = secs.slice(1).filter((s) => s.title && (/^\|\s*(Field|Attribute|Item)\s*\|/im.test(s.body) || (s.body.match(/^\s*[-*]\s+\*\*[^*]+:\*\*/gm) || []).length >= 3));
+    if (!people.length) return null;
+    const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${people.length} personas</span></div>`);
+    let n = 10;
+    secs.slice(1).filter((s) => s.title).forEach((s) => {
+      const isP = people.includes(s); const m = s.title.match(/^(P\d+)\s*[.:·—–-]\s*(.*)$/);
+      const sec = section(d, n++, m ? `${m[1]} ${m[2]}` : s.title, isP || !QUIET.test(s.title));
+      if (m) regRef(m[1], sec, m[2]);
+      const body = smartMd(d, s.body);
+      if (isP) {
+        const dl = body.querySelector("dl.facts"); const role = dl && [...dl.children].find((x) => x.tagName === "DT" && /^role$/i.test(x.textContent.trim()));
+        if (role) { const dd = role.nextElementSibling; const p = node('<p class="desc role"></p>'); p.innerHTML = dd.innerHTML; role.remove(); dd.remove(); dl.before(p); }
+        const card = node('<div class="card"></div>'); while (body.firstChild) card.appendChild(body.firstChild); body.appendChild(card);
+      }
+      sec.secbody.appendChild(body); root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- questions: each question with its options, the chosen one marked, its context folded --- */
+  const OPT_A = /^\s*(?:[-*]\s+)?([A-HX])[.)]\s+(\S.*)$/; const OPT_B = /^\s*[-*]\s+\*\*([A-HX])\.\s+(\S.*)$/;
+  function parseQuestion(body) {
+    const ctx = [], opts = [], after = []; let ans = null, cur = null, phase = "ctx", fence = false;
+    mdLines(body).forEach((l) => {
+      if (/^```/.test(l)) fence = !fence;
+      let m;
+      if (!fence && (m = l.match(/^\[Answer\]:\s*(.*)$/))) { ans = m[1].trim(); cur = null; phase = "after"; return; }
+      if (!fence && phase !== "after" && ((m = l.match(OPT_B) && ["", l.match(OPT_B)[1], "**" + l.match(OPT_B)[2]]) || (m = l.match(OPT_A)))) { cur = { k: m[1], t: m[2] }; opts.push(cur); phase = "opts"; return; }
+      if (phase === "opts" && cur) { if (l.trim() === "") { cur = null; phase = "gap"; return; } if (/^\s+\S/.test(l) && !/^\s*[-*]\s/.test(l)) { cur.t += " " + l.trim(); return; } }
+      (phase === "ctx" ? ctx : after).push(l);
+    });
+    let letters = [], note = ans;
+    if (ans) { const m = ans.match(/^([A-HX](?:\s*(?:,|and|&)\s*[A-HX])*)(?:\s*[.:—–-]\s*([\s\S]*)|\s*)$/); if (m) { letters = m[1].split(/\s*(?:,|and|&)\s*/); note = (m[2] || "").trim(); } }
+    const pm = after.join("\n").match(/\*\*Proposed:?\*\*:?\s*([A-HX])\b/);
+    return { ctx: ctx.join("\n").trim(), opts, after: after.join("\n").trim(), ans, letters, note, proposed: pm ? pm[1] : "" };
+  }
+  function viewQuestions(d) {
+    if (!/^\[Answer\]:/m.test(d.text)) return null;
+    const secs = splitHeadings(d.text, "##"); const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    const qs = secs.slice(1).filter((s) => s.title && /^\[Answer\]:/m.test(s.body)); if (!qs.length) return null;
+    const answered = qs.filter((s) => parseQuestion(s.body).ans).length;
+    root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${qs.length} questions</span><span class="chip ${answered === qs.length ? "ok" : "accent"}">${answered} answered</span>${answered < qs.length ? `<span class="chip warn">${qs.length - answered} open</span>` : ""}</div>`);
+    let n = 10;
+    secs.slice(1).filter((s) => s.title).forEach((s) => {
+      if (!qs.includes(s)) { const sec = section(d, n++, s.title, false); sec.secbody.appendChild(smartMd(d, s.body)); root.appendChild(sec); return; }
+      const q = parseQuestion(s.body); const mt = s.title.match(/^(?:Question\s+)?Q?(\d+)\s*[:.—–-]\s*(.*)$/i);
+      const sec = section(d, n++, mt ? `Q${mt[1]}: ${mt[2]}` : s.title, !q.ans || !q.letters.length || q.letters.includes("X"));
+      if (mt) regRef("Q" + mt[1], sec, mt[2]);
+      sec.querySelector("summary").insertBefore(node(`<span class="end">${q.ans ? (q.letters.length ? q.letters.map((k) => `<span class="chip ok">${esc(k)}</span>`).join(" ") : `<span class="chip ok">${esc(clip(q.ans, 30))}</span>`) : '<span class="chip warn">unanswered</span>'}</span>`), sec.querySelector(".cnt"));
+      const body = sec.secbody;
+      if (q.ctx) { const det = node('<details class="sub"><summary>Context</summary></details>'); det.appendChild(smartMd(d, q.ctx)); body.appendChild(det); }
+      if (q.opts.length) {
+        const ol = node('<ol class="opts"></ol>');
+        q.opts.forEach((o) => { const chosen = q.letters.includes(o.k); ol.appendChild(node(`<li class="${chosen ? "chosen" : ""}"><b>${esc(o.k)}</b><div>${inline(o.t)}${chosen ? ' <span class="chip ok">chosen</span>' : ""}${q.proposed === o.k ? ' <span class="chip muted">proposed</span>' : ""}</div></li>`)); });
+        body.appendChild(ol);
+      }
+      if (q.after && !(q.opts.length && /^\*\*Proposed:?\*\*/.test(q.after) && q.after.split("\n").length < 2 && false)) { const a = smartMd(d, q.after); a.classList.add("qafter"); body.appendChild(a); }
+      if (q.ans) body.appendChild(node(`<div class="answer"><b>Answer</b><span>${q.letters.length ? esc(q.letters.join(", ")) : ""}${q.letters.includes("X") || !q.letters.length ? ` ${inline(q.letters.length ? q.note : q.ans)}` : (q.note ? ` · ${inline(q.note)}` : "")}</span></div>`));
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- review copies: the findings table, the validation results as a grid, the summary as prose --- */
+  function findingsTable(rows) {
+    const wrapEl = node(`<div class="tablewrap"><table class="ftable"><thead><tr><th>ID</th><th>Severity</th><th>Where</th><th>Status</th></tr></thead><tbody>` + rows.map((r, i) => {
+      const open = isOpenStatus(r.status); const det = r.Finding || r.Where || r["Required action"] || r.Recheck;
+      return `<tr class="frow${open ? "" : " closed"}" data-i="${i}" data-ref="${esc(r.id)}" aria-expanded="${open && i < 3 ? "true" : "false"}"><td>${esc(r.id)}</td><td><span class="sev${isHi(r.severity) ? " hi" : ""}">${esc(r.severity)}</span></td><td class="where">${inline(r.where)}</td><td>${esc(r.status)}</td></tr>` +
+        (det ? `<tr class="fdet" data-for="${i}"${open && i < 3 ? "" : " hidden"}><td colspan="4"><dl>${r.Finding ? `<dt>Finding</dt><dd>${inline(r.Finding)}</dd>` : ""}${r.Where ? `<dt>Where</dt><dd>${inline(r.Where)}</dd>` : ""}${r["Required action"] ? `<dt>Required action</dt><dd>${inline(r["Required action"])}</dd>` : ""}${r.Recheck ? `<dt>Re-check</dt><dd>${inline(r.Recheck)}</dd>` : ""}</dl></td></tr>` : "");
+    }).join("") + `</tbody></table></div>`);
+    wrapEl.querySelectorAll("tr.frow").forEach((tr) => { regRef(tr.dataset.ref, tr, tr.textContent.trim().replace(/\s+/g, " ")); tr.addEventListener("click", () => {
+      const det = wrapEl.querySelector(`tr.fdet[data-for="${tr.dataset.i}"]`); if (!det) return;
+      det.hidden = !det.hidden; tr.setAttribute("aria-expanded", String(!det.hidden));
+    }); });
+    return wrapEl;
+  }
+  function viewReview(d) {
+    const subs = splitHeadings(d.text, "###"); const facts = factsOf(subs[0].body);
+    const fnd = subs.find((s) => /^findings?$/i.test(s.title)); if (!fnd && !facts.length) return null;
+    const root = wrap(); const get = (k) => (facts.find(([x]) => x.toLowerCase() === k) || [])[1] || "";
+    const verdict = get("verdict"); const t = fnd && mdTable(fnd.body);
+    const rows = t ? t.rows.map((r) => { const o = Object.fromEntries(t.head.map((h, i) => [h.toLowerCase(), r[i] || ""])); return { id: o.id || r[0], severity: o.severity || "", where: o.location || o.where || "", status: o.status || "", Finding: o.finding || "", Where: "", "Required action": o["required action"] || "" }; }) : [];
+    const quotes = {}; if (fnd) mdLines(fnd.body).forEach((l) => { const m = l.match(/^>\s*([A-Z]+-?\d+[\w.]*)\s+(.*)$/); if (m) quotes[m[1]] = m[2]; });
+    rows.forEach((r) => { if (quotes[r.id]) r.Recheck = quotes[r.id]; });
+    const open = rows.filter((r) => isOpenStatus(r.status)); const hi = open.filter((r) => isHi(r.severity)).length;
+    root.insertAdjacentHTML("beforeend", `<div class="vtools">${verdict ? `<span class="pill ${/^ready$/i.test(verdict) ? "ok" : "warn"}">${esc(verdict)}</span>` : ""}${get("reviewer") ? `<span class="pill quiet">${esc(get("reviewer"))}</span>` : ""}${get("iteration") ? `<span class="pill quiet">iteration ${esc(get("iteration"))}</span>` : ""}${get("date") ? `<span class="hint mono">${esc(get("date"))}</span>` : ""}${rows.length ? `<span class="pill ${open.length ? (hi ? "warn" : "accent") : "ok"}">${open.length ? open.length + " open" + (hi ? " · " + hi + " blocking" : "") : "no open findings"}</span><span class="hint">${rows.length} finding${rows.length === 1 ? "" : "s"}</span>` : ""}</div>`);
+    const extra = facts.filter(([k]) => !/^(verdict|reviewer|iteration|date)$/i.test(k)); if (extra.length) root.appendChild(factRow(extra));
+    let n = 10;
+    subs.slice(1).filter((s) => s.title).forEach((s) => {
+      const isF = s === fnd; const sec = section(d, n++, s.title, isF || !QUIET.test(s.title));
+      if (isF && rows.length) { sec.querySelector(".cnt").textContent = rows.length + (rows.length === 1 ? " finding" : " findings"); sec.secbody.appendChild(findingsTable(rows)); const rest = fnd.body.split("\n").filter((l) => !/^\s*\||^>/.test(l)).join("\n").trim(); if (rest) sec.secbody.appendChild(smartMd(d, rest)); }
+      else { const b = smartMd(d, s.body); sec.querySelector(".cnt").textContent = countOf(b); sec.secbody.appendChild(b); }
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
+  /* --- wireframes and mockups: ASCII screens framed, side by side when several fit; diagrams drawn --- */
+  const SCREEN_LANG = (l) => !/^(mermaid|ya?ml|json|swift|ts|tsx|typescript|javascript|js|bash|sh|shell|python|py|css|html|sql|toml|diff)$/i.test(String(l).trim());
+  function screensBody(d, title, text) {
+    const re = /```([^\n]*)\n([\s\S]*?)```[ \t]*(?:\n\s*<!--\s*Text fallback:\s*([\s\S]*?)-->)?/g;
+    const box = document.createElement("div"); let last = 0, m; let group = null; let md = "";
+    const flushMd = () => { if (md.trim()) box.appendChild(smartMd(d, md)); md = ""; };
+    const caption = () => { const lines = md.replace(/\s+$/, "").split("\n"); const lastLine = (lines[lines.length - 1] || "").trim(); const c = lastLine.match(/^(?:#{3,5}\s+|\*\*)(.{2,90}?)(?:\*\*)?:?$/); if (c) { lines.pop(); md = lines.join("\n"); return c[1].replace(/\*\*/g, ""); } return ""; };
+    let count = 0; let total = 0; { const r2 = new RegExp(re.source, "g"); let q; while ((q = r2.exec(text))) if (SCREEN_LANG(q[1]) && !/^mermaid$/i.test(q[1].trim())) total++; }
+    while ((m = re.exec(text))) {
+      md += text.slice(last, m.index); last = m.index + m[0].length;
+      if (/^mermaid$/i.test(m[1].trim())) { flushMd(); group = null; box.appendChild(diagramBox(m[2])); continue; }
+      if (!SCREEN_LANG(m[1])) { md += m[0]; continue; }
+      const cap = caption(); if (md.trim()) { flushMd(); group = null; }
+      if (!group) { group = node('<div class="screens"></div>'); box.appendChild(group); }
+      count++;
+      const fig = node('<figure class="screen"><figcaption></figcaption><pre></pre></figure>');
+      fig.querySelector("figcaption").textContent = cap || (total > 1 ? "Screen " + count : title);
+      fig.querySelector("pre").textContent = m[2].replace(/\s+$/, "");
+      if (m[3]) { const det = node('<details class="sub"><summary>Describe in words</summary></details>'); det.appendChild(mdDiv(m[3].trim())); fig.appendChild(det); }
+      group.appendChild(fig);
+    }
+    md += text.slice(last); flushMd();
+    return { box, count };
+  }
+  function viewScreens(d) {
+    if (!/```/.test(d.text)) return viewStructured(d, {});
+    const secs = splitHeadings(d.text, "##"); const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    let n = 10, screens = 0;
+    const built = secs.slice(1).filter((s) => s.title).map((s) => { const r = screensBody(d, s.title, foldFallbacksKeep(s.body)); screens += r.count; return [s, r]; });
+    if (!screens && !/```mermaid/.test(d.text)) return viewStructured(d, {});
+    if (screens) root.insertAdjacentHTML("beforeend", `<div class="vtools"><span>${screens} screens in ${built.filter(([, r]) => r.count).length} sections</span></div>`);
+    built.forEach(([s, r]) => {
+      const sec = section(d, n++, s.title, r.count > 0 || !QUIET.test(s.title) && s.body.length < 1800, r.count ? r.count + (r.count === 1 ? " screen" : " screens") : countOf(r.box));
+      const mm = s.title.match(HEAD_ID); if (mm) regRef(mm[1], sec, s.title);
+      sec.secbody.appendChild(r.box); root.appendChild(sec);
+    });
+    return root;
+  }
+  const foldFallbacksKeep = (t) => t; /* fallbacks stay as comments here: screensBody reads them next to their screen */
+
+  /* --- contracts: every `## C1 · …` / `### C1 — …` entry; a YAML block becomes an operations table, a type sheet a table per type, code stays code --- */
+  function viewContracts(d) {
+    const isEntry = (t) => /^[CE]\d+\b/.test(t);
+    const secs = flatSections(d.text, (h2, h3) => isEntry(h3)); if (!secs.some((s) => isEntry(s.title))) return null;
+    const root = wrap(); const ln = leadNode(d, secs[0].body); if (ln) root.appendChild(ln);
+    let n = 10;
+    secs.slice(1).forEach((s) => {
+      if (!s.title) return;
+      const isC = isEntry(s.title); const sec = section(d, n++, s.title, isC);
+      if (s.group) sec.querySelector("summary").insertBefore(node(`<span class="chip muted">${esc(s.group)}</span>`), sec.querySelector(".cnt"));
+      if (isC) regRef(s.title.match(/^([CE]\d+)/)[1], sec, s.title);
+      const parts = []; let last = 0; const re = /```ya?ml[^\n]*\n([\s\S]*?)```/g; let m; const body = s.body;
+      while ((m = re.exec(body))) { if (m.index > last) parts.push({ md: body.slice(last, m.index) }); let y = null; if (typeof jsyaml !== "undefined") { try { y = jsyaml.load(m[1]); } catch { try { y = jsyaml.load(yamlSafe(m[1])); } catch { y = null; } } } parts.push({ yaml: m[1], data: y }); last = m.index + m[0].length; }
+      if (last < body.length) parts.push({ md: body.slice(last) });
+      parts.forEach((p) => {
+        if (p.md !== undefined) { if (p.md.trim()) sec.secbody.appendChild(smartMd(d, p.md, { foldCode: 60 })); return; }
+        const y = p.data; let done = false;
+        if (y && y.paths && typeof y.paths === "object") {
+          const ops = []; Object.entries(y.paths).forEach(([path, methods]) => { if (!methods || typeof methods !== "object") return; Object.entries(methods).forEach(([method, op]) => { if (!/^(get|post|put|patch|delete|head|options)$/i.test(method) || !op || typeof op !== "object") return; ops.push({ method: method.toUpperCase(), path, id: str(op.operationId || ""), summary: str(op.summary || ""), codes: op.responses ? Object.keys(op.responses) : [] }); }); });
+          if (ops.length) { sec.secbody.insertAdjacentHTML("beforeend", `<p class="hint">${ops.length} operations${y.info && y.info.title ? " · " + esc(str(y.info.title)) : ""}</p><div class="tablewrap"><table class="grid"><thead><tr><th>Method</th><th>Path</th><th>Operation</th><th>Summary</th><th>Responses</th></tr></thead><tbody>${ops.map((o) => `<tr data-op="${esc(o.id)}"><td><span class="chip ${/GET/.test(o.method) ? "ok" : /DELETE/.test(o.method) ? "warn" : "accent"}">${esc(o.method)}</span></td><td class="mono">${esc(o.path)}</td><td class="id">${esc(o.id)}</td><td>${inline(o.summary)}</td><td class="dim">${esc(o.codes.join(" "))}</td></tr>`).join("")}</tbody></table></div>`); sec.secbody.querySelectorAll("tr[data-op]").forEach((tr) => regRef(tr.dataset.op, tr, tr.textContent.trim().replace(/\s+/g, " "))); done = true; }
+        }
+        const schemas = y && y.components && y.components.schemas;
+        if (schemas && typeof schemas === "object" && Object.keys(schemas).length) { sec.secbody.appendChild(schemaCards(schemas)); done = true; }
+        if (!done && y && typeof y === "object" && !Array.isArray(y) && Object.keys(y).length && Object.values(y).every((v) => v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every((f) => typeof f !== "object" || f === null || Array.isArray(f)))) {
+          const notes = {}; let type = ""; p.yaml.split("\n").forEach((l) => { const t = l.match(/^([A-Za-z_][\w]*)\s*:/); if (t) { type = t[1]; return; } const mm = l.match(/^\s+([A-Za-z_][\w]*)\s*:\s*(.*?)\s*#\s*(.*)$/); if (mm) notes[type + "." + mm[1]] = mm[3]; });
+          sec.secbody.insertAdjacentHTML("beforeend", Object.entries(y).map(([type, fields]) => `<div class="card flat" style="margin:6px 0 10px" data-type="${esc(type)}"><div class="chead"><h4>${esc(type)}</h4></div><div class="tablewrap"><table class="grid"><tbody>${Object.entries(fields).map(([f, t]) => `<tr><td class="id">${esc(f)}</td><td class="ty">${esc(str(t))}</td><td class="dim">${inline(notes[type + "." + f] || "")}</td></tr>`).join("")}</tbody></table></div></div>`).join(""));
+          sec.secbody.querySelectorAll("[data-type]").forEach((c) => regRef(c.dataset.type, c, "")); done = true;
+        }
+        if (!done && y && typeof y === "object") { sec.secbody.appendChild(jsonTree(y)); done = true; }
+        if (!done) { const pre = document.createElement("pre"); pre.className = "src"; pre.textContent = p.yaml; sec.secbody.appendChild(pre); }
+      });
+      root.appendChild(sec);
+    });
+    return root;
+  }
+
+  const VIEWS = [
+    { key: /^entities$/, render: viewEntities },
+    { key: /^rules$/, render: viewRules },
+    { key: /^(components|logical-components|frontend-components)$/, render: viewComponentsAny },
+    { key: /^unit-of-work-dependency$/, render: viewUnitDeps },
+    { key: /^unit-of-work-story-map$/, render: viewStoryMap },
+    { key: /^unit-of-work$/, render: viewUnits },
+    { key: /^(stories|user-stories)$/, render: viewStories },
+    { key: /^requirements$/, render: viewRequirements },
+    { key: /^decisions$/, render: viewDecisions },
+    { key: /^bolt-plan$/, render: viewBolts },
+    { key: /^contract-summary$/, render: viewContracts },
+    { key: /^(traceability|cross-unit-traceability)$/, render: viewTraceability },
+    { key: /^functional-spec$/, render: viewFunctionalSpec },
+    { key: /^(performance|security|scalability|reliability|observability)-design$/, render: viewNfrDesign },
+    { key: /^tech-stack-decisions$/, render: viewTechStack },
+    { key: /^code-generation-plan$/, render: viewCodePlan },
+    { key: /^source-manifest$/, render: viewManifest },
+    { key: /^code-summary$/, render: viewCodeSummary },
+    { key: /^personas$/, render: viewPersonas },
+    { key: /^(mockups|wireframes|rough-mockups|refined-mockups)$/, render: viewScreens },
+    { key: /^((performance|security|scalability|reliability|observability)-requirements|infrastructure-specification|monitoring-design|cicd-pipeline|[a-z]+-test-instructions|build-instructions|build-and-test-summary|test-results|ci-config|quality-gates|user-stories-assessment|feasibility-assessment|scope-document|intent-statement|stakeholder-map|intent-backlog|constraint-register|raid-log|team-practices|discovered-rules|evidence|team-allocation|risk-and-sequencing-rationale|external-dependency-map|user-flow|interaction-spec|design-system-mapping|accessibility-checklist)$/, render: (d) => viewStructured(d) },
+  ];
+  function viewFor(d) {
+    const k = keyOf(d);
+    if (d.kind === "questions" || /-questions$/.test(k)) return { render: viewQuestions };
+    if (d.kind === "review" || /^review-\d+$/.test(k)) return { render: viewReview };
+    const hit = VIEWS.find((v) => v.key.test(k)); if (hit) return hit;
+    if (d.kind === "json") return { render: viewJsonGeneric };
+    return null;
   }
 
   /* ---------- the outline ---------- */
@@ -543,30 +1736,33 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
     const sig = JSON.stringify([docs.map((d) => [d.key, d.title, (el.col.querySelector(`#d-${CSS.escape(d.key)} summary h2`) || {}).textContent, [...el.col.querySelectorAll(`#d-${CSS.escape(d.key)} details.sec`)].map((s) => s.dataset.title)]), Object.keys(view.notes).filter((k) => (view.notes[k] || "").trim())]);
     if (sig === view.railSig) return; view.railSig = sig;
     let html = `<div class="railh"><span>Outline</span><span class="tools"><button type="button" data-all="open">Expand all</button><button type="button" data-all="close">Collapse all</button></span></div>`;
-    if (view.gate && view.gate.summary) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-summary"><span>Summary</span></button></div>`;
-    if (view.gate && view.gate.brief) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-brief"><span>Review</span></button></div>`;
+    if (view.gate && view.gate.summary) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-summary"><span class="rcaret none">▶</span><span class="rtitle">Summary</span></button></div>`;
+    if (view.gate && view.gate.brief) html += `<div class="rgroup"><button type="button" class="rdoc" data-go="b-brief"><span class="rcaret none">▶</span><span class="rtitle">Review</span></button></div>`;
     docs.forEach((d) => {
-      const secs = [...el.col.querySelectorAll(`#d-${CSS.escape(d.key)} details.sec`)];
       const shown = el.col.querySelector(`#d-${CSS.escape(d.key)} summary h2`); const title = (shown && shown.textContent.trim()) || d.title || d.key;
-      html += `<div class="rgroup"><button type="button" class="rdoc" data-go="d-${esc(d.key)}" title="${esc(title)}"><span>${esc(title)}</span>${(view.notes[d.key] || "").trim() ? '<i class="dot"></i>' : ""}${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}</button>` +
-        secs.map((s) => `<button type="button" class="rsec" data-go="${esc(s.id)}" title="${esc(s.dataset.title)}">${esc(s.dataset.title)}</button>`).join("") + `</div>`;
+      const secs = [...el.col.querySelectorAll(`#d-${CSS.escape(d.key)} details.sec`)];
+      const block = $("d-" + d.key); const open = Object.prototype.hasOwnProperty.call(view.railOpen, d.key) ? view.railOpen[d.key] : !!(block && block.open);
+      html += `<details class="rgroup" data-key="${esc(d.key)}"${open ? " open" : ""}><summary><span class="rdoc" data-go="d-${esc(d.key)}" title="${esc(title)}" role="button" tabindex="0"><span class="rcaret${secs.length ? "" : " none"}" title="${secs.length ? "Fold or unfold the sections" : ""}">▶</span><span class="rtitle">${esc(title)}</span>${(view.notes[d.key] || "").trim() ? '<i class="dot"></i>' : ""}${KIND[d.kind] ? `<span class="pill quiet">${KIND[d.kind]}</span>` : ""}</span></summary>` +
+        secs.map((s) => `<button type="button" class="rsec" data-go="${esc(s.id)}" title="${esc(s.dataset.title)}">${esc(s.dataset.title)}</button>`).join("") + `</details>`;
     });
     el.rail.innerHTML = html;
   }
   el.rail.addEventListener("click", (e) => {
     const all = e.target.closest("[data-all]");
-    if (all) { el.col.querySelectorAll("details").forEach((d) => { d.open = all.dataset.all === "open"; }); if (all.dataset.all === "open") drawDiagrams(el.col); return; }
+    if (all) { el.col.querySelectorAll("details").forEach((d) => { d.open = all.dataset.all === "open"; }); if (all.dataset.all === "open") drawDiagrams(el.col); el.rail.querySelectorAll("details.rgroup").forEach((g) => { g.open = all.dataset.all === "open"; view.railOpen[g.dataset.key] = g.open; }); return; }
+    if (e.target.closest(".rcaret")) { const g = e.target.closest("details.rgroup"); if (g) { e.preventDefault(); g.open = !g.open; view.railOpen[g.dataset.key] = g.open; } return; }
+    if (e.target.closest("summary")) e.preventDefault();
     const b = e.target.closest("[data-go]"); if (!b) return;
     const target = document.getElementById(b.dataset.go); if (!target) return;
-    let d = target.closest("details"); while (d) { d.open = true; d = d.parentElement && d.parentElement.closest("details"); }
-    drawDiagrams(target);
-    const top = target.getBoundingClientRect().top + window.scrollY - (document.querySelector(".head").offsetHeight + 10);
-    window.scrollTo({ top, behavior: "smooth" });
+    jumpTo(target);
     el.rail.querySelectorAll(".active").forEach((x) => x.classList.remove("active")); b.classList.add("active");
     if (matchMedia("(max-width: 900px)").matches) el.rail.classList.remove("show");
   });
+  el.rail.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest(".rdoc")) { e.preventDefault(); e.target.closest(".rdoc").click(); } });
   el.railtoggle.addEventListener("click", () => el.rail.classList.toggle("show"));
   el.col.addEventListener("click", (e) => {
+    const sb = e.target.closest(".seg button");
+    if (sb) { e.preventDefault(); e.stopPropagation(); view.mode[sb.dataset.key] = sb.dataset.mode; view.painted = ""; paintAll(); return; }
     const nb = e.target.closest(".notebtn");
     if (nb) {
       e.preventDefault(); e.stopPropagation();
@@ -596,44 +1792,11 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   async function patch(fields) {
     try { await db.doc("gates/" + view.id).update(fields); return true; }
     catch (e) {
-      setStatus(e && e.code === "invalid_argument" ? "You can read this gate but not save to it. Ask the owner for Contributor access." : "Couldn’t save. Check your connection and try again.", "warn");
+      setStatus(e && e.code === "invalid_argument" ? "You can read this gate but not save notes to it. Ask the owner for Contributor access." : "Couldn’t save. Check your connection and try again.", "warn");
       return false;
     }
   }
-
-  /* ---------- the draft decision ---------- */
-  function setDeciding(on) { el.approve.disabled = el.changes.disabled = !on; }
-  function paintBar() {
-    const g = view.gate; if (!g) return;
-    const opt = (k, fallback) => { const o = (g.options || []).find((x) => x.k === k); return { t: (o && o.t) || fallback, d: (o && o.d) || "" }; };
-    const a = opt("approve", "Approve"), c = opt("changes", "Request changes");
-    el.approve.textContent = a.t; el.approve.title = a.d; el.changes.textContent = c.t; el.changes.title = c.d;
-    setDeciding(true);
-    const d = g.decision;
-    el.approve.setAttribute("aria-pressed", String(!!d && d.k === "approve"));
-    el.changes.setAttribute("aria-pressed", String(!!d && d.k === "changes"));
-    if (d && document.activeElement !== el.dnote) el.dnote.value = d.note || "";
-    if (d) setStatus(`Draft: ${d.k === "approve" ? a.t : c.t}${d.at ? " · " + fmt(d.at) : ""}. Answer the question in chat; the draft can still change.`, "ok");
-    else setStatus("Draft a decision here; the real answer is given in chat.");
-  }
-  async function decide(k) {
-    if (!db || !view.id) return;
-    clearTimeout(view.decideTimer); setDeciding(false); setStatus("Saving…");
-    const decision = { k, note: el.dnote.value.trim(), at: new Date().toISOString() };
-    const ok = await patch({ decision, status: "decided" });
-    setDeciding(true);
-    if (ok && view.gate) { view.gate = Object.assign({}, view.gate, { decision, status: "decided" }); paintBar(); paintGate(); }
-  }
-  el.approve.addEventListener("click", () => decide("approve"));
-  el.changes.addEventListener("click", () => decide("changes"));
-  el.dnote.addEventListener("input", () => {
-    const d = view.gate && view.gate.decision; if (!d) return;
-    setStatus("Unsaved note…"); clearTimeout(view.decideTimer); view.decideTimer = setTimeout(() => decide(d.k), 800);
-  });
-  if (window.ResizeObserver) {
-    new ResizeObserver(() => { document.documentElement.style.setProperty("--bar-h", el.bar.offsetHeight + "px"); }).observe(el.bar);
-    new ResizeObserver(() => { document.documentElement.style.setProperty("--head-h", document.querySelector(".head").offsetHeight + "px"); }).observe(document.querySelector(".head"));
-  }
+  if (window.ResizeObserver) new ResizeObserver(() => { document.documentElement.style.setProperty("--head-h", document.querySelector(".head").offsetHeight + "px"); }).observe(document.querySelector(".head"));
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { view.painted = ""; paintAll(); });
   new MutationObserver(() => { view.painted = ""; paintAll(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
@@ -643,7 +1806,7 @@ details.sec > .secbody { padding: 2px 0 10px 22px; }
   route();
   (async () => {
     db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null;
-    if (!db) { el.lede.textContent = "Sign in to claude.ai to read this gate."; el.lede.hidden = false; el.list.innerHTML = ""; el.col.innerHTML = ""; el.rail.innerHTML = ""; el.bar.hidden = true; return; }
+    if (!db) { el.lede.textContent = "Sign in to claude.ai to read this gate."; el.lede.hidden = false; el.list.innerHTML = ""; el.col.innerHTML = ""; el.rail.innerHTML = ""; return; }
     route();
   })();
 })();
