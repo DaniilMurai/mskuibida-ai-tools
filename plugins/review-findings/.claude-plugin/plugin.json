@@ -1,7 +1,7 @@
 {
   "name": "review-findings",
   "displayName": "Review findings",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "When review findings reach the developer (an AI-DLC stage review at its approval gate, or a code review), shows a compact summary and asks one question first: Fix, Accept (only when nothing blocks) or Open in form. A hook keeps the order.",
   "author": {
     "name": "Maksym Skuibida"

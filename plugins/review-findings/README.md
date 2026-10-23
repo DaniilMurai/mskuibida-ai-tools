@@ -9,6 +9,8 @@ Two sources, nothing else in this version:
 - **AI-DLC stage reviews.** The review brief the protocol prints at an approval gate
   (`aidlc engine review-brief review --stage …`). Open findings are the rows with status `New` or
   `Unresolved`; `Critical` and `Major` block.
+  The brief must be printed unpiped and in full: a piped or redirected call is refused, and a
+  cut-off output (table without the `> R-NN Finding:` lines) is not recorded as findings.
 - **Code review.** `/code-review` reports its findings through the `ReportFindings` tool. Every
   finding is open; those marked `CONFIRMED` block.
 

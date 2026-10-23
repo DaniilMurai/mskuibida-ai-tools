@@ -19,6 +19,11 @@ What it enforces (PreToolUse, exit code 2 and the reason on stderr)
   * Answer Open in form: the gate (and the report) waits until the form reads status done.
   * Answer Fix: a rejected report must name every open finding id in `--reason`.
   * An agent never writes status done on a findings form.
+  * The review brief is printed unpiped and in full: a Bash call that pipes `aidlc engine review-brief`
+    (`| head`, `| tail`, `| grep`, …) or redirects its output is refused, and a brief whose table lists
+    open findings without their `> R-NN Finding:` lines (a cut-off output) is not recorded as findings:
+    the state stays "cut off" and refuses the questions, the gate and the reports until a complete brief
+    has been printed.
 
 What it records (PostToolUse), from what the harness reports: the triage answer, the form the
 agent wrote, a read that shows the form done, the engine's approved/rejected report. UserPromptSubmit
@@ -320,6 +325,35 @@ def briefs_of(command):
             for seg in segs if aidlc_words(seg, ["engine", "review-brief"])]
 
 
+def cut_briefs(command):
+    """True when a `aidlc engine review-brief` in the command line has its output piped to another command or
+    redirected to a file, so the hook (and the agent) would see only part of it, or none."""
+    return any(cut_segments(command))
+
+
+def cut_segments(command):
+    lex = shlex.shlex(str(command).replace("\n", " ; "), posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    try:
+        tokens = list(lex) + [";"]
+    except ValueError:  # an unbalanced quote: read the raw text
+        return [bool(re.search(r"review-brief\b[^;&\n]*\|(?!\|)", str(command)))]
+    out, seg = [], []
+    for tok in tokens:
+        if tok and set(tok) <= set("&|;()"):
+            seg_ = strip_prefix(seg)
+            if aidlc_words(seg_, ["engine", "review-brief"]):
+                redirected = any(t in (">", ">>", ">|", "&>", "&>>") and not (i and seg[i - 1] == "2")
+                                 for i, t in enumerate(seg))
+                out.append(tok in ("|", "|&") or redirected)
+            elif seg_ and os.path.basename(seg_[0]) in SHELLS and "-c" in seg_[1:-1]:
+                out += cut_segments(seg_[seg_.index("-c") + 1])
+            seg = []
+        else:
+            seg.append(tok)
+    return out
+
+
 def git_writes(command):
     try:
         return any(git_subcommand(seg) in ("commit", "push") for seg in commands(command))
@@ -414,6 +448,14 @@ def guarded(tool, ti, command):
 def pre(event):
     tool, ti = event.get("tool_name"), event.get("tool_input") or {}
     command = ti.get("command", "") if tool == "Bash" else ""
+    if tool == "Bash" and "review-brief" in command and aidlc_project(event):
+        try:
+            if cut_briefs(command):
+                return refuse("The review brief must be printed unpiped and in full: this call pipes or redirects "
+                              "`aidlc engine review-brief`, which cuts its per-finding detail off. Run the command "
+                              "again as the only command, without `|` (head, tail, grep, …) or `>`.")
+        except Exception:  # noqa: BLE001
+            pass
     if not guarded(tool, ti, command):
         return 0
     try:
@@ -430,7 +472,20 @@ def pre(event):
     return 0
 
 
+def cut_off_text(pend):
+    ids = ", ".join((pend.get("truncated") or {}).get("ids") or [])
+    return (f"{F.CUT_OFF}. The brief listed open findings without their detail ({ids or 'no rows readable'}), so "
+            "nothing is recorded: no question, no approval gate and no approved/rejected report goes on until a "
+            "complete brief has been printed.")
+
+
 def guard(event, tool, ti, command, pend):
+    if pend.get("truncated"):
+        if tool in ("AskUserQuestion", "ArtifactData") or any(
+                rep["result"] in RESULTS_DONE and same_stage(pend, rep["stage"], rep["unit"])
+                for rep in reports_of(command)):
+            raise Refusal(cut_off_text(pend))
+        return
     total, blocking = len(pend.get("findings") or []), pend.get("blocking", 0)
     if tool == "AskUserQuestion":
         qs = questions_of(ti)
@@ -626,8 +681,28 @@ def on_bash(event, state, ti, resp):
             if pend and same_stage(pend, doc["stage"], doc["unit"]):
                 state["pending"] = None
             return None
+        if F.unfilled(doc):
+            return cut_off(event, state, doc, brief)
         return instruction(event, doc, adopt(event, state, doc))
     return None
+
+
+def cut_off(event, state, doc, brief):
+    """A brief whose open findings have no detail lines was cut off (piped through head/tail/grep): record
+    that, not the findings, so the next step is refused until a complete brief arrives."""
+    old = pending_of(state)
+    if old and not old.get("truncated") and same_stage(old, doc["stage"], doc["unit"]):
+        return ("this output of the review brief is cut off and was ignored; the findings recorded before stand. "
+                + F.CUT_OFF + ".")
+    open_ = doc["findings"]
+    state["pending"] = {"source": "aidlc", "stage": doc.get("stage", ""), "unit": doc.get("unit", ""),
+                        "stage_name": doc.get("stage_name", ""), "artifact": doc.get("artifact", ""),
+                        "findings": open_, "blocking": sum(1 for f in open_ if f.get("blocking")), "open": len(open_),
+                        "at": time.time(), "asked": False, "answer": None, "form": None,
+                        "truncated": {"ids": F.unfilled(doc)}}
+    with contextlib.suppress(OSError):
+        os.remove(findings_path(event))
+    return cut_off_text(state["pending"]) + " Do not show a findings summary from it."
 
 
 def choice_of(answer):
@@ -636,7 +711,7 @@ def choice_of(answer):
 
 def on_answers(state, ti, resp):
     pend = pending_of(state)
-    if pend is None:
+    if pend is None or pend.get("truncated"):
         return None
     answers = answers_of(resp)
     asked = questions_of(ti)

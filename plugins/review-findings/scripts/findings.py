@@ -196,6 +196,22 @@ def parse_report(data):
     return {"source": "code-review", "stage": "", "stage_name": "code review", "artifact": "", "findings": found}
 
 
+CUT_OFF = ("the review brief was cut off (piped through head/tail/grep or redirected): run the command again "
+           "unpiped as the only command")
+
+
+def unfilled(doc):
+    """The ids of the open findings that have no finding text: a brief whose `> R-NN Finding:` lines never arrived."""
+    return [f.get("id", "?") for f in doc.get("findings") or [] if not one_line(f.get("finding"))]
+
+
+def incomplete(doc):
+    """The refusal text when an open finding has no finding text, else "". A form or a summary built from
+    such a document would show the developer cards with nothing to decide on."""
+    ids = unfilled(doc)
+    return f"{CUT_OFF}. No finding text for: {', '.join(ids)}." if ids else ""
+
+
 def counts(doc):
     found = doc.get("findings") or []
     return len(found), sum(1 for f in found if f.get("blocking"))
@@ -297,6 +313,8 @@ def board(doc, fid, title, out_dir, now=None):
     """Write forms.json, cards/<qid>.json and writes.json for one ArtifactData batch; returns a summary dict."""
     if not doc.get("findings"):
         raise ValueError("there are no open findings, so there is nothing to sort")
+    if incomplete(doc):
+        raise ValueError(incomplete(doc))
     code = doc.get("source") == "code-review"
     out = os.path.abspath(out_dir)
     os.makedirs(os.path.join(out, "cards"), exist_ok=True)
@@ -370,9 +388,15 @@ def main(argv=None):
                 doc["unit"] = args.unit
             print(json.dumps(doc, indent=2, ensure_ascii=False))
         elif args.cmd == "summary":
-            print(summary(load_findings(args.findings)))
+            doc = load_findings(args.findings)
+            if incomplete(doc):
+                raise ValueError(incomplete(doc))
+            print(summary(doc))
         elif args.cmd == "question":
-            print(json.dumps(triage(load_findings(args.findings)), indent=2, ensure_ascii=False))
+            doc = load_findings(args.findings)
+            if incomplete(doc):
+                raise ValueError(incomplete(doc))
+            print(json.dumps(triage(doc), indent=2, ensure_ascii=False))
         else:
             doc = load_findings(args.findings)
             code = doc.get("source") == "code-review"

@@ -23,6 +23,15 @@ comes out of order. This file is the procedure; the hook's refusals say which st
 - **Code review.** `/code-review` reports through the `ReportFindings` tool. Every finding is open;
   those with verdict `CONFIRMED` block, `PLAUSIBLE` ones do not. An empty report asks nothing.
 
+**Print the brief unpiped and in full, as the only command:** `aidlc engine review-brief review
+--stage <slug> …` with no `| head`, `| tail`, `| grep` and no `>` redirect. The per-finding detail
+(`> R-NN Finding:`, `Where:`, `Required action:`) comes after the table, so a cut-off output holds
+rows with nothing to decide on. The hook refuses a piped or redirected brief before it runs. If a
+cut-off output reaches it anyway, it records no findings, says the brief was cut off, and refuses
+the questions, the gate and the approved/rejected reports until you run the same command again,
+unpiped. `findings.py summary|question|board` refuse a findings file with an empty finding text
+for the same reason.
+
 When there are open findings, the hook's `review-findings:` message arrives right after the
 brief or the report. It holds the summary block and the path of a saved findings file (the
 `--findings` argument of the commands below).

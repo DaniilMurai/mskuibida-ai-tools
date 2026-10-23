@@ -273,6 +273,29 @@ class Cli(unittest.TestCase):
             self.assertRegex(result["id"], r"^260101-demo-shop-domain-design-findings-\d{8}t\d{4}$")
             self.assertTrue(os.path.isfile(result["writes"]))
 
+    def test_a_cut_off_brief_builds_no_form_summary_or_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "findings.json")
+            code, out, _ = self.run_cli("parse", "--brief", os.path.join(FIXTURES, "brief-cut.txt"), "--stage", "domain-design")
+            self.assertEqual(code, 0)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(out)
+            for argv in (("summary", "--findings", path), ("question", "--findings", path),
+                         ("board", "--findings", path, "--out", os.path.join(tmp, "board"))):
+                with self.subTest(command=argv[0]):
+                    code, out, err = self.run_cli(*argv)
+                    self.assertEqual((code, out), (1, ""))
+                    self.assertIn("cut off", err)
+                    self.assertIn("unpiped as the only command", err)
+                    self.assertIn("R-02, R-03", err)
+            self.assertFalse(os.path.exists(os.path.join(tmp, "board")))
+
+    def test_board_refuses_a_finding_without_text(self):
+        doc = findings.parse_brief(fixture("brief-open.txt"), "domain-design")
+        doc["findings"][1]["finding"] = "  "
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(ValueError, "cut off.*R-03"):
+            findings.board(doc, "x", "t", tmp)
+
     def test_errors_exit_one(self):
         code, _, err = self.run_cli("summary", "--findings", os.path.join(FIXTURES, "brief-open.txt"))
         self.assertEqual(code, 1)

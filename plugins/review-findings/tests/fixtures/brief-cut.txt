@@ -1,0 +1,12 @@
+**Stage:** Domain Design
+**Review outcome:** 2 findings are open.
+**Why now:** First review completed.
+
+**Review artifact:** `aidlc/spaces/default/intents/260101-demo-shop/inception/domain-design/domain-model.md`
+
+| ID | Severity | Where | Status |
+|---|---|---|---|
+| R-01 | Minor | glossary.md > Order | Accepted risk |
+| R-02 | Major | domain-model.md > Cart aggregate ... | New |
+| R-03 | Minor | domain-model.md > Events | Unresolved |
+

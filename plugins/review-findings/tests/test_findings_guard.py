@@ -527,6 +527,87 @@ class Robustness(GuardCase):
         self.assertEqual(self.h.pending()["open"], 2)
 
 
+class CutOffBrief(GuardCase):
+    """The brief printed through `| head -30`: the table arrives, the `> R-NN Finding:` lines do not."""
+    CUT = BRIEF_COMMAND + " | head -30"
+
+    def cut(self, command=BRIEF_COMMAND):
+        return self.h.brief(fixture("brief-cut.txt"), command=command)
+
+    def test_a_cut_off_brief_is_not_recorded_as_findings(self):
+        code, out, _ = self.cut(self.CUT)
+        self.assertEqual(code, 0)
+        pend = self.h.pending()
+        self.assertEqual((pend["truncated"]["ids"], pend["asked"]), (["R-02", "R-03"], False))
+        self.assertFalse(os.path.exists(os.path.join(self.h.state, "s1.findings")))
+        text = context(out)
+        self.assertIn("cut off", text)
+        self.assertIn("unpiped as the only command", text)
+        self.assertNotIn("Review findings —", text)  # no summary with empty Finding cells
+
+    def test_the_next_step_is_refused_until_a_complete_brief(self):
+        self.cut(self.CUT)
+        self.assertRefused(self.h.pre("AskUserQuestion", triage_input()), "cut off", "unpiped as the only command")
+        self.assertRefused(self.h.pre("AskUserQuestion", gate_input()), "cut off")
+        self.assertRefused(self.h.pre("Bash", {"command": report_command("approved")}), "cut off")
+        self.assertRefused(self.h.pre("Bash", {"command": report_command("rejected", "R-02 R-03")}), "cut off")
+        self.assertAllowed(self.h.pre("Bash", {"command": report_command("awaiting-approval")}))
+
+    def test_a_complete_brief_replaces_it_and_the_guard_works_as_usual(self):
+        self.cut(self.CUT)
+        code, out, _ = self.h.brief()
+        self.assertEqual(code, 0)
+        pend = self.h.pending()
+        self.assertNotIn("truncated", pend)
+        self.assertEqual([f["id"] for f in pend["findings"]], ["R-02", "R-03"])
+        self.assertTrue(all(f["finding"] for f in pend["findings"]))
+        self.assertIn("Review findings — Domain Design", context(out))
+        self.assertTrue(os.path.isfile(os.path.join(self.h.state, "s1.findings")))
+        self.assertAllowed(self.h.pre("AskUserQuestion", triage_input()))
+        self.assertRefused(self.h.pre("AskUserQuestion", gate_input()), "Findings")
+
+    def test_a_cut_off_reprint_leaves_recorded_findings_alone(self):
+        self.h.brief()
+        self.h.triage("Fix")
+        code, out, _ = self.cut(self.CUT)
+        self.assertEqual(code, 0)
+        pend = self.h.pending()
+        self.assertEqual((pend["answer"], pend["asked"]), ("fix", True))
+        self.assertNotIn("truncated", pend)
+        self.assertIn("cut off", context(out))
+
+    def test_a_clean_brief_after_a_cut_off_one_clears_it(self):
+        self.cut(self.CUT)
+        self.h.brief(fixture("brief-none.txt"))
+        self.assertIsNone(self.h.pending())
+
+    def test_no_pending_outside_an_aidlc_project(self):
+        h = Harness(project=False)
+        self.addCleanup(h.close)
+        h.brief(fixture("brief-cut.txt"), command=self.CUT)
+        self.assertIsNone(h.pending())
+
+    def test_a_piped_or_redirected_brief_is_refused_before_it_runs(self):
+        for command in (self.CUT, BRIEF_COMMAND + " 2>&1 | tail -20", BRIEF_COMMAND + " | grep -n R-0",
+                        BRIEF_COMMAND + " > /tmp/brief.txt", BRIEF_COMMAND + " >> /tmp/brief.txt",
+                        "cd x && " + BRIEF_COMMAND + " |& head", f"bash -c '{BRIEF_COMMAND} | head'",
+                        "aidlc engine review-brief review --stage 'domain design | x | head"):
+            with self.subTest(command=command):
+                self.assertRefused(self.h.pre("Bash", {"command": command}), "unpiped and in full")
+
+    def test_a_plain_brief_is_not_refused(self):
+        for command in (BRIEF_COMMAND, BRIEF_COMMAND + " 2>&1", BRIEF_COMMAND + " 2>/dev/null",
+                        "cd x && " + BRIEF_COMMAND + " && echo done", "echo hi | head -1",
+                        "aidlc engine status | head -5"):
+            with self.subTest(command=command):
+                self.assertAllowed(self.h.pre("Bash", {"command": command}))
+
+    def test_outside_an_aidlc_project_a_piped_brief_is_not_this_guard(self):
+        h = Harness(project=False)
+        self.addCleanup(h.close)
+        self.assertAllowed(h.pre("Bash", {"command": self.CUT}))
+
+
 class Manifest(unittest.TestCase):
     def test_hooks_json(self):
         with open(HOOKS_JSON, encoding="utf-8") as f:
