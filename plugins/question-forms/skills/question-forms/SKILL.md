@@ -76,7 +76,7 @@ One `ArtifactData` `get` of `forms/<id>`. `answers[qid]` is `{k: [letters], note
 When the developer has to sort items rather than answer questions — a pull request review, on both
 sides (`pr-review` plugin: `review-pr` for the reviewer, `address-review` for the author, both followed by § 5b; `self-review` for the author's own AI review pass, a Fix now / Dismiss board that gets the form check of § 5b A and is not part of the flow guard) — the form is a board: 2–4 boxes
 side by side on a wide page, stacked on a narrow one, each item a card that starts in the box the
-agent proposes and can be moved by button or drag.
+agent proposes and can be moved by its buttons or by dragging its handle; the rest of the card is plain text that can be selected and copied.
 
 - `forms/<id>` adds `view: "board"` and `boxes: [{k, t, hint?, tone?, group?, sink?}]`; `tone` is
   `ink`, `accent`, `warn` or `muted`. The box labels are data, written by the skill that opens the

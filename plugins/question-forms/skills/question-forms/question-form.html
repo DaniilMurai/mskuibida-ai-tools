@@ -167,7 +167,10 @@ body.wide main, body.wide .barin { max-width: 1320px; }
 .cards { display: grid; gap: 10px; padding: 12px; align-content: start; min-height: 72px; }
 .cards:empty { border: 1px dashed var(--line); border-radius: 8px; margin: 12px; padding: 0; }
 .card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
-.card[draggable="true"] { cursor: grab; }
+/* Only the handle drags, so the card's text can be selected and copied. */
+.cgrip { flex: none; align-self: center; display: grid; place-items: center; width: 18px; height: 28px; margin-left: -6px; border-radius: 4px; color: var(--muted); cursor: grab; }
+.cgrip:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.cgrip:active { cursor: grabbing; }
 .card.dragging { opacity: .45; }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chead { display: flex; gap: 10px; align-items: baseline; }
@@ -346,7 +349,7 @@ body.resizing, body.resizing * { cursor: ns-resize !important; user-select: none
       const f = snap.data(); view.form = f;
       el.title.textContent = f.title || id;
       el.lede.textContent = f.intro || (f.view === "board"
-        ? "Each card starts in the box Claude suggests. Move it with its buttons or by dragging; Done saves where every card sits."
+        ? "Each card starts in the box Claude suggests. Move it with its buttons or by dragging its handle (⠿); Done saves where every card sits."
         : "Nothing is pre-selected. Pick an option or write your own; a note is optional unless you choose Other. Answers save as you go.");
       el.meta.innerHTML = `${f.stage ? `<span>${esc(f.stage)}</span>` : ""}${f.file ? `<span class="file">${esc(f.file)}</span>` : ""}<span class="pill ${f.status === "done" ? "done" : "open"}">${f.status === "done" ? "done" : "open"}</span>`;
       layout();
@@ -450,8 +453,8 @@ body.resizing, body.resizing * { cursor: ns-resize !important; user-select: none
     return b;
   }
   function renderCard(q) {
-    const c = document.createElement("article"); c.className = "card"; c.id = "q-" + q.id; c.dataset.qid = q.id; c.draggable = true; c.tabIndex = -1;
-    c.innerHTML = `<div class="chead"><span class="qid">${esc(q.id)}</span><h4 class="ctitle">${inline(q.text)}</h4>
+    const c = document.createElement("article"); c.className = "card"; c.id = "q-" + q.id; c.dataset.qid = q.id; c.tabIndex = -1;
+    c.innerHTML = `<div class="chead"><span class="cgrip" draggable="true" title="Drag to another box" aria-hidden="true"><svg viewBox="0 0 10 16" width="10" height="16"><g fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></g></svg></span><span class="qid">${esc(q.id)}</span><h4 class="ctitle">${inline(q.text)}</h4>
         <span class="cflag" aria-hidden="true"></span>
         <button type="button" class="cexp" aria-expanded="false" aria-label="Show details of ${esc(q.id)}"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
       <div class="moves" role="group" aria-label="Move this card"></div>
@@ -468,12 +471,13 @@ body.resizing, body.resizing * { cursor: ns-resize !important; user-select: none
     if (view.expanded.has(q.id)) setOpen(c, true);
     c.querySelector(".cexp").addEventListener("click", () => setOpen(c, !c.classList.contains("open")));
     c.querySelector(".addnote").addEventListener("click", () => { c.classList.add("noting"); c.querySelector("textarea").focus(); });
-    c.addEventListener("dragstart", (e) => { view.drag = q.id; c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", q.id); } catch {}
+    /* The drag starts on the handle but carries the whole card's image. */
+    const grip = c.querySelector(".cgrip");
+    grip.addEventListener("dragstart", (e) => { view.drag = q.id; c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", q.id); } catch {}
+      try { const r = c.getBoundingClientRect(); e.dataTransfer.setDragImage(c, e.clientX - r.left, e.clientY - r.top); } catch {}
       el.qs.querySelectorAll(".box").forEach((b) => b.classList.toggle("no-drop", b.dataset.box !== boxOf(q.id) && !allowed(q, b.dataset.box))); });
-    c.addEventListener("dragend", () => { view.drag = null; c.classList.remove("dragging"); el.qs.querySelectorAll(".box.over, .box.no-drop").forEach((b) => b.classList.remove("over", "no-drop")); });
+    grip.addEventListener("dragend", () => { view.drag = null; c.classList.remove("dragging"); el.qs.querySelectorAll(".box.over, .box.no-drop").forEach((b) => b.classList.remove("over", "no-drop")); });
     const ta = c.querySelector("textarea");
-    ta.addEventListener("focus", () => { c.draggable = false; });
-    ta.addEventListener("blur", () => { c.draggable = true; });
     ta.addEventListener("input", () => collect(q.id));
     c.querySelector(".moves").addEventListener("click", (e) => { const to = e.target.closest(".move")?.dataset.to; if (to) place(q.id, to, true); });
     return c;
